@@ -1,6 +1,27 @@
 servers:
+  # 版本釘死：@latest 每次啟動都抓新版，壞掉時不知道是哪一版。升級就改這裡。
+  # --browser-url 連 127.0.0.1:9222 的 Chrome（WSL 走 mirrored localhost，EC2 走 SSH -R），
+  # 少了它 server 會想自己開一個 Chrome 然後失敗。
+  chrome-devtools:
+    command: npx
+    args:
+      - -y
+      - chrome-devtools-mcp@1.10.1
+      - --browser-url=http://127.0.0.1:9222
+      - --no-usage-statistics
+      - --no-performance-crux
+    targets: [claude, codex, opencode]
+  codegraph:
+    command: codegraph
+    args: [serve, --mcp]
+    targets: [claude, codex, opencode]
+  # key 從環境變數讀，不進 repo。dotfiles 會 export CONTEXT7_API_KEY。
+  context7:
+    url: https://mcp.context7.com/mcp
+    headers:
+      CONTEXT7_API_KEY:
+        fromEnv: CONTEXT7_API_KEY
+    targets: [claude, codex, opencode]
   gh_grep:
     url: https://mcp.grep.app
-    targets:
-      - claude
-      - codex
+    targets: [claude, codex, opencode]
