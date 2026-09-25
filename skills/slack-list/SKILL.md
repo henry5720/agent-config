@@ -12,6 +12,7 @@ PM（chieh）與授權使用者把 bug 與需求記在 Slack 的一張 List：**
 錯誤翻譯、欄位對應、討論串對應。繞過它就是重寫一次，而且會寫錯。
 
 > 📁 **路徑**：下面的指令一律寫 `~/.claude/skills/slack-list/scripts/slack-list`，在哪個 cwd 跑都一樣。
+> 內文寫 `slack-list <指令>` 時指的也是這支；它不在 PATH 上，要打完整路徑。
 > 本機由 skillshare sync 到那裡；container 的 skills 也掛在自己的 `~/.claude/skills`。
 > 設定讀 `~/.config/slack-list/.env`，環境變數裡已經有的值優先。
 > 其他 repo 只使用 runtime 明確提供的絕對路徑，不要自行猜 host/container 對應位置。
