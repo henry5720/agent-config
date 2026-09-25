@@ -1,0 +1,6 @@
+servers:
+  gh_grep:
+    url: https://mcp.grep.app
+    targets:
+      - claude
+      - codex
