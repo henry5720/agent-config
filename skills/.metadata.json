@@ -160,6 +160,20 @@
         "agents/openai.yaml": "sha256:5c479fd562c691851690e8b18c8501045bef0943c10743d636b2fae26add1d28"
       }
     },
+    "herdr": {
+      "source": "github.com/herdrdev/herdr/skills/herdr",
+      "type": "github-subdir",
+      "branch": "v0.9.1",
+      "installed_at": "2026-09-29T10:00:42.407986536Z",
+      "repo_url": "https://github.com/herdrdev/herdr.git",
+      "subdir": "skills/herdr",
+      "version": "065ef9d",
+      "tree_hash": "6985a5e8418d43171c45c2a9e04b02de7308e1d8",
+      "commit": "065ef9d6a531c49fb8bee7e818ef837065b21ee9",
+      "file_hashes": {
+        "SKILL.md": "sha256:03855a7a1f9d0aa1ba6444fed2e4971adf796e91e73001d8f2472f5f9e5f659f"
+      }
+    },
     "implement": {
       "source": "github.com/mattpocock/skills/skills/engineering/implement",
       "type": "github-subdir",
