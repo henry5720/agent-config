@@ -9,7 +9,7 @@ Chrome 跑在使用者的 Windows 桌機。chrome-devtools MCP 連 `127.0.0.1:92
 
 ```
 company-ec2 的 MCP  →  127.0.0.1:9222
-                         │  ssh 轉發（桌機 `ssh company-ec2` 的 RemoteForward）
+                         │  ssh 轉發（桌機連 company-ec2 的 ssh 連線，帶 RemoteForward）
                          ▼
 桌機 WSL            →  127.0.0.1:9222
                          │  WSL mirrored 網路，WSL 和 Windows 共用 localhost
@@ -17,7 +17,9 @@ company-ec2 的 MCP  →  127.0.0.1:9222
 Windows Chrome      ←  在 9222 監聽（由 scripts/chrome-mcp 啟動，profile ChromeDevToolsMCP）
 ```
 
-在桌機 WSL 用只需要 Chrome 開著；在 company-ec2 用還要那條 ssh 連線沒斷。
+在桌機 WSL 用只需要 Chrome 開著；在 company-ec2 用還要桌機有一條連過去的 ssh 連線：
+herdr 的 saved machine `company-ec2` 連著就算（它的 ssh 讀 `~/.ssh/config`，會帶上
+RemoteForward），或是一條普通的 `ssh company-ec2`。
 
 ## 步驟
 
@@ -29,7 +31,7 @@ Windows Chrome      ←  在 9222 監聽（由 scripts/chrome-mcp 啟動，profi
 2. **開 Chrome**，看這台是哪一種：
    - **桌機 WSL**（`command -v cmd.exe` 找得到）→ 自己跑 `~/.claude/skills/chrome-mcp/scripts/chrome-mcp`。
    - **遠端主機**（找不到 `cmd.exe`）→ Chrome 在使用者那台，這台開不了。請使用者在桌機 WSL 跑
-     `chrome-mcp`，並確認桌機有一條 `ssh company-ec2` 連線開著。
+     `chrome-mcp`，並確認桌機的 herdr 有連著 company-ec2（或開一條 `ssh company-ec2`）。
 
    做完回到 1。
 3. **重連 MCP**：Claude Code 用 `/mcp`；其他 client 用它自己的 reconnect。

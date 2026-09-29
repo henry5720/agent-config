@@ -163,15 +163,15 @@
     "herdr": {
       "source": "github.com/herdrdev/herdr/skills/herdr",
       "type": "github-subdir",
-      "branch": "v0.9.1",
-      "installed_at": "2026-09-29T10:00:42.407986536Z",
+      "branch": "v0.9.2",
+      "installed_at": "2026-09-30T00:36:21.822902888+08:00",
       "repo_url": "https://github.com/herdrdev/herdr.git",
       "subdir": "skills/herdr",
-      "version": "065ef9d",
-      "tree_hash": "6985a5e8418d43171c45c2a9e04b02de7308e1d8",
-      "commit": "065ef9d6a531c49fb8bee7e818ef837065b21ee9",
+      "version": "48292af",
+      "tree_hash": "67042ed7910d4177a9000e0679e78b0346060927",
+      "commit": "48292af8e33a08c8030b7f1512c8d0da739f5ab1",
       "file_hashes": {
-        "SKILL.md": "sha256:03855a7a1f9d0aa1ba6444fed2e4971adf796e91e73001d8f2472f5f9e5f659f"
+        "SKILL.md": "sha256:b16ba0d9a22adbaf259d2022cd323801f8e51d530c94cb0cd23a69069292506b"
       }
     },
     "implement": {
