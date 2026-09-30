@@ -9,7 +9,7 @@ Chrome 跑在使用者的 Windows 桌機。chrome-devtools MCP 連 `127.0.0.1:92
 
 ```
 company-ec2 的 MCP  →  127.0.0.1:9222
-                         │  ssh 轉發（桌機連 company-ec2 的 ssh 連線，帶 RemoteForward）
+                         │  ssh 轉發（chrome-mcp 開的 `ssh -f -N company-ec2-chrome`，帶 RemoteForward）
                          ▼
 桌機 WSL            →  127.0.0.1:9222
                          │  WSL mirrored 網路，WSL 和 Windows 共用 localhost
@@ -17,21 +17,23 @@ company-ec2 的 MCP  →  127.0.0.1:9222
 Windows Chrome      ←  在 9222 監聽（由 scripts/chrome-mcp 啟動，profile ChromeDevToolsMCP）
 ```
 
-在桌機 WSL 用只需要 Chrome 開著；在 company-ec2 用還要桌機有一條連過去的 ssh 連線：
-herdr 的 saved machine `company-ec2` 連著就算（它的 ssh 讀 `~/.ssh/config`，會帶上
-RemoteForward），或是一條普通的 `ssh company-ec2`。
+在桌機 WSL 用只需要 Chrome 開著。在 company-ec2 用還要一條轉發連線，`chrome-mcp` 開完
+Chrome 會自己起。只有 `Host company-ec2-chrome` 帶 RemoteForward；一般的 `ssh company-ec2`
+和 herdr 都不帶 —— EC2 的 9222 只有一個位子，每條連線都帶的話先連的搶到、其他默默失敗。
 
 ## 步驟
 
 1. **驗證**：`curl -s --max-time 3 127.0.0.1:9222/json/version | grep User-Agent`
+   （在 company-ec2 上驗就在那邊跑；桌機那邊的 Chrome 好了但 EC2 不通，看 `chrome-mcp` 印的轉發訊息）
    - 看到 `Windows NT` → 通了，跳到 3。
    - 看到 `X11; Linux` → 連到本機別的 Chrome（例如 Playwright 起的）。`ss -ltnp | grep 9222`
      找出來，請使用者決定要不要關。
    - 沒回應 → 做 2。
 2. **開 Chrome**，看這台是哪一種：
    - **桌機 WSL**（`command -v cmd.exe` 找得到）→ 自己跑 `~/.claude/skills/chrome-mcp/scripts/chrome-mcp`。
-   - **遠端主機**（找不到 `cmd.exe`）→ Chrome 在使用者那台，這台開不了。請使用者在桌機 WSL 跑
-     `chrome-mcp`，並確認桌機的 herdr 有連著 company-ec2（或開一條 `ssh company-ec2`）。
+   - **遠端主機**（找不到 `cmd.exe`）→ Chrome 在使用者那台，這台開不了。請使用者在眼前那台的
+     WSL 跑 `chrome-mcp`（Chrome 和轉發一起開）。它說「9222 被別台占著」時，EC2 用的是另一台的
+     Chrome；要換成眼前這台，就在另一台 `pkill -f -- '-N .*company-ec2-chrome'` 再重跑。
 
    做完回到 1。
 3. **重連 MCP**：Claude Code 用 `/mcp`；其他 client 用它自己的 reconnect。
