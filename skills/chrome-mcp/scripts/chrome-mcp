@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 啟動 Windows 側的 Chrome 並開 remote debugging port,給 chrome-devtools MCP 連。
 # WSL 這邊不裝 Linux Chrome —— 設定本來就是連 Windows 那台,在 WSL 另開一個是白費工。
-# 怎麼用見同一個 skill 的 SKILL.md；背景與排錯見 dotfiles 的 docs/chrome-devtools-mcp.md。
+# 怎麼用見同一個 skill 的 SKILL.md；背景與排錯見 agent-config 的 docs/skills/chrome-mcp.md。
 
 set -euo pipefail
 

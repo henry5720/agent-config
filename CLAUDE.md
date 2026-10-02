@@ -13,6 +13,10 @@
   會蓋掉。要改就另存成自己的 skill。
 - **新增 skill 或 MCP 用 skillshare 指令，不要手寫 `.metadata.json`。** `install` 會記來源，
   `mcp add` 會寫 `mcp.yaml`。
+- **給人看的文件放 `docs/`，不放 skill 資料夾。** `SKILL.md` 是給 agent 的；skill 資料夾會被
+  sync 到各 client，裡面不放 README。只有人要自己動手（跑 script、設定、排錯）的 skill 才寫
+  `docs/skills/<名字>.md`。流程、邊界、狀態先畫 mermaid 或表格，畫不出來才用文字。
+  第三方 skill 帶來的 README 不動。
 - **不要加 OpenCode target。** OpenCode 會讀 `~/.claude/skills` 和 `~/.agents/skills`，加了會
   同一支出現三次。
 

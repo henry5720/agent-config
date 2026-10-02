@@ -2,7 +2,7 @@
 
 從 git commit 產生給主管看的每日／每週工作日誌。
 
-方法論全部在 [`SKILL.md`](./SKILL.md)，兩種用法都吃同一份檔案：
+方法論全部在 [`SKILL.md`](../../skills/daily-worklog/SKILL.md)，兩種用法都吃同一份檔案：
 
 ## 用法 A：裝成 Claude Code skill（推薦，之後只要說「寫日誌」）
 
@@ -20,5 +20,5 @@ Codex / Cursor / ChatGPT 沒有 skill 機制，直接把 `SKILL.md` 全文貼進
 ## 產出放哪
 
 哪裡都不放。日誌直接輸出在對話裡讓你複製貼進公司表單，使用者明講要存檔才落檔，
-理由（兩個 repo 都是 public）見 [`SKILL.md`](./SKILL.md) 的「產出放哪」。
+理由（兩個 repo 都是 public）見 [`SKILL.md`](../../skills/daily-worklog/SKILL.md) 的「產出放哪」。
 唯一固定會寫的檔案是跨日進度清單 `~/.claude/worklog-backlog.md`。

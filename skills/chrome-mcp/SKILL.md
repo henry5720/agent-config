@@ -48,5 +48,5 @@ Ctrl+C 會把轉發和 MCP Chrome 一起關掉 —— 開著就是在用，用�
 `chrome.exe --remote-debugging-port=9222 --user-data-dir=...` 會開出另一個 profile：既有的
 MCP Chrome 還開著時搶不到 9222 而且不報錯，登入狀態也不共用。遠端主機保持不裝 Chrome。
 
-背景與完整排錯表：dotfiles 的
-[docs/chrome-devtools-mcp.md](https://github.com/henry5720/dotfiles/blob/main/docs/chrome-devtools-mcp.md)。
+背景與完整排錯表：agent-config 的
+[docs/skills/chrome-mcp.md](https://github.com/henry5720/agent-config/blob/main/docs/skills/chrome-mcp.md)。

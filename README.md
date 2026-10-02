@@ -24,6 +24,7 @@ flowchart LR
 
 ```text
 mcp.yaml              三個 client 共用的 MCP server
+docs/skills/          給人看的：要自己動手的 skill 才有一份（chrome-mcp、daily-worklog）
 skills/
   .metadata.json      第三方 skill 從哪裝、哪個 commit（update --all 讀它）
   <名字>/SKILL.md     自己寫的 + 第三方裝進來的，都在這層
