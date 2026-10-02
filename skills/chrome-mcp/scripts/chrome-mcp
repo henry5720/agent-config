@@ -34,42 +34,59 @@ check_devtools_endpoint() {
   return 0
 }
 
-# Chrome 起來之後，把 9222 反向轉到 company-ec2，給那邊的 chrome-devtools MCP 用。
-# 只有這條連線帶 RemoteForward(見 ~/.ssh/config 的 Host company-ec2-chrome):EC2 的
-# 9222 只有一個位子，每條 ssh 都帶的話先連的搶到、其他默默失敗，搶到的還不一定開著 Chrome。
-# 轉發失敗不算這支 script 失敗 —— 本機的 Chrome 已經好了。
-EC2_TUNNEL_HOST=company-ec2-chrome
-open_ec2_tunnel() {
-  local err
+# 開著就是在用，關掉就整組收掉：轉發跑在前景，Ctrl+C / 關終端機時 trap 收轉發、
+# 關掉 MCP profile 的 Chrome。以前用 ssh -f 丟背景，沒人收，換台或重開機後 EC2 的 9222
+# 還被舊連線佔著。trap 跑不到的情況:斷電、重開機(EC2 那頭靠 sshd 的 ClientAliveInterval
+# 清死連線),以及 herdr 關 pane(HUP 之後整棵 process 馬上被砍,連 setsid 出去的都活不了;
+# 轉發會斷,Chrome 會留著)。留著的 Chrome 下次跑會沿用，結束時一起關。
 
-  # ssh config 沒有這個 Host(只在本機用的機器)就不做。
-  ssh -G "$EC2_TUNNEL_HOST" 2>/dev/null | grep -qi '^remoteforward ' || return 0
-
-  if pgrep -f -- "-N .*${EC2_TUNNEL_HOST}\$" >/dev/null; then
-    echo "轉發到 company-ec2 的連線已經在了。"
-    return 0
-  fi
-
-  # ExitOnForwardFailure=yes 時 -f 會等遠端的 9222 綁好才轉到背景，綁不到就直接失敗。
-  if err=$(ssh -f -N -o BatchMode=yes -o ConnectTimeout=10 "$EC2_TUNNEL_HOST" 2>&1); then
-    echo "已把 9222 轉到 company-ec2,那邊的 MCP 會用這台的 Chrome。"
-  elif grep -q 'remote port forwarding failed' <<<"$err"; then
-    echo "company-ec2 的 9222 被別台占著(另一台的 chrome-mcp 轉發),那邊的 MCP 會用那台的 Chrome。" >&2
-    echo "要改用這台：在那台 pkill -f -- '-N .*${EC2_TUNNEL_HOST}',再回來重跑 chrome-mcp。" >&2
-  else
-    echo "連不上 company-ec2,轉發沒開：${err}" >&2
-  fi
+close_chrome() {
+  # 先 CloseMainWindow 讓它正常關(下次不會跳「還原分頁」),5 秒沒關再強制。
+  powershell.exe -NoProfile -NonInteractive -Command '
+    $p = Get-CimInstance Win32_Process -Filter "Name='\''chrome.exe'\''" |
+      Where-Object { $_.CommandLine -match "ChromeDevToolsMCP" -and $_.CommandLine -notmatch "--type=" }
+    foreach ($x in $p) { (Get-Process -Id $x.ProcessId -ErrorAction SilentlyContinue).CloseMainWindow() | Out-Null }
+    Start-Sleep 5
+    foreach ($x in $p) { Stop-Process -Id $x.ProcessId -Force -ErrorAction SilentlyContinue }
+  ' </dev/null >/dev/null 2>&1 || true
 }
 
-# 1. 已經在跑就直接結束。這一步不是禮貌,是必要的:Chrome 已有實例時,再下一次帶參數的啟動
-#    會被轉交給既有實例、新參數整組被忽略、而且不報錯。少了這個檢查,你會看到
+cleanup() {
+  trap - EXIT
+  echo "關掉 MCP Chrome..." 2>/dev/null || true
+  close_chrome
+}
+trap cleanup EXIT
+trap 'exit 130' INT TERM HUP
+
+# 只有這條連線帶 RemoteForward(見 ~/.ssh/config 的 Host company-ec2-chrome):EC2 的
+# 9222 只有一個位子，每條 ssh 都帶的話先連的搶到、其他默默失敗。
+EC2_TUNNEL_HOST=company-ec2-chrome
+hold() {
+  # ssh config 沒有這個 Host(只在本機用的機器)就只守著 Chrome。
+  if ! ssh -G "$EC2_TUNNEL_HOST" 2>/dev/null | grep -qi '^remoteforward '; then
+    echo "開著中，按 Ctrl+C 關掉 Chrome。"
+    while sleep 3600; do :; done
+  fi
+
+  echo "轉發 9222 到 company-ec2 中，那邊的 MCP 會用這台的 Chrome。按 Ctrl+C 全部關掉。"
+  local status=0
+  ssh -N -o BatchMode=yes -o ConnectTimeout=10 "$EC2_TUNNEL_HOST" || status=$?
+  # 被 Ctrl+C 打斷時 trap 已經在處理，走不到這裡;走到這裡是 ssh 自己斷了。
+  echo "轉發斷了(ssh exit $status)。" >&2
+  echo "一連上就斷、印了 remote port forwarding failed:company-ec2 的 9222 被別台占著," >&2
+  echo "去那台把 chrome-mcp 關掉(Ctrl+C)再重跑;那台已經關機的話等 EC2 清掉死連線(約 90 秒)。" >&2
+  exit 1
+}
+
+# 1. 已經在跑就不再開 —— 這一步不是禮貌，是必要的:Chrome 已有實例時，再下一次帶參數的
+#    啟動會被轉交給既有實例、新參數整組被忽略、而且不報錯。少了這個檢查，你會看到
 #    「指令跑完、沒有錯誤、MCP 還是連不上」,那是最難查的一種。
 if check_devtools_endpoint; then
-  echo "Chrome 已經在 127.0.0.1:$PORT 上跑了,不用再開。"
-  open_ec2_tunnel
-  exit 0
+  echo "Chrome 已經在 127.0.0.1:$PORT 上跑了，沿用它。"
+  hold
 elif [ "$?" -eq 1 ]; then
-  echo "127.0.0.1:$PORT 已有服務,但不是有效的 Chrome DevTools endpoint。" >&2
+  echo "127.0.0.1:$PORT 已有服務，但不是有效的 Chrome DevTools endpoint。" >&2
   exit 1
 fi
 
@@ -115,7 +132,7 @@ if ! powershell.exe -NoProfile -NonInteractive -Command \
   exit 1
 fi
 
-# 5. 背景啟動。用獨立 profile 而不是你平常那個:平常那個開著的時候 Chrome 不會理
+# 5. 啟動。用獨立 profile 而不是你平常那個:平常那個開著的時候 Chrome 不會理
 #    --remote-debugging-port,而且讓 agent 碰你日常瀏覽的 session 也不是好主意。
 echo "啟動 Chrome(profile: ${profile})..."
 nohup "$chrome" \
@@ -129,8 +146,7 @@ disown
 for _ in $(seq 1 15); do
   if check_devtools_endpoint; then
     echo "好了,127.0.0.1:$PORT 通了。"
-    open_ec2_tunnel
-    exit 0
+    hold
   elif [ "$?" -eq 1 ]; then
     echo "127.0.0.1:$PORT 已有服務,但不是有效的 Chrome DevTools endpoint。" >&2
     exit 1
