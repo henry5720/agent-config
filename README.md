@@ -24,7 +24,10 @@ flowchart LR
 
 ```text
 mcp.yaml              三個 client 共用的 MCP server
-docs/skills/          給人看的：要自己動手的 skill 才有一份（chrome-mcp、daily-worklog）
+docs/                 給人看的文件
+  mcp.md              MCP：三個 client 怎麼共用、舊條目怎麼清
+  skills/README.md    skill：從哪來、裝給誰、怎麼關
+  skills/<名字>.md     要自己動手的 skill 才有一份
 skills/
   .metadata.json      第三方 skill 從哪裝、哪個 commit（update --all 讀它）
   <名字>/SKILL.md     自己寫的 + 第三方裝進來的，都在這層
