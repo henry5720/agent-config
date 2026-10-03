@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# 在遠端主機(company-ec2)自己開 headless Chrome 佔 127.0.0.1:9222,給 chrome-devtools MCP 連。
+# 跟桌機的 chrome-mcp 二選一：不用看畫面就用這個，agent 自己開得起來;要看畫面或用桌機的登入狀態就 Ctrl+C 掉它，改跑 chrome-mcp。
+# MCP 設定不用改 —— 它只認 9222,不管後面是哪個 Chrome。
+# Chrome 由 dotfiles 的 install-tools-ai.sh「headless Chrome」裝(官方 .deb + 中文/emoji 字型)。
+# 怎麼用見同一個 skill 的 SKILL.md；背景與排錯見 agent-config 的 docs/skills/chrome-mcp.md。
+
+set -euo pipefail
+
+PORT=9222
+# 登入狀態放這裡，關掉再開還在。是狀態不是快取，所以不放 ~/.cache。
+PROFILE="${XDG_STATE_HOME:-$HOME/.local/state}/chrome-mcp-profile"
+LOG="$PROFILE.log"
+
+endpoint_browser() {
+  curl -s --max-time 2 "http://127.0.0.1:$PORT/json/version" | jq -er '.Browser // empty' 2>/dev/null
+}
+
+# 1. 9222 已經有 Chrome 就不開。可能是桌機的 chrome-mcp 正在轉發，也可能是上一次的
+#    chrome-headless 還開著;不管哪個，MCP 現在就能用。9222 有別的東西(不是 Chrome)就失敗。
+if browser=$(endpoint_browser); then
+  echo "127.0.0.1:$PORT 已經有 Chrome($browser),不用開。"
+  curl -s --max-time 2 "http://127.0.0.1:$PORT/json/version" | jq -r '."User-Agent"' | grep -q 'Windows NT' &&
+    echo "那是桌機轉發過來的 Windows Chrome —— 要改用 headless,先去桌機把 chrome-mcp Ctrl+C 掉。"
+  exit 0
+fi
+if curl -s --max-time 2 -o /dev/null "http://127.0.0.1:$PORT/"; then
+  echo "127.0.0.1:$PORT 已有服務，但不是 Chrome DevTools endpoint。ss -ltnp | grep $PORT 看是誰。" >&2
+  exit 1
+fi
+
+if ! command -v google-chrome >/dev/null 2>&1; then
+  echo "找不到 google-chrome。跑 dotfiles 的 install-tools-ai.sh,選「headless Chrome」。" >&2
+  exit 1
+fi
+
+# 2. 啟動。不加 --no-sandbox:官方 .deb 帶 /etc/apparmor.d/chrome 和 setuid 的 chrome-sandbox,
+#    Ubuntu 24.04 限制 unprivileged userns 也開得起來。stderr 的 dbus 錯誤是沒桌面環境的正常雜訊，丟進 log。
+mkdir -p "$PROFILE"
+google-chrome \
+  --headless \
+  --remote-debugging-address=127.0.0.1 \
+  --remote-debugging-port="$PORT" \
+  --user-data-dir="$PROFILE" \
+  --no-first-run --no-default-browser-check \
+  --window-size=1280,800 \
+  >"$LOG" 2>&1 &
+chrome_pid=$!
+
+# 開著就是在用,Ctrl+C / 關終端機就收掉，不留著佔 9222(不然桌機的 chrome-mcp 轉發會失敗)。
+cleanup() {
+  trap - EXIT
+  echo "關掉 headless Chrome..." 2>/dev/null || true
+  kill "$chrome_pid" 2>/dev/null || true
+  wait "$chrome_pid" 2>/dev/null || true
+}
+trap cleanup EXIT
+trap 'exit 130' INT TERM HUP
+
+# 3. 等 endpoint 真的起來再回報。
+for _ in $(seq 1 15); do
+  if browser=$(endpoint_browser); then
+    echo "好了,127.0.0.1:$PORT 是 $browser(profile: $PROFILE)。按 Ctrl+C 關掉。"
+    wait "$chrome_pid" || true
+    echo "Chrome 自己結束了，看 $LOG。" >&2
+    exit 1
+  fi
+  kill -0 "$chrome_pid" 2>/dev/null || { echo "Chrome 啟動失敗，看 $LOG。" >&2; exit 1; }
+  sleep 1
+done
+
+echo "等了 15 秒 127.0.0.1:$PORT 還是不通，看 $LOG。" >&2
+exit 1

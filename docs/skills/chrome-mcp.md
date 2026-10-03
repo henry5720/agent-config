@@ -5,16 +5,18 @@ console、抓 network、跑 lighthouse。這份記的是**這幾台機器上為�
 的用法（用法看[官方 repo](https://github.com/ChromeDevTools/chrome-devtools-mcp)）。
 
 教 agent 怎麼用的是 [`skills/chrome-mcp/SKILL.md`](../../skills/chrome-mcp/SKILL.md)，
-script 本體是 [`skills/chrome-mcp/scripts/chrome-mcp`](../../skills/chrome-mcp/scripts/chrome-mcp)。
+script 本體是 [`skills/chrome-mcp/scripts/chrome-mcp`](../../skills/chrome-mcp/scripts/chrome-mcp)，
+遠端主機自己開 headless 用的是 [`scripts/chrome-headless`](../../skills/chrome-mcp/scripts/chrome-headless)。
 
 ## 全貌
 
-Chrome 只有一個，開在桌機（desktop 或 laptop）的 Windows 上。WSL 和 EC2 的 MCP 都連
-`127.0.0.1:9222`，只是 EC2 那邊要靠 ssh 把 9222 轉回來。
+平常 Chrome 開在桌機（desktop 或 laptop）的 Windows 上。WSL 和 EC2 的 MCP 都連
+`127.0.0.1:9222`，只是 EC2 那邊要靠 ssh 把 9222 轉回來。EC2 也可以改用自己的
+headless Chrome，見〈[EC2：自己開 headless](#ec2自己開-headless)〉。
 
 ```mermaid
 flowchart LR
-  subgraph EC2["company-ec2（不裝 Chrome）"]
+  subgraph EC2["company-ec2"]
     EM["MCP"] --> EP["127.0.0.1:9222<br/>sshd 代為監聽"]
   end
   subgraph PC["桌機"]
@@ -91,7 +93,7 @@ client 用它自己的 reconnect，`/mcp` 不是通用指令。
 
 ## EC2：用桌機的 Windows Chrome
 
-EC2 不裝 Chrome（為什麼見最後一節）。MCP 設定跟 WSL 那份一樣
+MCP 設定跟 WSL 那份一樣
 （`--browser-url=http://127.0.0.1:9222`），把桌機的 9222 用 ssh 反向轉過去：
 
 ```bash
@@ -141,6 +143,39 @@ sudo sshd -t && sudo systemctl reload ssh
 
 2026-09-25 在 company-ec2 實測：`chrome-devtools-mcp@1.10.1` 經這條路開頁、列頁、關頁都正常。
 
+## EC2：自己開 headless
+
+EC2 自己開 headless Chrome 佔 9222。MCP 設定一個字都不改 —— 它只認 9222，不管後面是誰。
+兩種隨時都能用，看需求挑：
+
+| | headless（`chrome-headless`） | 桌機 Chrome（`chrome-mcp`） |
+|---|---|---|
+| 看畫面 | 看不到，叫 agent 截圖 | 看得到視窗 |
+| 登入狀態 | EC2 自己那份 | 你在桌機登入過的那份 |
+| 要你做什麼 | 不用，agent 自己開 | 在桌機 WSL 跑 `chrome-mcp`、終端機開著 |
+| 什麼時候用 | 不需要看畫面（一般偵錯、截圖、跑流程），或手邊沒桌機（平板） | 要看著它操作，或要用桌機登入過的網站 |
+
+```bash
+chrome-headless                                          # EC2：開 headless Chrome，停在前景；Ctrl+C 關掉
+curl -s 127.0.0.1:9222/json/version | grep User-Agent    # 要看到 HeadlessChrome
+```
+
+agent 照 SKILL.md 會自己開，不用你動手。看不到畫面，要看就叫它截圖。
+
+**跟桌機輪流用 9222。** 兩邊同時只能有一個：
+
+| 正在跑 | 再開另一個 |
+|---|---|
+| EC2 的 `chrome-headless` | 桌機的 `chrome-mcp` 轉發失敗（`remote port forwarding failed`）→ 先去 EC2 把 headless Ctrl+C 掉 |
+| 桌機的 `chrome-mcp` | `chrome-headless` 看到 9222 已有 Windows Chrome，直接沿用、不開，提示要先關桌機那邊 |
+
+**登入狀態跟桌機不共用。** profile 在 EC2 的 `~/.local/state/chrome-mcp-profile`，關掉再開還在，
+但跟桌機 `ChromeDevToolsMCP` 那份是兩份。沒有畫面，要登入的網站讓 agent 自己填表登入。
+
+**安裝**：dotfiles 的 `install-tools-ai.sh` 選「headless Chrome」。裝 Google 官方 `.deb`
+加上 `fonts-noto-cjk`、`fonts-noto-color-emoji` —— 少了字型，截圖裡中文和 emoji 全是方框。
+桌機 WSL 會跳過這一項（上面的 ⚠️：WSL 不裝 Linux Chrome）。
+
 ## 設定放在哪
 
 ```mermaid
@@ -151,7 +186,7 @@ flowchart LR
   end
   subgraph dot["dotfiles（chezmoi）"]
     SSH["~/.ssh/config<br/>Host company-ec2-chrome"]
-    LN["~/.local/bin/chrome-mcp<br/>symlink"]
+    LN["~/.local/bin/chrome-mcp<br/>chrome-headless<br/>symlink"]
     PL["~/.claude/settings.json<br/>關掉官方 plugin"]
   end
   Y -- "skillshare sync mcp -g" --> CL["三個 client 的設定檔"]
@@ -175,12 +210,13 @@ MCP server 的定義在這個 repo 的 [`mcp.yaml`](../../mcp.yaml)。`skillshar
 --no-performance-crux                 跑效能分析時不去 CrUX API 查別人網站的公開數據
 ```
 
-dotfiles 管的三樣：
+dotfiles 管的這幾樣：
 
 | 檔案 | 部署到 | 管什麼 |
 |---|---|---|
 | [`home/private_dot_ssh/private_config`](https://github.com/henry5720/dotfiles/blob/main/home/private_dot_ssh/private_config) | `~/.ssh/config` | 只有 `Host company-ec2-chrome` 帶 RemoteForward |
 | [`home/dot_local/bin/symlink_chrome-mcp.tmpl`](https://github.com/henry5720/dotfiles/blob/main/home/dot_local/bin/symlink_chrome-mcp.tmpl) | `~/.local/bin/chrome-mcp` | 指到這個 repo 的 script |
+| [`home/dot_local/bin/symlink_chrome-headless.tmpl`](https://github.com/henry5720/dotfiles/blob/main/home/dot_local/bin/symlink_chrome-headless.tmpl) | `~/.local/bin/chrome-headless` | 同上，EC2 用 |
 | [`home/dot_claude/modify_settings.json`](https://github.com/henry5720/dotfiles/blob/main/home/dot_claude/modify_settings.json) | `~/.claude/settings.json` | 關掉官方 chrome-devtools plugin |
 
 Windows 端的 `C:\Users\henry\.ssh\config` 誰都不管，兩個 Host 要手動保持跟 dotfiles 那份一樣。
@@ -218,6 +254,8 @@ Protocol error (Target.setDiscoverTargets): Target closed
 | Windows 的 MCP Chrome 還在跑，9222 卻不通 | 9222 被搶過一次之後，Windows Chrome 的 listener 就掉了，不會自己回來；再叫一次 Chrome，新參數也會被轉給舊的 process 然後丟掉。只關 `ChromeDevToolsMCP` profile 那個 Chrome，再跑 `chrome-mcp` |
 | agent 看到的網站沒登入 | 獨立 profile 是新的，手動登入一次 |
 | `claude mcp list` 顯示 Failed | 先確認 Chrome 在跑，再 `/mcp` 重連 |
+| `chrome-headless` 說「Chrome 啟動失敗」 | 看 `~/.local/state/chrome-mcp-profile.log`。dbus／UPower 的 ERROR 是沒有桌面環境的正常雜訊，不是原因 |
+| headless 截圖中文或 emoji 是方框 | 字型沒裝，重跑 dotfiles 的「headless Chrome」選項 |
 
 驗證整條路通了：
 
@@ -227,12 +265,16 @@ curl -s 127.0.0.1:9222/json/version | jq .Browser  # 看得到版本號
 claude mcp list                                    # chrome-devtools 顯示 Connected
 ```
 
-## 為什麼 EC2 不裝 Chrome
+## EC2 裝 Chrome 的來龍去脈
 
 2026-09-21 研究過在 EC2（Ubuntu 24.04）裝 Chrome for Testing 跑 headless。可行，但要自己處理：
 固定版本與 SHA256、Ubuntu 的 AppArmor 擋 sandbox（不能拿 `--no-sandbox` 當預設）、
-非 root 帳號、一串系統套件。而且 headless 的登入狀態要另外搬過去。
+非 root 帳號、一串系統套件。而且 headless 的登入狀態要另外搬過去。所以主路是 ssh 轉發桌機的
+Chrome，登入狀態就是你在桌機登的那份。
 
-改用 ssh 轉發桌機的 Chrome，上面這些都不用做，登入狀態就是你在桌機登的那份。
-代價是桌機要開著、`chrome-mcp` 要跑著。研究原文在 dotfiles 的 git 歷史：
+2026-10-03 為了手邊沒桌機（平板）也能用，補上 headless，改裝 Google 官方 `.deb`，上面的麻煩大多消失：
+apt 會補齊系統套件；Ubuntu 內建 `/etc/apparmor.d/chrome` 放行 `/opt/google/chrome/chrome`，
+`chrome-sandbox` 也帶 setuid，在 `kernel.apparmor_restrict_unprivileged_userns = 1` 下不加
+`--no-sandbox` 照樣開得起來。版本跟著 apt 升級，不釘。剩下的差別是登入狀態不共用、看不到畫面，
+兩種就變成看需求挑（見〈EC2：自己開 headless〉的表）。研究原文在 dotfiles 的 git 歷史：
 [`docs/ec2-headless-chrome-research.md` @4d52f35](https://github.com/henry5720/dotfiles/blob/4d52f3525f316f459488092273ed3139d397049d/docs/ec2-headless-chrome-research.md)。
