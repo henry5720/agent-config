@@ -172,9 +172,10 @@ agent 照 SKILL.md 會自己開，不用你動手。看不到畫面，要看就�
 **登入狀態跟桌機不共用。** profile 在 EC2 的 `~/.local/state/chrome-mcp-profile`，關掉再開還在，
 但跟桌機 `ChromeDevToolsMCP` 那份是兩份。沒有畫面，要登入的網站讓 agent 自己填表登入。
 
-**安裝**：dotfiles 的 `install-tools-ai.sh` 選「headless Chrome」。裝 Google 官方 `.deb`
-加上 `fonts-noto-cjk`、`fonts-noto-color-emoji` —— 少了字型，截圖裡中文和 emoji 全是方框。
-桌機 WSL 會跳過這一項（上面的 ⚠️：WSL 不裝 Linux Chrome）。
+**安裝**：dotfiles chezmoi 選裝工具選單的 `headless-chrome`；已經 init 過的機器用
+`chezmoi edit-config` 把它加進 `tools`，再 `chezmoi apply`。裝 Google 官方 `.deb`，
+`fonts-noto-cjk`、`fonts-noto-color-emoji` 也在同一次 `chezmoi apply` 裝 —— 少了字型，截圖裡中文和 emoji 全是方框。
+桌機 WSL 的選單不會出現這一項（上面的 ⚠️：WSL 不裝 Linux Chrome）。
 
 ## 設定放在哪
 
@@ -217,7 +218,7 @@ dotfiles 管的這幾樣：
 | [`home/private_dot_ssh/private_config`](https://github.com/henry5720/dotfiles/blob/main/home/private_dot_ssh/private_config) | `~/.ssh/config` | 只有 `Host company-ec2-chrome` 帶 RemoteForward |
 | [`home/dot_local/bin/symlink_chrome-mcp.tmpl`](https://github.com/henry5720/dotfiles/blob/main/home/dot_local/bin/symlink_chrome-mcp.tmpl) | `~/.local/bin/chrome-mcp` | 指到這個 repo 的 script |
 | [`home/dot_local/bin/symlink_chrome-headless.tmpl`](https://github.com/henry5720/dotfiles/blob/main/home/dot_local/bin/symlink_chrome-headless.tmpl) | `~/.local/bin/chrome-headless` | 同上，EC2 用 |
-| [`home/dot_claude/modify_settings.json`](https://github.com/henry5720/dotfiles/blob/main/home/dot_claude/modify_settings.json) | `~/.claude/settings.json` | 關掉官方 chrome-devtools plugin |
+| [`home/dot_claude/modify_settings.json.tmpl`](https://github.com/henry5720/dotfiles/blob/main/home/dot_claude/modify_settings.json.tmpl) | `~/.claude/settings.json` | 關掉官方 chrome-devtools plugin |
 
 Windows 端的 `C:\Users\henry\.ssh\config` 誰都不管，兩個 Host 要手動保持跟 dotfiles 那份一樣。
 
@@ -255,7 +256,7 @@ Protocol error (Target.setDiscoverTargets): Target closed
 | agent 看到的網站沒登入 | 獨立 profile 是新的，手動登入一次 |
 | `claude mcp list` 顯示 Failed | 先確認 Chrome 在跑，再 `/mcp` 重連 |
 | `chrome-headless` 說「Chrome 啟動失敗」 | 看 `~/.local/state/chrome-mcp-profile.log`。dbus／UPower 的 ERROR 是沒有桌面環境的正常雜訊，不是原因 |
-| headless 截圖中文或 emoji 是方框 | 字型沒裝，重跑 dotfiles 的「headless Chrome」選項 |
+| headless 截圖中文或 emoji 是方框 | 字型沒裝。確認 `chezmoi edit-config` 的 `tools` 有 `headless-chrome`，再 `chezmoi apply` |
 
 驗證整條路通了：
 

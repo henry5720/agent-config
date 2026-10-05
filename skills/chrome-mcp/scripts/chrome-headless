@@ -2,7 +2,7 @@
 # 在遠端主機(company-ec2)自己開 headless Chrome 佔 127.0.0.1:9222,給 chrome-devtools MCP 連。
 # 跟桌機的 chrome-mcp 二選一：不用看畫面就用這個，agent 自己開得起來;要看畫面或用桌機的登入狀態就 Ctrl+C 掉它，改跑 chrome-mcp。
 # MCP 設定不用改 —— 它只認 9222,不管後面是哪個 Chrome。
-# Chrome 由 dotfiles 的 install-tools-ai.sh「headless Chrome」裝(官方 .deb + 中文/emoji 字型)。
+# Chrome 由 dotfiles chezmoi 選裝工具的 headless-chrome 裝(官方 .deb + 中文/emoji 字型)。
 # 怎麼用見同一個 skill 的 SKILL.md；背景與排錯見 agent-config 的 docs/skills/chrome-mcp.md。
 
 set -euo pipefail
@@ -30,7 +30,7 @@ if curl -s --max-time 2 -o /dev/null "http://127.0.0.1:$PORT/"; then
 fi
 
 if ! command -v google-chrome >/dev/null 2>&1; then
-  echo "找不到 google-chrome。跑 dotfiles 的 install-tools-ai.sh,選「headless Chrome」。" >&2
+  echo "找不到 google-chrome。chezmoi edit-config 把 headless-chrome 加進 tools，再 chezmoi apply。" >&2
   exit 1
 fi
 
