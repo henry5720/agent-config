@@ -16,7 +16,7 @@ _Avoid_: client
 實際讀 skill、呼叫 MCP 的程式：Claude Code、Codex、OpenCode。OpenCode 是 client，但不是 target。
 
 **Local skill**:
-target 目錄裡不是 skillshare 放進去的條目，例如 herdr、obsidian-wiki 自己連的。這是 `skillshare status` 的用語，不代表錯誤。
+target 目錄裡不是 skillshare 放進去的條目，例如 obsidian-wiki 自己連的。這是 `skillshare status` 的用語，不代表錯誤。
 _Avoid_: 自己寫的 skill
 
 **Own skill**:

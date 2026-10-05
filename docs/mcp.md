@@ -57,5 +57,5 @@ chezmoi update → skillshare sync mcp -g --dry-run → 處理 conflict → skil
 
 | server | 看哪 |
 |---|---|
-| chrome-devtools | [docs/skills/chrome-mcp.md](skills/chrome-mcp.md)：要連 Windows 的 Chrome、要關掉官方 plugin、版本釘在 `mcp.yaml` |
+| chrome-devtools | [docs/skills/chrome-mcp.md](skills/chrome-mcp.md)：桌機要連 Windows 的 Chrome（遠端主機也能自己開 headless Chrome）、要關掉官方 plugin、版本釘在 `mcp.yaml` |
 | codegraph | dotfiles 的 [ai-agent-setup.md〈codegraph〉](https://github.com/henry5720/dotfiles/blob/main/docs/ai-agent-setup.md#codegraph設定會回來但它塞進-claudemd-的那段不會)：CLI 安裝、索引、worktree 與 git hook 都由 dotfiles 管 |

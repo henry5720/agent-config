@@ -13,7 +13,7 @@
 
 ## 用法 B：當純 context 貼給任何 agent
 
-Codex / Cursor / ChatGPT 沒有 skill 機制，直接把 `SKILL.md` 全文貼進去，
+Cursor / ChatGPT 沒有 skill 機制，直接把 `SKILL.md` 全文貼進去，
 再補一句「今天是 2026-08-11，author 是 henry」即可。
 最上面那段 `---` frontmatter 留著不影響閱讀，不用刪。
 
