@@ -20,7 +20,7 @@ disable-model-invocation: true
 └─ 不需要 → subagent。結果回到 manager；權限提示跳到 manager 這裡，它不能問問題
 ```
 
-預設：executor 用 `--bg`（跑得久、使用者可能要進去跟它討論，`/implement` 也只有這樣叫得到）；reviewer 用
+預設：executor 用 `--bg`（跑得久、使用者可能要進去跟它討論）；reviewer 用
 subagent。reviewer 要做瀏覽器驗收（中途要使用者登入、確認畫面），或使用者說想跟它討論 findings，就改用 `--bg`。
 
 ## 1. 派 executor
