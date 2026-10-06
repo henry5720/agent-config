@@ -174,9 +174,9 @@ agent 照 SKILL.md 會自己開，不用你動手。看不到畫面，要看就�
 |---|---|---|---|
 | MCP 條目 | agent-config（這個 repo） | [`mcp.yaml`](../../mcp.yaml) | `chrome-devtools` 的參數、版本 |
 | skill 與 script | agent-config（這個 repo） | [`skills/chrome-mcp/`](../../skills/chrome-mcp/) | `SKILL.md` 教 agent；`chrome-mcp`、`chrome-headless` 兩支 script |
-| ssh 轉發 | dotfiles（chezmoi） | `home/private_dot_ssh/private_config` | `Host company-ec2-chrome` 帶 RemoteForward |
-| 指令 symlink | dotfiles（chezmoi） | `home/dot_local/bin/symlink_chrome-mcp.tmpl`、`symlink_chrome-headless.tmpl` | `~/.local/bin/` 指到這個 repo 的 script |
-| 關官方 plugin | dotfiles（chezmoi） | `home/dot_claude/modify_settings.json.tmpl` | `~/.claude/settings.json` 關掉官方 chrome-devtools plugin |
+| ssh 轉發 | dotfiles（chezmoi） | [`home/private_dot_ssh/private_config`](https://github.com/henry5720/dotfiles/blob/main/home/private_dot_ssh/private_config) | 部署成 `~/.ssh/config`；只有 `Host company-ec2-chrome` 帶 RemoteForward |
+| 指令 symlink | dotfiles（chezmoi） | [`home/dot_local/bin/symlink_chrome-mcp.tmpl`](https://github.com/henry5720/dotfiles/blob/main/home/dot_local/bin/symlink_chrome-mcp.tmpl)、[`symlink_chrome-headless.tmpl`](https://github.com/henry5720/dotfiles/blob/main/home/dot_local/bin/symlink_chrome-headless.tmpl) | 部署成 `~/.local/bin/chrome-mcp`、`chrome-headless`（EC2 用），指到這個 repo 的 script |
+| 關官方 plugin | dotfiles（chezmoi） | [`home/dot_claude/modify_settings.json.tmpl`](https://github.com/henry5720/dotfiles/blob/main/home/dot_claude/modify_settings.json.tmpl) | 改 `~/.claude/settings.json`，關掉官方 chrome-devtools plugin |
 
 MCP server 的定義在這個 repo 的 [`mcp.yaml`](../../mcp.yaml)。`skillshare sync mcp -g`
 把它寫進三個 client 各自的設定檔，只動自己寫的那幾個條目：
@@ -194,15 +194,6 @@ MCP server 的定義在這個 repo 的 [`mcp.yaml`](../../mcp.yaml)。`skillshar
 --no-usage-statistics                 不回報使用統計
 --no-performance-crux                 跑效能分析時不去 CrUX API 查別人網站的公開數據
 ```
-
-dotfiles 管的這幾樣：
-
-| 檔案 | 部署到 | 管什麼 |
-|---|---|---|
-| [`home/private_dot_ssh/private_config`](https://github.com/henry5720/dotfiles/blob/main/home/private_dot_ssh/private_config) | `~/.ssh/config` | 只有 `Host company-ec2-chrome` 帶 RemoteForward |
-| [`home/dot_local/bin/symlink_chrome-mcp.tmpl`](https://github.com/henry5720/dotfiles/blob/main/home/dot_local/bin/symlink_chrome-mcp.tmpl) | `~/.local/bin/chrome-mcp` | 指到這個 repo 的 script |
-| [`home/dot_local/bin/symlink_chrome-headless.tmpl`](https://github.com/henry5720/dotfiles/blob/main/home/dot_local/bin/symlink_chrome-headless.tmpl) | `~/.local/bin/chrome-headless` | 同上，EC2 用 |
-| [`home/dot_claude/modify_settings.json.tmpl`](https://github.com/henry5720/dotfiles/blob/main/home/dot_claude/modify_settings.json.tmpl) | `~/.claude/settings.json` | 關掉官方 chrome-devtools plugin |
 
 Windows 端的 `C:\Users\henry\.ssh\config` 誰都不管，兩個 Host 要手動保持跟 dotfiles 那份一樣。
 
