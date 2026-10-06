@@ -16,19 +16,10 @@ headless Chrome，見〈[EC2：自己開 headless](#ec2自己開-headless)〉。
 
 ```mermaid
 flowchart LR
-  subgraph EC2["company-ec2"]
-    EM["MCP"] --> EP["127.0.0.1:9222<br/>sshd 代為監聽"]
-  end
-  subgraph PC["桌機"]
-    subgraph WSL
-      WM["MCP"] --> WP["127.0.0.1:9222"]
-      S["chrome-mcp"]
-    end
-    C["Windows Chrome<br/>profile ChromeDevToolsMCP"]
-  end
-  EP == "ssh -N company-ec2-chrome<br/>（RemoteForward）" ==> WP
-  WP -- "mirrored 網路<br/>共用 localhost" --> C
-  S -. "開 Chrome、起轉發" .-> C
+  EM["EC2 MCP"] --> EP["EC2 :9222<br/>sshd 代為監聽"]
+  EP == "ssh -N company-ec2-chrome<br/>（RemoteForward）" ==> WP["WSL :9222"]
+  WM["WSL MCP"] --> WP
+  WP -- "mirrored 網路<br/>共用 localhost" --> C["Windows Chrome<br/>ChromeDevToolsMCP"]
 ```
 
 前提：WSL interop 叫得動 Windows 的 `cmd.exe`／`powershell.exe`、Windows 裝了 Chrome、
@@ -179,20 +170,13 @@ agent 照 SKILL.md 會自己開，不用你動手。看不到畫面，要看就�
 
 ## 設定放在哪
 
-```mermaid
-flowchart LR
-  subgraph here["agent-config（這個 repo）"]
-    Y["mcp.yaml<br/>chrome-devtools 條目、版本"]
-    SC["skills/chrome-mcp/<br/>SKILL.md + script"]
-  end
-  subgraph dot["dotfiles（chezmoi）"]
-    SSH["~/.ssh/config<br/>Host company-ec2-chrome"]
-    LN["~/.local/bin/chrome-mcp<br/>chrome-headless<br/>symlink"]
-    PL["~/.claude/settings.json<br/>關掉官方 plugin"]
-  end
-  Y -- "skillshare sync mcp -g" --> CL["三個 client 的設定檔"]
-  LN --> SC
-```
+| 設定 | 在哪個 repo | 路徑 | 作用 |
+|---|---|---|---|
+| MCP 條目 | agent-config（這個 repo） | [`mcp.yaml`](../../mcp.yaml) | `chrome-devtools` 的參數、版本 |
+| skill 與 script | agent-config（這個 repo） | [`skills/chrome-mcp/`](../../skills/chrome-mcp/) | `SKILL.md` 教 agent；`chrome-mcp`、`chrome-headless` 兩支 script |
+| ssh 轉發 | dotfiles（chezmoi） | `home/private_dot_ssh/private_config` | `Host company-ec2-chrome` 帶 RemoteForward |
+| 指令 symlink | dotfiles（chezmoi） | `home/dot_local/bin/symlink_chrome-mcp.tmpl`、`symlink_chrome-headless.tmpl` | `~/.local/bin/` 指到這個 repo 的 script |
+| 關官方 plugin | dotfiles（chezmoi） | `home/dot_claude/modify_settings.json.tmpl` | `~/.claude/settings.json` 關掉官方 chrome-devtools plugin |
 
 MCP server 的定義在這個 repo 的 [`mcp.yaml`](../../mcp.yaml)。`skillshare sync mcp -g`
 把它寫進三個 client 各自的設定檔，只動自己寫的那幾個條目：
