@@ -5,13 +5,13 @@
 
 ```mermaid
 flowchart LR
-  dotfiles["dotfiles（chezmoi）<br/>機器、client 設定"]
-  here["agent-config（skillshare）<br/>skills、MCP"]
+  dotfiles["dotfiles（chezmoi）<br/>規則、client 設定"]
+  agentconfig["agent-config（skillshare）<br/>skills、MCP"]
   clients["Claude Code<br/>Codex<br/>OpenCode"]
 
   dotfiles --> clients
-  here --> clients
-  dotfiles -. "裝 skillshare、放 config.yaml" .-> here
+  agentconfig --> clients
+  dotfiles -. "裝 skillshare、放 config.yaml" .-> agentconfig
 ```
 
 怎麼在新機器裝起來、規則和 client 設定在哪，看
