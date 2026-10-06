@@ -9,13 +9,19 @@ script 本體是 [`skills/slack-list/scripts/slack-list`](../../skills/slack-lis
 ## 全貌
 
 ```mermaid
-flowchart LR
-  PM["PM<br/>在 Slack 開列、在留言串裁決"] --> L["Slack List<br/>Bug/需求總表"]
-  L <-- "Slack API<br/>（bot token）" --> S["slack-list script"]
-  S --- A1["local agent<br/>（你的終端機）"]
-  S --- A2["OpenAB agent<br/>（container，從 Slack 叫）"]
-  A1 -- "gh：查重、開 issue" --> G["GitHub issue"]
-  S -- "progress／ready<br/>回到該列留言串" --> L
+sequenceDiagram
+  participant PM
+  participant L as Slack List<br/>Bug/需求總表
+  participant A as agent<br/>（slack-list script）
+  participant G as GitHub
+  PM->>L: 開列
+  A->>L: rows、replies
+  L-->>A: 列 + 留言串（真規格）
+  A->>G: gh issue list --search Rec…
+  Note over A,G: 沒命中才 gh issue create
+  A->>L: progress：回留言串
+  A->>L: ready：@ 回報對象、改 PM確認中
+  PM->>L: 在留言串裁決
 ```
 
 兩個 agent 用的是同一支 script，差在「我是誰」怎麼來、能不能碰 GitHub（見〈兩種跑法〉）。
