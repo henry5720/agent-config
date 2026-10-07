@@ -8,7 +8,7 @@ Chrome 自己點一遍、截圖、看 console，回報時附證據和「未驗�
 調查與 token 實測在
 [docs/research/agent-browser-tools.md](https://github.com/henry5720/dotfiles/blob/main/docs/research/agent-browser-tools.md)。
 
-## 兩支 skill、一支 MCP 怎麼分
+## 為什麼這樣分
 
 | 要做的事 | 用什麼 | skill |
 |---|---|---|
@@ -17,22 +17,17 @@ Chrome 自己點一遍、截圖、看 console，回報時附證據和「未驗�
 | 你要看著 agent 操作、或要用你桌機的登入狀態 | chrome-devtools MCP 接桌機 Chrome | [`chrome-mcp`](chrome-mcp.md) |
 | 值得防回歸的流程 | 寫成該 repo 的 Playwright e2e | — |
 
-| skill | 來源 | 內容 |
-|---|---|---|
-| `playwright-cli` | 第三方，`microsoft/playwright-cli` 的 `skills/playwright-cli`，`.metadata.json` 記來源 | 指令用法 |
-| `verify-in-browser` | 自己寫的 | 什麼時候驗、怎麼登入、留什麼證據、卡住換 chrome-mcp |
-
-官方那支是第三方，`update` 會蓋掉，所以驗收的規矩另外寫一支，不併進去。
-
-`playwright-cli` 的瀏覽器走 pipe，不佔 9222，跟 `chrome-mcp`／`chrome-headless` 可以同時開。
+官方的 `playwright-cli` 是第三方（`.metadata.json` 記來源），`update` 會蓋掉，所以驗收的規矩另外寫成
+`verify-in-browser`，不併進去。`playwright-cli` 的瀏覽器走 pipe，不佔 9222，跟
+`chrome-mcp`／`chrome-headless` 可以同時開。
 
 ## 你要做的事
 
 | 什麼時候 | 做什麼 |
 |---|---|
-| 新機器 | dotfiles chezmoi 選裝工具勾 `playwright-cli`（用 `headless-chrome` 裝的 Chrome；WSL、ARM 不裝） |
+| 新機器 | dotfiles chezmoi 選裝工具勾 `playwright-cli`（用 `headless-chrome` 裝的 Chrome）。WSL、ARM 不裝，agent 會改走 `chrome-mcp` 或把驗收列進「未驗」 |
 | 升級 `@playwright/cli` 後 | 官方 skill 釘在跟 CLI 同一版的 commit，要手動跟（見下方） |
-| 要 agent 驗需要登入的頁面 | 確認那個 repo 的 `.env` 有帳密；agent 照 repo 既有的登入流程填表 |
+| 要 agent 驗需要登入的頁面 | 確認那個 repo 的 `.env` 有帳密（agent 只讀它要的那個 key） |
 
 ### 升級 playwright-cli 後跟上 skill
 
@@ -56,10 +51,5 @@ diff -r ~/.config/skillshare/skills/playwright-cli \
 `playwright-cli install --skills` 也能裝，但它寫進當下專案的 `.claude/skills/`，只有 Claude Code
 看得到、也不記來源，所以改由 skillshare 裝。
 
-## 踩過的雷（0.1.22）
-
-| 症狀 | 原因與做法 |
-|---|---|
-| 整棵 accessibility tree 印進對話 | 裸 `snapshot` 會直接印出來（官方 skill 寫的是存檔，實際沒有）。一律 `snapshot --filename=<名字>.yml` 再讀檔，或用 `find` |
-| 密碼出現在對話紀錄 | `fill` 的輸出含產生的 Playwright code，值是明文。填密碼要加 `--raw` |
-| repo 多出 `.playwright-cli/` | 它寫在當下目錄。agent 要在證據資料夾裡跑指令 |
+換版後回頭看 `skills/verify-in-browser/SKILL.md` 裡寫著版本號的句子：裸 `snapshot` 印進對話、
+`fill` 不加 `--raw` 印出明文、填完密碼後自動存的 snapshot 含明文。新版行為變了就改那幾句和版本號。
