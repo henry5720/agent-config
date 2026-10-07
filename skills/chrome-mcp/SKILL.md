@@ -5,15 +5,8 @@ description: 用 chrome-devtools MCP 查前端問題的原因（慢、記憶體�
 
 # chrome-mcp
 
-chrome-devtools MCP 留給兩件事：
-
-| 要做的事 | 用什麼 |
-|---|---|
-| 操作頁面、改完前端驗收 | `playwright-cli`（`verify-in-browser` skill），不用這個 MCP |
-| 查原因：performance trace、lighthouse、heap snapshot、minify 過的 code 下斷點 | 這個 MCP |
-| 使用者要看著 agent 在他的 Chrome 上操作，或要用他桌機登入過的網站 | 這個 MCP，接桌機 Chrome |
-
-`playwright-cli` 的瀏覽器走 pipe，不佔 9222，兩個可以同時開。
+這個 MCP 留給兩件事：查原因（performance trace、lighthouse、heap snapshot、minify 過的 code 下斷點），
+和使用者要看著 agent 在他的 Chrome 上操作。操作頁面、改完驗收走 `verify-in-browser` skill。
 
 chrome-devtools MCP 只認 `127.0.0.1:9222`，後面接的 Chrome 有兩種。平常是使用者的 Windows 桌機，封包這樣走：
 
