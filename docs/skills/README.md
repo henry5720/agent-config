@@ -42,6 +42,9 @@ herdr 的 skill 釘在跟本機 herdr 同一版（skill 裡的指令要對得上
 skillshare install herdrdev/herdr/skills/herdr --branch v<新版> --force && skillshare sync
 ```
 
+`playwright-cli` 的 skill 同理，釘在跟本機 `@playwright/cli` 同版的上游 commit，升級步驟見
+[verify-in-browser.md](verify-in-browser.md#升級-playwright-cli-後跟上-skill)。
+
 ## 為什麼第三方 skill 用 skillshare 裝，不手抄
 
 那些檔案是別人 repo 裡的。手抄進來以後，上游改了你不會跟著動；想跟上就得手動比對、貼、
@@ -147,6 +150,7 @@ done
 | skill | 你要做的事 |
 |---|---|
 | [chrome-mcp](chrome-mcp.md) | 開 Chrome 給 agent 用、轉發到 EC2、排錯 9222 |
+| [verify-in-browser](verify-in-browser.md) | 裝 `playwright-cli`、升級後跟上官方 skill；也講瀏覽器工具怎麼分工 |
 | [slack-list](slack-list.md) | 建 Slack app、填 `.env`、排錯 |
 | [daily-worklog](daily-worklog.md) | 兩種用法：裝成 skill，或整份貼給其他 agent |
 

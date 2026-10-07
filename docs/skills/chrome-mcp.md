@@ -1,7 +1,10 @@
 # chrome-mcp：讓 agent 開你的瀏覽器
 
-Claude Code、Codex、OpenCode 都接了 `chrome-devtools-mcp`，agent 因此能開網頁、點按鈕、看
-console、抓 network、跑 lighthouse。這份記的是**這幾台機器上為什麼要這樣設**，不是這個 MCP
+Claude Code、Codex、OpenCode 都接了 `chrome-devtools-mcp`。它留給兩件事：**查原因**（performance
+trace、lighthouse、heap snapshot、minify 過的 code 下斷點），和**你要看著 agent 在你的 Chrome 上操作**。
+一般的操作頁面、改完驗收改用 `playwright-cli`，見 [verify-in-browser.md](verify-in-browser.md)。
+
+這份記的是**這幾台機器上為什麼要這樣設**，不是這個 MCP
 的用法（用法看[官方 repo](https://github.com/ChromeDevTools/chrome-devtools-mcp)）。
 
 教 agent 怎麼用的是 [`skills/chrome-mcp/SKILL.md`](../../skills/chrome-mcp/SKILL.md)，

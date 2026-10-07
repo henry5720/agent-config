@@ -1,9 +1,12 @@
 ---
 name: chrome-mcp
-description: chrome-devtools MCP 連不上 127.0.0.1:9222（Failed、Target closed、逾時）時使用；要讓 agent 用瀏覽器偵錯前、或在 company-ec2 等遠端主機要用瀏覽器時也用。
+description: 用 chrome-devtools MCP 查前端問題的原因（慢、記憶體、minify 過的錯誤）前，或使用者要看著 agent 在他的 Chrome 上操作時使用；MCP 連不上 127.0.0.1:9222（Failed、Target closed、逾時）時也用。
 ---
 
 # chrome-mcp
+
+這個 MCP 留給兩件事：查原因（performance trace、lighthouse、heap snapshot、minify 過的 code 下斷點），
+和使用者要看著 agent 在他的 Chrome 上操作。操作頁面、改完驗收走 `verify-in-browser` skill。
 
 chrome-devtools MCP 只認 `127.0.0.1:9222`，後面接的 Chrome 有兩種。平常是使用者的 Windows 桌機，封包這樣走：
 
@@ -58,7 +61,7 @@ Ctrl+C 會把轉發和 MCP Chrome 一起關掉 —— 開著就是在用，用�
 同理走 `chrome-headless`。手拼的
 `chrome.exe --remote-debugging-port=9222 --user-data-dir=...` 會開出另一個 profile：既有的
 MCP Chrome 還開著時搶不到 9222 而且不報錯，登入狀態也不共用。遠端主機只裝官方 `.deb` 的
-Chrome（dotfiles chezmoi 選裝工具的 `headless-chrome`），不要另外裝 Playwright／puppeteer 的。
+Chrome（dotfiles chezmoi 選裝工具的 `headless-chrome`，`playwright-cli` 用的也是這支），不要另外裝 Playwright／puppeteer 的。
 
 背景與完整排錯表：agent-config 的
 [docs/skills/chrome-mcp.md](https://github.com/henry5720/agent-config/blob/main/docs/skills/chrome-mcp.md)。
