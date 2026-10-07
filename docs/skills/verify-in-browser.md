@@ -21,6 +21,22 @@ Chrome 自己點一遍、截圖、看 console，回報時附證據和「未驗�
 `verify-in-browser`，不併進去。`playwright-cli` 的瀏覽器走 pipe，不佔 9222，跟
 `chrome-mcp`／`chrome-headless` 可以同時開。
 
+## 什麼時候驗、證據放哪
+
+```mermaid
+flowchart LR
+  D{"diff 改到瀏覽器裡<br/>看得到的東西？"}
+  D -- 有 --> V["只驗改到的狀態<br/>截圖、console"]
+  D -- 沒有 --> S["不開瀏覽器<br/>PR 寫「未做：非 UI 改動」"]
+  V --> P["PR body「## 驗證」<br/>截圖用 gh pr comment --attach"]
+  S --> P
+```
+
+- 互動 session 和 agent-runner 規則一樣。互動時你說「不用驗」它就跳過。
+- 整套回歸交給 CI 和 e2e，agent 只驗這次改到的地方，每次多花的時間主要在起 dev server 和第一次登入。
+- 截圖會上傳到 GitHub，只截測試資料。
+- 「每個 PR 都寫驗證段」這條是全域規則，寫在 dotfiles 的 `~/.claude/CLAUDE.md`，不是這支 skill。這支只在 UI 改動時才會被讀到。
+
 ## 你要做的事
 
 | 什麼時候 | 做什麼 |

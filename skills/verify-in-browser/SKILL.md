@@ -7,6 +7,14 @@ description: 改完 UI 或前端行為、回報完成之前，用 playwright-cli
 
 指令用法看 `playwright-cli` skill（或 `playwright-cli --help`）。這份只補它沒寫的：什麼時候驗、怎麼登入、留什麼證據、卡住換什麼。
 
+## 先判斷要不要驗
+
+看這次的 diff 有沒有改到瀏覽器裡看得到的東西或行為（component、樣式、路由、表單、前端呼叫 API 的地方）：
+
+- **有** → 往下走。只驗這次改到的狀態；整套回歸交給 CI 和 e2e。
+- **沒有**（只動後端、型別、測試、文件、設定）→ 不開瀏覽器。回報的「瀏覽器」那格寫「未做：非 UI 改動（只動 <哪些檔>）」，讓 reviewer 看得到這個判斷。
+- 使用者要用他的 Chrome、或要看著操作 → 改走 `chrome-mcp` skill，證據要求跟下面一樣。
+
 ## 開始前
 
 1. **確認有裝。** `command -v playwright-cli`。沒有（WSL、ARM 不裝）就改走 `chrome-mcp` skill；那也不能用，就把整個驗收列進「未驗」。不要自己 `npm i -g`。
@@ -70,15 +78,23 @@ cd <E> && playwright-cli -s=<S> <指令>
 
 ## 回報
 
-回報完成時附上：
+寫進 PR body 的「## 驗證」段（沒開 PR 就寫在回報裡）：
 
 | 項目 | 內容 |
 |---|---|
-| 走過的狀態 | 每個狀態一行：做了什麼 → 看到什麼 → 截圖路徑 |
+| 走過的狀態 | 每個狀態一行：做了什麼 → 看到什麼 → 截圖檔名 |
 | console | 錯誤數；新出現的錯誤原文 |
 | 未驗 | 沒走到的狀態和原因（沒裝 `playwright-cli`、要特定資料、要另一個角色、要真的寄信…）。沒有就寫「無」 |
 
-PR 要附圖時用 `gh pr comment --attach`（見 `playwright-cli` skill 的 PR attachments）。
+截圖附在 PR 上，不 commit 進 repo：
+
+```bash
+gh pr comment <PR> --body "<狀態>：<看到什麼>" --attach '<E>/<狀態>.png'
+```
+
+- 版面、樣式這類視覺改動，附改前／改後各一張。改前在動手前先截，或在 base 分支截。
+- 截圖會上傳到 GitHub：只截測試資料，畫面上有真實客戶資料就不附圖，改用文字描述。
+- 截圖格式、大小限制見 `playwright-cli` skill 的 PR attachments。
 
 ## 卡住時換工具
 
