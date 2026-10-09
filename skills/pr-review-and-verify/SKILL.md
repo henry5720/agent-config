@@ -29,9 +29,9 @@ description: >-
 
 針對固定 head 執行適用的 repo review skill（沒有才用 `code-review`），並以最新原始碼核對舊 finding 與作者聲稱已完成的修正。每項 finding 寫出證據位置、影響及建議處理；區分明確 bug、需求取捨、寫法／優化建議。需求取捨先問使用者；寫法與可優化建議只列在 report，不自動修改，也不作為阻擋收尾的 bug。
 
-自審完成後、開始修正前，先向 PR 發布本輪 report。每次發布 report、thread 回覆、結果或 body 前，都重新查最新遠端 head；如 head 有變，先讀新增差異、更新受影響 finding 及驗證範圍，再發布與新 head 相符的內容。
+自審完成後，先向 PR 發布本輪 report 並取得 URL，再開始修正或 browser 驗收；開啟頁面、讀取畫面狀態與派發 browser 驗收任務都在此後執行。每次發布 report、thread 回覆、結果或 body 前，都重新查最新遠端 head；如 head 有變，先讀新增差異、更新受影響 finding 及驗證範圍，再發布與新 head 相符的內容。
 
-**完成條件：** report 已先於修正發布；finding 皆有當前程式碼證據與分類。發布受阻時記錄原因，不假稱已發布。
+**完成條件：** report URL 已取得，且發布先於修正及 browser 驗收；finding 皆有當前程式碼證據與分類。發布受阻時記錄原因，不假稱已發布。
 
 ### 3. 修正明確 bug 並驗證
 
