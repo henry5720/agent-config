@@ -53,7 +53,7 @@ description: >-
 
 發布收尾前再次查遠端 head。若有新差異，先讀取並依影響補做 review／驗證，再更新回覆和結果；任何結果都保留它實際對應的 commit。用 `pr` skill 更新 PR body 摘要及 `## 驗證`，列出實際指令／操作、結果、證據、未驗及原因、剩餘風險；讓 body 明確對應最新已核對的 head，本輪 comments 保留歷史。視覺證據按需附真實截圖；只有靜態圖不足以表達互動時才附短影片，憑證不得發布，附件不 commit。
 
-body 更新後，另發布一則本輪唯一的收尾結果 comment。它是獨立的最終紀錄：自審 report、逐項 thread／review 回覆及 PR body 都不能代替它。用精簡文字列出本輪實際核對的 head、最終驗證結果、未驗項目及原因、仍待 reviewer 確認的 threads，並明確寫出「本輪完成，等待 review」或「收尾未完成」；不要複製 PR body 的 Summary／Evidence 格式。每次發布前重新核對遠端 head；若 head 改變，先檢查新增差異並補做受影響的 review／驗證，再同步 body 與收尾結果。
+body 更新後，另發布一則本輪唯一的收尾結果 comment。它是獨立的最終紀錄：自審 report、逐項 thread／review 回覆及 PR body 都不能代替它。用精簡文字列出本輪實際核對的 head、最終驗證結果、未驗項目及原因、仍待 reviewer 確認的 threads，並明確寫出「本輪完成，等待 review」或「收尾未完成」；沿用摘要與證據的寫法，只列本輪結果；有新增風險才補 Merge Danger。每次發布前重新核對遠端 head；若 head 改變，先檢查新增差異並補做受影響的 review／驗證，再同步 body 與收尾結果。
 
 若有規則衝突、待決需求或其他已知阻塞，先完成不受影響的工作，再於詢問使用者前發布「收尾未完成」PR comment。comment 記錄已完成工作、阻塞來源及位置、影響、未完成／未驗範圍與下一步決定；發布前核對遠端 head，並在 head 漂移時先讀新增差異。若 PR body 的 `## 驗證` 會把舊 head 或未通過的驗證寫成目前完成狀態，先同步 body 至最新 head 並標明未驗與風險；不要把這則 blocked comment 說成成功 report，也不要等待使用者回答後才發布已知阻塞。
 

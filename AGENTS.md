@@ -31,14 +31,11 @@
 
 ## PR 自審與驗收
 
-明確呼叫 `pr-review-and-verify`，或要求自審／驗收自己作者的 PR（例如「收這個 PR」）時，依 `pr-review-and-verify` skill 執行；完整流程留在 skill。
+明確呼叫 `pr-review-and-verify`，或要求完整執行自己作者的 PR 自審與驗收（例如「收這個 PR」）時，依 `pr-review-and-verify` skill 執行；完整流程留在 skill。
 
-## PR 的驗證段
+## PR body
 
-PR body 一律有「## 驗證」：列出實際執行的指令與結果；未執行或未涵蓋的項目列「未驗」和原因。
-
-- 視覺證據按需提供：呈現 UI 效果時優先附真實截圖；只有靜態圖無法呈現互動時才附短影片，不要求每個 PR 都附圖或錄影。說明圖不算實測證據。
-- 證據須對應這次變更，作為附件提供、不 commit 進 repo，且不含敏感資料。
+撰寫或更新 PR body 時使用 `pr` skill，遵循 repo 的 PR 規則。驗證段使用 `## 驗證`，列實際執行的指令與結果，以及未驗項目和原因。視覺證據按需附真實截圖；靜態圖不足以表達互動時才附短影片。證據須對應本次變更、不含敏感資料，作為附件提供、不 commit。
 
 ## 誠實
 
@@ -76,3 +73,5 @@ If there is no `.codegraph/` directory, skip CodeGraph entirely — indexing is 
 - 只有使用者明確啟動這個 PR 的作者自審／驗收回合時，才使用 `.agents/skills/pr-review-and-verify/SKILL.md` 和 `docs/acceptance/ui-fixture-41.md`；一般對話不啟動作者流程、不跑 PR 檢查。
 - 自審方法只用 `.agents/skills/repo-review/SKILL.md`。作者回合必須執行指定的 `git diff origin/main...HEAD --check`，並用原生 browser 實際操作 fixture；靜態 HTML 檢查或 HTTP checker 不能代替 browser 驗收。
 - Browser 測試只對 `http://127.0.0.1:8000/` 已啟動的本機頁面操作；不啟停 parent 管理的 server。截圖僅附 PNG，裁掉測試憑證 panel；保留虛構姓名、email、對話和附件。不要附 trace、snapshot、影片或 browser storage state。
+
+- 本輪附件指令參考的同版副本在 `docs/acceptance/pr-attachments.md`；它與已安裝 playwright-cli reference 逐 byte 相同，先讀此副本以避免外部目錄 read gate。
