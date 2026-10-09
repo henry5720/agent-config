@@ -21,8 +21,10 @@ EnterWorktree --path <那個 path>
 
 - `--cwd` 給**主 checkout**；給 linked worktree 會回 `linked_worktree_source`。
 - `--base` 不給就用預設分支。要疊在別人剛做好的那顆 commit 上時指定它。
-- 開在 `~/.herdr/worktrees/<repo>/<branch>`，在 repo 外面，IDE、檔案搜尋、watcher 掃不到。
-  代價是順便開一個 herdr workspace。
+- 使用 Herdr 預設位置 `~/.herdr/worktrees/<repo>/<branch>`；建立指令省略 `--path`。
+  在 repo 外面，IDE、檔案搜尋、watcher 掃不到；代價是順便開一個 herdr workspace。
+- 若 sandbox 或檔案權限阻擋預設位置，先回報被拒的路徑與錯誤，再處理權限；不得自行改放 `~/code` 或其他位置。
+- 改用非預設位置前，先說明原因與完整目標路徑，取得使用者對該位置的明確同意後才加 `--path`。本次對話已取得的同意可沿用；同意開 worktree 不等於同意改位置。
 - Claude Code 進了一個 worktree 之後，`EnterWorktree --path` 只認 `<repo>/.claude/worktrees/` 底下的，
   換不到第二個 herdr worktree。要換基底就在**現在這個** worktree 裡 `git switch`。
 
