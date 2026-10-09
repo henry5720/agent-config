@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 這是 skillshare 的設定目錄，也是 git repo（`henry5720/agent-config`）。文件、註解、commit message
-用繁體中文。操作方式見 [README.md](README.md)，詞彙見 [CONTEXT.md](CONTEXT.md)。
+用繁體中文。操作方式見 [README.md](README.md)，詞彙見 [GLOSSARY.md](GLOSSARY.md)。
 
 ## 規則
 
