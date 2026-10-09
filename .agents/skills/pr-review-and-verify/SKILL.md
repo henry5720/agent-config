@@ -1,8 +1,64 @@
 ---
 name: pr-review-and-verify
-description: Use when explicitly invoked or when asked to self-review or verify your own PR.
+description: >-
+  使用者明確呼叫本 skill、說「收這個 PR」，或要求完整執行 PR 作者自審與驗收時使用；
+  開 PR 或一般要求 review 本身不啟動作者收尾流程。
 ---
 
-# Own-PR review and verification
+# PR 自審與驗收
 
-Read `docs/acceptance/pr-review-round-39.md`, inspect the review thread, and run its exact validation command. If the requirement is already satisfied, make no file changes and reply with the check result.
+本 skill 僅由作者明確啟動一輪；在原 session 完成自審、必要修正與驗證、既有意見回覆及 PR 收尾。先按順序完成每階段條件，再進下一階段。
+
+## 規則選用
+
+- 自審先找目前 repo 明確適用的 review skill；有就用它，沒有才用共用 `code-review`。被選中的 review skill 負責審查方法，本 skill 負責作者流程與收尾。
+- 使用者明確指定某 skill 或流程時，該 skill 對本次工作的具體要求及發布授權優先於衝突的一般 repo 指引；其他未衝突的 repo 規則仍適用。只在指定範圍套用優先權，不把它擴張成覆蓋整個 repo。單獨使用原 skill 時，仍遵守該 skill 自己的流程與發布規則。
+- 先依適用範圍判定差異。若兩項明確要求仍無法並行或判定優先順序，停止受影響工作，向使用者列出兩邊原文、檔案／位置及影響，再詢問決定；先完成不受衝突影響的部分。
+- 驗證使用 repo 規定及本次明確指定的 verification skill。需要實際畫面或操作才能判定時，使用 `verify-in-browser` 及其指向的瀏覽器工具 skill。
+- 需要寫或更新 PR body 時，使用原有 `pr` skill；不要複製它的 body 範本或 review 方法。
+
+## 一輪流程
+
+### 1. 固定 PR 範圍
+
+讀取 PR 的 base、最新遠端 head、目前工作分支／HEAD 與需求來源；讀取所有一般 PR comments、整體 reviews，以及完整 inline review threads（含未解決及已解決項目）。記錄 head SHA，並把每項 feedback 對回原 thread、程式碼位置與目前狀態。看不到必要資料或權限不足時，記下缺項與影響；能完成的部分照做。
+
+**完成條件：** review 範圍、base、遠端 head、需求和每項既有意見都有來源；任何不可取得的內容已明確標出。
+
+### 2. 發布自審 report
+
+針對固定 head 執行適用的 repo review skill（沒有才用 `code-review`），並以最新原始碼核對舊 finding 與作者聲稱已完成的修正。每項 finding 寫出證據位置、影響及建議處理；區分明確 bug、需求取捨、寫法／優化建議。需求取捨先問使用者；寫法與可優化建議只列在 report，不自動修改，也不作為阻擋收尾的 bug。
+
+自審完成後、開始修正前，先向 PR 發布本輪 report。每次發布 report、thread 回覆、結果或 body 前，都重新查最新遠端 head；如 head 有變，先讀新增差異、更新受影響 finding 及驗證範圍，再發布與新 head 相符的內容。
+
+**完成條件：** report 已先於修正發布；finding 皆有當前程式碼證據與分類。發布受阻時記錄原因，不假稱已發布。
+
+### 3. 修正明確 bug 並驗證
+
+只直接修正證據充分、修法明確且符合需求的 bug。需求或風險取捨交由使用者決定；不把建議性優化轉成自動修改。依 repo 規則與改動選必要驗證，不盲跑全套；需要畫面／操作驗收時依 `verify-in-browser` 執行。
+
+每項驗證記錄實際測試的 commit SHA、範圍、指令或操作、結果及證據。沿用結果時保留原測試 SHA，不改標成新 commit。每有新 commit，對照該 commit 的差異與各項測試範圍，判定哪些舊結果仍適用、哪些受影響；只重跑受影響及 repo 要求的項目。發現問題就修正並重驗受影響範圍，保留各版本結果與對應關係。
+
+**完成條件：** 明確 bug 已處理；必要且受影響的驗證有結果和準確版本，未驗項目有原因。尚需使用者決策或驗證受阻時保留阻塞狀態，不以部分通過宣稱完成。
+
+### 4. 逐項回覆原 review threads
+
+逐一核對一般留言、整體 reviews 及 inline threads；inline feedback 回原 thread，一般留言與整體 review 回原有對話，不另開重複頂層留言。逐項交代處理結果、最新程式碼位置／commit 與相關驗證。未修項目說明原因和待決事項；待 reviewer 確認的 thread 明列。feedback 若已過時，也引用目前程式碼證據說明，不默默略過。
+
+**完成條件：** 每項既有意見都有原 thread 回覆或明確列為發布受阻；待 reviewer 確認事項仍清楚可見。
+
+### 5. 發布收尾並同步 PR body
+
+作者明確啟動本 skill，即授權入口 agent 發布本輪自審 report、原對話／thread 回覆、收尾結果及 PR body 更新，不逐則詢問草稿；授權僅限這些本輪發布。入口 agent 是本輪唯一 publisher；參與修正的其他 agents 把修改、commit 和驗證交回，不另行發布。
+
+發布收尾前再次查遠端 head。若有新差異，先讀取並依影響補做 review／驗證，再更新回覆和結果；任何結果都保留它實際對應的 commit。用 `pr` skill 更新 body 摘要及 `## 驗證`，列出實際指令／操作、結果、證據、未驗及原因、剩餘風險；body 呈現目前狀態，本輪 comments 保留歷史。視覺證據按需附真實截圖；只有靜態圖不足以表達互動時才附短影片，憑證不得發布，附件不 commit。
+
+**完成條件：** 最新遠端 head 已核對；本輪結果已發布且 body 對應目前改動，或已明確記錄發布受阻及原因。
+
+## 結束狀態
+
+只有下列條件全滿足才回報 **「本輪完成，等待 review」**：自審 report 已發布；明確 bug 已處理、需求決策已有答案；必要驗證通過且版本對應準確；既有意見逐項回原 thread 回覆；剩餘 reviewer 確認、未驗和風險已列出；遠端 head 已核對，收尾結果及 PR body 已更新。
+
+任何必要項目未完成、head 變動尚未檢查、驗證受阻、權限不足或仍待需求決策時，回報 **「收尾未完成」**，列出已完成事項、阻塞及影響、未驗原因與下一步。有新證據或可繼續工作就續做；相同失敗重現且沒有新線索，或需要改需求／擴大範圍時停止並詢問，不無限重試。
+
+每輪新 review 都由使用者重新啟動。reviewer 負責確認及 resolve threads；merge 由人操作。本 skill 不代 reviewer resolve／approve，也不自動 merge。

@@ -5,4 +5,4 @@ description: Use for standalone review requests in this repository, including re
 
 # Repository review
 
-Review the requested changes and report findings. Keep this standalone review separate from the own-PR verification workflow.
+Compare the current PR diff with the explicit requirements in `docs/acceptance/pr-review-round-39.md`. Report each finding with its file, line, and evidence, or state that no findings were found. This skill only supplies review findings; do not run the author workflow, edit files, or publish comments or reports.
