@@ -23,21 +23,19 @@
 
 ## 照讀者選格式
 
-- 給人看的說明偏好精簡的視覺呈現；簡單問題用短文，只寫回答當下問題需要的內容。沒有要求就不加教學或指令清單，也不換格式重複說同一件事；需要時主動選最簡單、看得懂的形式，不等我指定。
+- 給人看的說明先用短文直答，只保留回答當下問題所需的資訊；未要求的教學、指令清單與 repo 背景留待追問。
+- 比短文更容易理解時，主動改用圖、表、樹狀結構或具體例子，不等我指定；同一內容只呈現一次。
 - agent 指引用精確的文字步驟、契約與完成條件，照 `writing-for-agents` skill。
 - 依接收平台選擇可直接閱讀、呈現的形式；PR/GitHub 不提供只能本機檢視的 HTML。
 - 要畫圖前先確認那個地方渲染得出來 —— 終端機和 Slack 都不會渲染 mermaid，改用文字箭頭或縮排樹；表格可以用。
 
 ## PR 自審與驗收
 
-明確呼叫 `pr-review-and-verify`，或要求自審／驗收自己作者的 PR（例如「收這個 PR」）時，依 `pr-review-and-verify` skill 執行；完整流程留在 skill。
+明確呼叫 `pr-review-and-verify`，或要求完整執行自己作者的 PR 自審與驗收（例如「收這個 PR」）時，依 `pr-review-and-verify` skill 執行；完整流程留在 skill。
 
-## PR 的驗證段
+## PR body
 
-PR body 一律有「## 驗證」：列出實際執行的指令與結果；未執行或未涵蓋的項目列「未驗」和原因。
-
-- 視覺證據按需提供：呈現 UI 效果時優先附真實截圖；只有靜態圖無法呈現互動時才附短影片，不要求每個 PR 都附圖或錄影。說明圖不算實測證據。
-- 證據須對應這次變更，作為附件提供、不 commit 進 repo，且不含敏感資料。
+撰寫或更新 PR body 時使用 `pr` skill，遵循 repo 的 PR 規則。驗證段使用 `## 驗證`，列實際執行的指令與結果，以及未驗項目和原因。視覺證據按需附真實截圖；靜態圖不足以表達互動時才附短影片。證據須對應本次變更、不含敏感資料，作為附件提供、不 commit。
 
 ## 誠實
 
@@ -72,5 +70,6 @@ If there is no `.codegraph/` directory, skip CodeGraph entirely — indexing is 
 
 ## Acceptance fixture instructions
 
-- For standalone review-only requests in this fixture repo, use its `repo-review` skill to compare the current PR diff with `docs/acceptance/pr-review-round-39.md`; report evidence without editing or publishing.
-- Every round must run exactly `git diff origin/main...HEAD --check` and report the actual command and result.
+- Standalone review requests use `.claude/skills/repo-review/SKILL.md`; only explicit complete author-round requests enter `pr-review-and-verify`.
+- Every PR author round must run exactly `git diff origin/main...HEAD --check` and report the actual command/result/tested SHA.
+- This isolated docs fixture needs no browser. Test only the docs requirement in `docs/acceptance/pr-review-round-39.md`.
