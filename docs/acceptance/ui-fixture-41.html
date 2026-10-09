@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>客服工作台｜隔離驗收畫面</title>
+  <style>
+    :root {
+      --paper: #f5f4ef;
+      --surface: #fffefa;
+      --ink: #202c29;
+      --muted: #727c76;
+      --line: #e4e7df;
+      --green: #246957;
+      --green-dark: #194e41;
+      --green-pale: #e6f2ec;
+      --gold: #ac7941;
+      --shadow: 0 18px 55px rgba(30, 47, 40, .08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    .app { min-height: 100vh; display: grid; grid-template-columns: 218px minmax(0, 1fr); }
+    .rail {
+      display: flex; flex-direction: column; min-height: 100vh; padding: 25px 16px 18px;
+      background: #20332e; color: #f1f5f0;
+    }
+    .brand { display: flex; align-items: center; gap: 11px; padding: 0 9px 34px; }
+    .brand-mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; background: #d5e7d9; color: #20332e; font: 700 17px Georgia, serif; }
+    .brand-name { font: 600 17px Georgia, "Noto Serif TC", serif; letter-spacing: .02em; }
+    .rail-label { padding: 0 10px; color: #aab8af; font-size: 10px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+    .nav { display: grid; gap: 5px; margin-top: 11px; }
+    .nav-item { display: flex; align-items: center; gap: 11px; min-height: 40px; padding: 0 11px; color: #bdc9c1; border-radius: 9px; }
+    .nav-item.active { background: #344c43; color: white; }
+    .nav-icon { width: 17px; color: #afc8b8; text-align: center; font-size: 16px; }
+    .count { margin-left: auto; color: #d7e5db; font-size: 11px; }
+    .rail-spacer { flex: 1; }
+    .env-card { padding: 14px 13px 13px; border: 1px solid #52655a; border-radius: 12px; background: rgba(255,255,255,.035); }
+    .env-heading { display: flex; align-items: center; gap: 7px; color: #e2eee4; font-size: 12px; font-weight: 700; }
+    .env-dot { width: 7px; height: 7px; border-radius: 50%; background: #9ed2aa; box-shadow: 0 0 0 3px rgba(158,210,170,.14); }
+    .env-card p { margin: 8px 0 0; color: #bac9bf; font-size: 11px; line-height: 1.55; }
+    .main { min-width: 0; padding: 27px clamp(22px, 4.2vw, 66px) 48px; }
+    .topline { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 31px; }
+    .crumb { color: var(--muted); font-size: 12px; }
+    .crumb strong { color: var(--ink); font-weight: 600; }
+    .user { display: flex; align-items: center; gap: 9px; color: #47534d; font-size: 12px; }
+    .avatar { display: grid; place-items: center; width: 31px; height: 31px; border-radius: 50%; background: #e5d8c6; color: #5b4832; font-weight: 700; }
+    .title-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; margin-bottom: 20px; }
+    .eyebrow { margin-bottom: 5px; color: var(--green); font-size: 10px; font-weight: 800; letter-spacing: .17em; }
+    h1 { margin: 0; font: 500 clamp(25px, 3vw, 34px)/1.2 Georgia, "Noto Serif TC", serif; letter-spacing: -.025em; }
+    .subhead { margin: 8px 0 0; color: var(--muted); font-size: 13px; }
+    .demo-badge { flex: 0 0 auto; display: flex; align-items: center; gap: 7px; padding: 7px 10px; border: 1px solid #d6e5d8; border-radius: 999px; background: #edf5ed; color: #3d684b; font-size: 11px; font-weight: 700; }
+    .demo-badge span { width: 6px; height: 6px; border-radius: 50%; background: #659b69; }
+    .case-head { display: flex; align-items: center; gap: 17px; padding: 19px 22px; border: 1px solid var(--line); border-radius: 13px 13px 0 0; background: var(--surface); }
+    .person-avatar { display: grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px; border-radius: 13px; background: #f0e8dc; color: #7f5c3d; font: 600 18px Georgia, serif; }
+    .person { min-width: 0; }
+    .person-name { font-size: 16px; font-weight: 700; }
+    .person-email { color: var(--muted); font-size: 12px; }
+    .case-meta { display: flex; align-items: center; gap: 8px 18px; margin-left: auto; color: var(--muted); font-size: 11px; }
+    .case-id { color: #56615a; font-variant-numeric: tabular-nums; }
+    .status { padding: 5px 9px; border-radius: 999px; background: #fff1df; color: #8b5c27; font-size: 11px; font-weight: 700; white-space: nowrap; }
+    .status.done { background: var(--green-pale); color: #28664f; }
+    .case-body { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(240px, .85fr); border: 1px solid var(--line); border-top: 0; border-radius: 0 0 13px 13px; background: var(--surface); box-shadow: var(--shadow); }
+    .conversation { min-width: 0; padding: 22px 24px 23px; border-right: 1px solid var(--line); }
+    .section-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 19px; }
+    h2 { margin: 0; font-size: 13px; font-weight: 750; }
+    .section-note { color: #88918b; font-size: 11px; }
+    .message { position: relative; max-width: 600px; padding: 15px 17px; border: 1px solid #e9e9e1; border-radius: 3px 13px 13px 13px; background: #f7f7f2; }
+    .message:before { position: absolute; top: -1px; left: -1px; width: 3px; height: 24px; border-radius: 3px 0 0; background: #c99b62; content: ""; }
+    .message p { margin: 0; color: #38423d; font-size: 13px; line-height: 1.8; }
+    .message-time { margin-top: 9px; color: #939b94; font-size: 10px; }
+    .attachment { display: flex; align-items: center; gap: 12px; max-width: 340px; margin-top: 15px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+    .file-icon { display: grid; place-items: center; width: 35px; height: 38px; border-radius: 8px; background: #f5eee4; color: #93673c; font-size: 17px; }
+    .file-name { color: #35423b; font-size: 12px; font-weight: 650; }
+    .file-detail { margin-top: 2px; color: #929a94; font-size: 10px; }
+    .reply-note { display: flex; gap: 9px; align-items: flex-start; margin-top: 21px; padding-top: 17px; border-top: 1px solid #eeefe9; color: #7e8981; font-size: 11px; }
+    .reply-note b { color: #58675d; font-weight: 650; }
+    .detail-panel { padding: 22px 21px; }
+    .detail-section + .detail-section { margin-top: 22px; padding-top: 19px; border-top: 1px solid #eeefe9; }
+    .detail-label { color: #8b948d; font-size: 10px; font-weight: 750; letter-spacing: .1em; }
+    .detail-value { margin-top: 6px; color: #35423b; font-size: 12px; }
+    .detail-value small { display: block; margin-top: 3px; color: #929a94; font-size: 10px; }
+    .action-button { width: 100%; min-height: 40px; margin-top: 14px; border: 0; border-radius: 8px; background: var(--green); color: white; font-size: 12px; font-weight: 700; transition: background .16s ease, transform .16s ease; }
+    .action-button:hover { background: var(--green-dark); transform: translateY(-1px); }
+    .action-button:focus-visible, input:focus-visible { outline: 3px solid #a4cdb1; outline-offset: 2px; }
+    .action-button:disabled { cursor: default; background: #e6f2ec; color: #28664f; transform: none; }
+    .secure-card { padding: 12px; border: 1px solid #eadfcf; border-radius: 9px; background: #fcf8f1; }
+    .secure-label { display: flex; align-items: center; gap: 7px; color: #735b3f; font-size: 11px; font-weight: 700; }
+    .lock { font-size: 13px; }
+    .secure-input { width: 100%; height: 35px; margin-top: 9px; padding: 0 9px; border: 1px solid #e5dac8; border-radius: 6px; background: white; color: #665943; font: 12px monospace; letter-spacing: .08em; }
+    .secure-caption { margin: 7px 0 0; color: #8d806e; font-size: 10px; line-height: 1.5; }
+    .footer-note { margin: 14px 3px 0; color: #89928b; font-size: 10px; }
+    .toast { position: fixed; right: 26px; bottom: 24px; padding: 11px 16px; border-radius: 9px; background: #203c32; color: #f5fff7; font-size: 12px; box-shadow: 0 10px 28px rgba(20,40,30,.22); opacity: 0; transform: translateY(8px); pointer-events: none; transition: opacity .2s, transform .2s; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    @media (max-width: 850px) {
+      .app { grid-template-columns: 70px minmax(0,1fr); }
+      .rail { align-items: center; padding: 20px 9px; }
+      .brand { padding: 0 0 30px; }
+      .brand-name, .rail-label, .nav-text, .count, .env-card { display: none; }
+      .nav { width: 100%; }
+      .nav-item { justify-content: center; padding: 0; }
+      .nav-icon { font-size: 18px; }
+      .main { padding: 22px 22px 36px; }
+      .case-meta { flex-wrap: wrap; justify-content: flex-end; }
+    }
+    @media (max-width: 620px) {
+      .main { padding: 18px 13px 28px; }
+      .topline { margin-bottom: 24px; }
+      .title-row { align-items: flex-start; flex-direction: column; gap: 11px; }
+      .case-head { align-items: flex-start; gap: 11px; padding: 15px; flex-wrap: wrap; }
+      .case-meta { width: 100%; margin-left: 55px; justify-content: flex-start; }
+      .case-body { grid-template-columns: 1fr; }
+      .conversation { border-right: 0; border-bottom: 1px solid var(--line); padding: 19px 16px; }
+      .detail-panel { padding: 19px 16px; }
+      .user-label { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="rail" aria-label="主要導覽">
+      <div class="brand"><div class="brand-mark" aria-hidden="true">S</div><div class="brand-name">松石客服</div></div>
+      <div class="rail-label">工作區</div>
+      <nav class="nav">
+        <div class="nav-item"><span class="nav-icon" aria-hidden="true">⌂</span><span class="nav-text">總覽</span></div>
+        <div class="nav-item active" aria-current="page"><span class="nav-icon" aria-hidden="true">▤</span><span class="nav-text">客服案件</span><span class="count">12</span></div>
+        <div class="nav-item"><span class="nav-icon" aria-hidden="true">◷</span><span class="nav-text">稍後處理</span></div>
+      </nav>
+      <div class="rail-spacer"></div>
+      <section class="env-card" aria-label="測試環境說明">
+        <div class="env-heading"><span class="env-dot"></span>已確認測試環境</div>
+        <p>隔離的本機驗收頁面<br>以下業務資料皆為虛構。</p>
+      </section>
+    </aside>
+
+    <main class="main">
+      <div class="topline">
+        <div class="crumb">工作區&nbsp; / &nbsp;客服案件&nbsp; / &nbsp;<strong>案件詳情</strong></div>
+        <div class="user"><span class="avatar" aria-hidden="true">林</span><span class="user-label">林予安・客服專員</span></div>
+      </div>
+
+      <header class="title-row">
+        <div>
+          <div class="eyebrow">CUSTOMER CARE&nbsp; / &nbsp;INBOX</div>
+          <h1>案件詳情</h1>
+          <p class="subhead">查看來信內容，並更新案件處理狀態。</p>
+        </div>
+        <div class="demo-badge"><span></span>確認測試環境・虛構業務資料</div>
+      </header>
+
+      <section class="case-head" aria-label="案件摘要">
+        <div class="person-avatar" aria-hidden="true">陳</div>
+        <div class="person">
+          <div class="person-name">陳以晴</div>
+          <div class="person-email">yiching.chen@example.com</div>
+        </div>
+        <div class="case-meta">
+          <span class="case-id">案件 #CS-2048</span>
+          <span>今天 10:42</span>
+          <span class="status" id="statusBadge" aria-live="polite">待處理</span>
+        </div>
+      </section>
+
+      <section class="case-body" aria-label="案件內容與操作">
+        <article class="conversation">
+          <div class="section-top"><h2>對話紀錄</h2><span class="section-note">1 則訊息</span></div>
+          <div class="message">
+            <p>您好，我上週訂購的手沖壺已經收到，外觀很喜歡。不過盒內少了一張使用說明卡，想請問可以補寄電子版給我嗎？謝謝！</p>
+            <div class="message-time">陳以晴・今天 10:42</div>
+          </div>
+          <div class="attachment" aria-label="附件：手沖壺訂單照片 jpg">
+            <div class="file-icon" aria-hidden="true">▧</div>
+            <div><div class="file-name">手沖壺訂單照片.jpg</div><div class="file-detail">圖片附件・1.8 MB</div></div>
+          </div>
+          <div class="reply-note"><span aria-hidden="true">↳</span><span><b>處理提示</b><br>可寄送電子版說明卡，回覆後再更新案件狀態。</span></div>
+        </article>
+
+        <aside class="detail-panel" aria-label="案件處理資訊">
+          <div class="section-top"><h2>處理資訊</h2><span class="section-note">本機範例</span></div>
+          <div class="detail-section">
+            <div class="detail-label">負責人</div>
+            <div class="detail-value">林予安<small>客服小組・一般優先級</small></div>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">商品</div>
+            <div class="detail-value">霧白手沖壺・600 ml<small>訂單 #OD-7316</small></div>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">案件狀態</div>
+            <div class="detail-value" id="statusCopy">等待客服處理</div>
+            <button class="action-button" id="statusButton" type="button">確認已處理</button>
+          </div>
+          <div class="detail-section">
+            <div class="secure-card">
+              <div class="secure-label"><span class="lock" aria-hidden="true">▣</span>測試用憑證欄位</div>
+              <input class="secure-input" aria-label="合成測試 token，預設遮蔽" type="password" value="TEST-local-only-7KQ2" readonly autocomplete="off" spellcheck="false">
+              <p class="secure-caption">合成的本機 TEST 值，非有效憑證；欄位預設遮蔽。勿將此區域納入截圖。</p>
+            </div>
+          </div>
+        </aside>
+      </section>
+      <p class="footer-note">此頁僅供隔離 UI 驗收；所有名稱、對話、訂單與憑證字串均為虛構測試資料。</p>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script>
+    (() => {
+      const button = document.getElementById('statusButton');
+      const badge = document.getElementById('statusBadge');
+      const copy = document.getElementById('statusCopy');
+      const toast = document.getElementById('toast');
+      let completed = false;
+      let toastTimer;
+      button.addEventListener('click', () => {
+        completed = !completed;
+        badge.textContent = completed ? '已處理' : '待處理';
+        badge.classList.toggle('done', completed);
+        copy.textContent = completed ? '已完成・可供確認' : '等待客服處理';
+        button.textContent = completed ? '恢復待處理' : '確認已處理';
+        button.setAttribute('aria-pressed', String(completed));
+        toast.textContent = completed ? '案件狀態已更新為「已處理」' : '案件狀態已恢復為「待處理」';
+        toast.classList.add('show');
+        window.clearTimeout(toastTimer);
+        toastTimer = window.setTimeout(() => toast.classList.remove('show'), 2600);
+      });
+      button.setAttribute('aria-pressed', 'false');
+    })();
+  </script>
+</body>
+</html>
