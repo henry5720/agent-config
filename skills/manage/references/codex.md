@@ -10,7 +10,7 @@
 
 reviewer 用 `collaboration.spawn_agent` 明確設定 `fork_turns: "none"`；省略時預設 `all`，會繼承父對話。
 Standards、Spec 各建獨立 reviewer，message 只給各 axis 必要 review 指標與固定 SHA。工具缺少 non-fork 能力時依主流程停止 review。
-名額依當下工具結果判斷；暫滿先等待，已排隊 review 優先，不把研究時的三個 child 上限當成所有版本的保證。
+名額依當下工具結果判斷，不把研究時的三個 child 上限當成所有版本的保證；容量處理依主流程步驟 5。
 
 子 agent 繼承父 cwd、既有權限與 MCP。brief 的絕對路徑不會改 session cwd，也不是原生 worktree 隔離。
 executor 開工先用指定 `workdir` 核對 `pwd`、`git rev-parse --show-toplevel`、branch 與 base；後續每個 shell 工具指定該 `workdir`，檔案工具用目標絕對路徑。單次 shell `cd` 不會改後續工具的預設路徑。
@@ -21,11 +21,11 @@ executor 開工先用指定 `workdir` 核對 `pwd`、`git rev-parse --show-tople
 只有連到共用 daemon 的互動 TUI，且目前暴露 `codex_tui.create_thread`、`list_threads`、`read_thread`、`wait_threads` 與所需後續工具時，才能用這條路。
 先核對各工具 schema 與呼叫限制；目前 `create_thread` 只允許使用者明確要求新任務時建立。任務授權不清楚先問使用者，缺背景能力則依主流程停止該次派工。
 
-`codex_tui.create_thread` 接受 `prompt`、可選 `title`／`model`；省略 model 沿用目前 model，只有使用者明確指定時才覆寫。
+呼叫 `codex_tui.create_thread` 時依當下 schema 組織輸入；省略 model 沿用目前 model，只有使用者明確指定時才覆寫。
 它繼承 manager 當前 cwd，沒有 `cwd` 或 branch 參數。brief 必須指明專用 worktree 絕對路徑與開工核對，executor 的每次操作仍須指定目標路徑。
 工具核准模式是 `prompt`；是否經既有自動審查依設定，不承諾完全不需核准，也不更改既定權限。
 
-`create_thread.prompt` 與 `send_message_to_thread.prompt` 目前各限 **1,000 UTF-8 bytes**。
+spec 的研究基準中，`create_thread.prompt` 上限是 **1,000 UTF-8 bytes**；操作時以當下 schema 的上限為準，版本不同時重新核對，不用研究數字拒絕當下合法輸入。`send_message_to_thread.prompt` 的上限也從當下 schema 取得。
 長 brief 寫入 executor 可讀文件，短 prompt 保留必要開頭指令並指向該文件的絕對路徑；不能只放 manager 可讀但 executor 無權限的路徑。
 送出前計算完整 prompt 的 UTF-8 byte 數，例如 `len(prompt.encode("utf-8"))`，不是中文字數；超過限制先縮短 prompt，不截斷驗收條件。
 
@@ -37,8 +37,8 @@ executor 開工先用指定 `workdir` 核對 `pwd`、`git rev-parse --show-tople
 
 ## 等待、讀取與接手
 
-用 `codex_tui.wait_threads` 等既有 thread，`targets` 包含 `threadId`；若已有讀取 cursor，依 schema 傳 `afterCursor` 以觀察後續更新。
-目前一次最多八個 targets；以短等待配合不相依工作，`timeoutMs: 0` 只取得即時 snapshot。
+用 `codex_tui.wait_threads` 等既有 thread；等待目標、讀取 cursor、一次可等的數量與 timeout 輸入都依當下 schema。
+以短等待配合不相依工作；schema 支援 `timeoutMs: 0` 時可取即時 snapshot，snapshot 只反映查詢當下，不能代替後續等待與結果讀取。
 核對實際回傳，分開處理以下事件；需要詳細訊息時用 `read_thread` 並按 schema 開 `includeOutputs`，輸出截斷則繼續讀取，不從片段宣稱完成：
 
 | 回傳／觀察 | 原生操作 |
@@ -58,6 +58,5 @@ manager 提供 thread ID、blocker 與需要的操作，人處理後繼續讀／
 ## 模式與限制
 
 `codex exec` 沒有這組 daemon 背景工具；沒有等同 `claude --bg` 的一行 Codex CLI，也沒有 `codex agents --json`。
-非互動模式若具備任務必要的 collaboration 能力仍可派 subagent；需要直接接手、手動 skill 或背景 reviewer 卻缺工具，就指出缺項並請切換連到共用 daemon 的 Codex 互動 TUI。
-必要 review 工具或乾淨 context 能力缺失也依主流程停止；容量暫滿則等待。
-能力不足不以 `codex exec &` 或自製 JSON-RPC client 替代可接手 thread，缺工具與容量都不是跨 provider 授權。
+需要背景工具時，切換連到共用 daemon 的 Codex 互動 TUI，再核對本 reference「可接手背景 thread」所列工具。一般 subagent 使用目前暴露的 collaboration 工具。
+能力檢查與停止條件依主流程步驟 1，review 能力與名額依步驟 5。

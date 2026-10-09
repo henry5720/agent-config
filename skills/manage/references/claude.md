@@ -51,5 +51,4 @@ reviewer 背景 session 也用相同操作，但 prompt 明確唯讀、固定 SH
 
 ## 模式與限制
 
-`claude -p` 若有任務必要原生工具即可執行；需要接手、手動 skill 或 non-fork review 而工具缺失，就指出缺項並請切換 Claude Code 互動 session。
-容量暫滿先等可用名額；工具缺失是停止原因。兩者都不授權跨 provider。
+`claude -p` 的能力檢查依主流程步驟 1，review 能力與名額依步驟 5。需要切換模式時，進入 Claude Code 互動 session，再核對該任務所需的 `Agent`、背景 session 與 non-fork 能力。

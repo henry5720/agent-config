@@ -33,7 +33,7 @@ disable-model-invocation: true
 Herdr 路徑遵守 herdr skill 的環境要求；Herdr 不可用時停止該次跨 provider 派工，說明缺少的環境或能力。
 遵守 `HERDR_ENV=1`，不從 Herdr 外控制聚焦中的 session。當前 CLI 缺原生工具不擋住已明確授權且能力齊全的 Herdr 工作，也不授權其他角色換 provider。
 
-完成條件：每個本次角色已有 provider／任務範圍、已讀適用 reference／skill，並確認其路徑具備派工、等待、結果讀取、接手及 context 隔離能力；未具備就明確停止。
+完成條件：每個本次角色已有 provider／任務範圍、已讀適用 reference／skill，並逐項確認該任務必要能力：所有工作需要派工、等待與結果讀取；需要使用者直接對話或手動 skill 的工作另需可接手背景能力；reviewer 另需不繼承父對話的乾淨 context。一般 subagent executor 不以背景、接手或 non-fork 工具為必要條件；缺該任務必要能力才停止。
 
 ## 2. 寫 brief，準備 worktree，派 executor
 
