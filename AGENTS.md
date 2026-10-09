@@ -72,5 +72,5 @@ If there is no `.codegraph/` directory, skip CodeGraph entirely — indexing is 
 
 ## Acceptance fixture instructions
 
-- For standalone review-only requests in this fixture repo, use its `repo-review` skill to compare the current PR diff with `docs/acceptance/pr-review-round-39.md`; report evidence without editing or publishing.
+- This fixture temporarily omits its repository-specific review skill for fallback acceptance; standalone review-only requests use common `code-review`. Only enter the author workflow when the author explicitly invokes it.
 - Every round must run exactly `git diff origin/main...HEAD --check` and report the actual command and result.
