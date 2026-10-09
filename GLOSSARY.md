@@ -42,3 +42,24 @@ _Avoid_: local skill、personal skill
 
 - 「local」在 skillshare 是「不是它放的」，不是「自己寫的」。自己寫的一律叫 **Own skill**。
 - 「sync」單講只指 skill。要寫進 client 的 MCP，一定講 **MCP sync**。
+
+## PR 收尾詞彙
+
+**PR 自審與驗收（PR review and verification）**:
+作者處理自己 PR 的自審、修正、驗證與回報；既有決策中的「PR 收尾」指同一段流程，merge 由人操作。
+_Avoid_: 把本輪完成當成已獲准 merge
+
+**收尾一輪（Closing round）**:
+從一次啟動到本輪完成或受阻回報的一段工作。新 review 可啟動下一輪。
+
+**入口 skill（Entry skill）**:
+提供作者自審與驗收整輪流程的指引，讓 agent 按條件接續各支 skill。
+
+**自審 report（Self-review report）**:
+作者自審後對問題、影響及程式碼位置的紀錄；不是修正與驗證已完成的結論。
+
+**收尾結果（Closing result）**:
+一輪工作的處理結果、驗證證據、未驗項目與仍待處理事項。
+
+**未驗（Unverified）**:
+與驗證目的相關、尚未執行或未涵蓋的項目及原因。
