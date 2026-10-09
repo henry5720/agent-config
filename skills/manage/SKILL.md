@@ -9,26 +9,31 @@ disable-model-invocation: true
 你是 **manager**。使用者決定方向與 findings 要不要修；executor 寫交付的 code；reviewer 唯讀。
 你寫 brief、派工、核對、安排 review、自己驗收。每條改碼 **track** 有一個 executor、一條分支與專用 worktree；多條 track 可平行走以下流程。
 
-## 1. 載入操作 reference，確認能力
+## 1. 選定本次派工路徑，載入操作說明
 
-`manage` 是 L2：在哪個 Client 呼叫，就用該 CLI 原生分工；L1 是人透過 Herdr 派工。
-派工前辨認目前 Client，讀對應 reference；不要從 Source／Target 的目錄名稱推定 Client。
+`manage` 是 L2：在哪個 Client 呼叫，未另行指定的工作就用該 CLI 原生分工；L1 是人透過 Herdr 派工。
+先辨認 manager 目前 Client，逐一確認本次 executor／reviewer 的 provider 與任務範圍；不要從 Source／Target 目錄名稱推定 Client。
 
-| 目前 Client | 派工前必讀 |
+只有使用者明確指定另一家 provider **執行某角色或任務**，該工作才走 Herdr；指定目前 provider 繼續原生派工。
+「Codex 會怎麼做？」是詢問，「找另一個 agent」未指定 provider；缺工具、容量不足或非互動限制也不是授權。指名不清楚先問人。
+指定 reviewer 只改該 reviewer；指定某票 executor 包含該票後續修正，不涵蓋其他票或 reviewer；manager 留在目前 CLI。
+
+先依指定範圍選路徑，再讀該路徑的操作說明、核對所需能力：
+
+| 本次角色／任務 | 派工前必讀 |
 |---|---|
-| Claude Code | [Claude 操作](references/claude.md) |
-| Codex | [Codex 操作](references/codex.md) |
+| 原生派工，manager 在 Claude Code | [Claude 操作](references/claude.md) |
+| 原生派工，manager 在 Codex | [Codex 操作](references/codex.md) |
+| 明確指定另一家 provider | herdr skill；跨 provider 的操作只依該 skill |
 
-reference 不存在、Client 不支援或缺任務必要工具時，停止該次派工，列缺項與切換至同一 CLI 互動 session 的方式。
+原生路徑的 reference 不存在、Client 不支援或缺必要工具時，停止該次原生派工，列缺項與切換至同一 CLI 互動 session 的方式。
 `claude -p`／`codex exec` 依實際能力判斷：必要能力齊全即可做，模式名稱本身不是禁令。
 能力不足不能換成無法履行任務的 subagent、不可接手的 headless 程序或自製 JSON-RPC client。
 
-只有使用者明確指定另一家 provider 做某角色或任務，才載入 herdr skill 啟動該工作；指定目前 provider 繼續原生派工。
-「Codex 會怎麼做？」是詢問，「找另一個 agent」未指定 provider，缺工具或容量也不是授權；指名不清楚先問人。
-指定 reviewer 只改 reviewer；指定某票 executor 包含該票後續修正，不涵蓋其他票或 reviewer；manager 留在目前 CLI。
-跨 provider 的操作只依 herdr skill。Herdr 不可用就停止該次派工；遵守 `HERDR_ENV=1`，不從 Herdr 外控制聚焦中的 session。
+Herdr 路徑遵守 herdr skill 的環境要求；Herdr 不可用時停止該次跨 provider 派工，說明缺少的環境或能力。
+遵守 `HERDR_ENV=1`，不從 Herdr 外控制聚焦中的 session。當前 CLI 缺原生工具不擋住已明確授權且能力齊全的 Herdr 工作，也不授權其他角色換 provider。
 
-完成條件：已讀適用 reference／skill，確認本次角色所需的派工、等待、結果讀取、接手及 context 隔離能力；未具備就明確停止。
+完成條件：每個本次角色已有 provider／任務範圍、已讀適用 reference／skill，並確認其路徑具備派工、等待、結果讀取、接手及 context 隔離能力；未具備就明確停止。
 
 ## 2. 寫 brief，準備 worktree，派 executor
 
@@ -48,12 +53,12 @@ brief 要求 executor 開工核對 checkout 絕對路徑、branch 與 base，讀
 任務長短不單獨決定方式。兩家的 subagent 都不能主動問使用者，也不在 agent view 成為獨立頂層 session。
 subagent message 中寫了手動 skill 名稱不算啟動；背景 session 也須讀輸出，確認該 skill 確實載入並執行。
 
-依 reference 派工，記錄 agent／session ID、版本與模式、brief 指標、worktree、branch、base。
+依步驟 1 選定的 reference／skill 派工，記錄 agent／session ID、版本與模式、brief 指標、worktree、branch、base。
 完成條件：核對識別碼與實際工作狀態，確認 prompt 引發工作；只收到 ID 或成功送出文字不算完成派工。
 
 ## 3. 等待，讀結果與處理 blocker
 
-依 reference 原生等待；期間做不相依的準備、驗收規劃或其他 track。
+依步驟 1 選定的 reference／skill 等待、讀取與提供接手方式；期間做不相依的準備、驗收規劃或其他 track。
 
 | 觀察到的狀態 | 下一步 |
 |---|---|
