@@ -61,4 +61,4 @@ PR 交付依受眾提供最小但足以理解的視覺說明。UI 截圖依情�
 
 若實際 review 反覆缺少理解改動所需的視覺說明，或出現漏驗、虛報、工具不適用等具體問題，再按案例重新檢討最小必要規則；目前沒有足夠證據把既有分類表改成 mandatory policy，也沒有通用 token 節省比例。
 
-`show-me` 來自上游 `humanlayer/skills`；正文與 description 保持上游內容。本機僅開放自主呼叫：`SKILL.md` 的 `disable-model-invocation: false`，以及 `agents/openai.yaml` 的 `allow_implicit_invocation: true`。上游更新後須核對這兩個設定；它們允許自主呼叫，不保證每次觸發，各 client 仍依自身載入機制運作。
+`show-me` 來自上游 `humanlayer/skills`。研究當時曾在本機開放自主呼叫；2026-10-09 核對已恢復上游原檔：`SKILL.md` 的 `disable-model-invocation: true`，以及 `agents/openai.yaml` 的 `allow_implicit_invocation: false`。日常主動呈現由共用格式指引承接，不要求先載入 `show-me`；明確呼叫仍保留。上游更新後核對原檔與安裝版本，各 client 的實際呼叫另以原生驗收確認。
