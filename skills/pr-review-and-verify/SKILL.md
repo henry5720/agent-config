@@ -14,7 +14,7 @@ description: >-
 - 自審先找目前 repo 明確適用的 review skill；有就用它，沒有才用共用 `code-review`。被選中的 review skill 負責審查方法，本 skill 負責作者流程與收尾。
 - 使用者明確指定某 skill 或流程時，該 skill 對本次工作的具體要求及發布授權優先於衝突的一般 repo 指引；其他未衝突的 repo 規則仍適用。只在指定範圍套用優先權，不把它擴張成覆蓋整個 repo。單獨使用原 skill 時，仍遵守該 skill 自己的流程與發布規則。
 - 先依適用範圍判定差異。若兩項明確要求仍無法並行或判定優先順序，先完成不受衝突影響的工作，停止受影響工作。回到使用者詢問前，若目前是 PR 作者回合且有 GitHub 發布權限，先重新核對遠端 head；head 有變就讀新增差異並更新影響與驗證範圍，再由本輪唯一 publisher 發布一則「收尾未完成」PR comment，列出已完成工作、兩邊原文與檔案／行號、衝突影響、未完成／未驗項目及需要使用者決定的下一步。若無發布權限，在 session 明確記錄權限阻礙及相同資訊，不假稱已發布。發布或記錄後再詢問使用者；不得先等答案才回報已知阻塞，也不得自行推定優先順序。
-- 驗證使用 repo 規定及本次明確指定的 verification skill。需要實際畫面或操作才能判定時，使用 `verify-in-browser` 及其指向的瀏覽器工具 skill。
+- 驗證使用 repo 規定及本次明確指定的 verification skill。需要實際畫面或操作才能判定時，使用 `verify-in-browser` 及其指向的瀏覽器工具 skill；它只回報結果與本機證據路徑，附件由本 skill 在步驟 5 發布。
 - 需要寫或更新 PR body 時，使用原有 `pr` skill；不要複製它的 body 範本或 review 方法。
 
 ## 一輪流程
@@ -52,6 +52,13 @@ description: >-
 作者明確啟動本 skill，即授權入口 agent 發布本輪自審 report、原對話／thread 回覆、本輪收尾結果及 PR body 更新，不逐則詢問草稿；授權僅限這些本輪發布。入口 agent 是本輪唯一 publisher；參與修正的其他 agents 把修改、commit 和驗證交回，不另行發布。
 
 發布收尾前再次查遠端 head。若有新差異，先讀取並依影響補做 review／驗證，再更新回覆和結果；任何結果都保留它實際對應的 commit。用 `pr` skill 更新 PR body 摘要及 `## 驗證`，列出實際指令／操作、結果、證據、未驗及原因、剩餘風險；讓 body 明確對應最新已核對的 head，本輪 comments 保留歷史。視覺證據按需附真實截圖；只有靜態圖不足以表達互動時才附短影片，憑證不得發布，附件不 commit。
+
+附件從 `verify-in-browser` 回報的本機證據挑選，用 `gh pr comment <PR> --body "<驗證結果>" --attach '<路徑>'` 上傳（格式、大小限制見 `playwright-cli` skill 的 PR attachments）：
+
+- 附件對應實測的操作、範圍與 commit SHA；發布前重新核對最新 PR head，確認結果和附件仍對應該版本。
+- 已確認是測試用途的環境，預設附上有助判讀的真實截圖，不逐張詢問。姓名、email、對話及附件名稱等正常測試業務資料可以完整保留，不只因為出現這些資料就省略截圖。
+- 發布前避開或遮蔽實際出現的密碼、token、API key、登入憑證等秘密。環境不明、含正式資料或改貼到新的公開受眾時，依該次實際資料與發布對象處理；不建立固定資料分類、host allowlist 或逐張截圖確認流程。
+- 截圖遮蔽只處理該張圖片，不代表 trace、snapshot、影片或 storage state 也已清理。發布其他產物前各自檢查並遮蔽實際秘密；不需要的檔案留在附件之外。
 
 body 更新後，另發布一則本輪唯一的收尾結果 comment。它是獨立的最終紀錄：自審 report、逐項 thread／review 回覆及 PR body 都不能代替它。用精簡文字列出本輪實際核對的 head、最終驗證結果、未驗項目及原因、仍待 reviewer 確認的 threads，並明確寫出「本輪完成，等待 review」或「收尾未完成」；沿用摘要與證據的寫法，不重複貼整份 PR body；有新增風險才補 Merge Danger。每次發布前重新核對遠端 head；若 head 改變，先檢查新增差異並補做受影響的 review／驗證，再同步 body 與收尾結果。
 
