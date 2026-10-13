@@ -20,7 +20,7 @@ description: 當使用者要求瀏覽器驗收，或 agent 判斷需要透過瀏
 1. **確認有裝。** `command -v playwright-cli`。沒有（WSL、ARM 不裝）就改走 `chrome-mcp` skill；那也不能用，就把整個驗收列進「未驗」。不要自己 `npm i -g`。
 2. **定兩個名字，整趟照抄成字面值：**
    - session `S` = `<repo 名>-<分支名>`，`/` 換成 `-`（例：`agent-config-feat-login`）。
-   - 證據資料夾 `E` = 絕對路徑。有 `$CLAUDE_JOB_DIR` 用 `$CLAUDE_JOB_DIR/tmp/verify-<S>`，沒有用 `/tmp/verify-<S>`。先 `mkdir -p <E>`。
+   - 證據資料夾 `E` = 絕對路徑。有 `$CLAUDE_JOB_DIR` 用 `$CLAUDE_JOB_DIR/tmp/verify-<S>`，沒有用 `/tmp/verify-<S>`。先 `mkdir -p <E> && chmod 700 <E>`：裡面會有 `auth.json` 和含明文密碼的 `.playwright-cli/`，只給自己讀。
 
 ## 每個指令的寫法
 
@@ -51,11 +51,13 @@ cd <E> && playwright-cli -s=<S> <指令>
 填表單的規矩，因為密碼一進欄位就會到處出現（0.1.22 實測：`find`、填完後任何動作自動存的 `.playwright-cli/page-*.yml`，都含明文）：
 
 - 欄位用 selector 指（`'input[type=password]'`、`'getByPlaceholder("密碼")'`），不必先 snapshot。要先 snapshot 找 ref，只能在填密碼**之前**。
-- 帳密只從 `.env` 讀需要的那個 key，直接塞進指令，不 `source`、不 `cat .env`（不知道變數名就 `grep -o '^[A-Z_]*=' <repo 絕對路徑>/.env`）：
+- 帳密照 dotenv 的順序取：環境變數有值就用它，沒有才讀帳密檔（該 repo e2e 讀的那個 `.env`）。值只出現在指令的 `${…}`／`$(…)` 展開裡，不 `source`、不 `cat` 帳密檔：
 
   ```bash
-  cd <E> && playwright-cli -s=<S> --raw fill 'input[type=password]' "$(grep -m1 '^X_PASSWORD=' <repo 絕對路徑>/.env | cut -d= -f2- | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'\$/\1/")"
+  cd <E> && playwright-cli -s=<S> --raw fill 'input[type=password]' "${X_PASSWORD:-$(grep -m1 '^X_PASSWORD=' <帳密檔絕對路徑> | cut -d= -f2- | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'\$/\1/")}"
   ```
+
+- 不知道變數名時只列名字：`env | grep -o '^[A-Za-z_][A-Za-z0-9_]*='`、`grep -o '^[A-Za-z_][A-Za-z0-9_]*=' <帳密檔絕對路徑>`。
 
 - 每個 `fill`、`localstorage-set` 都加 `--raw`：不加會把產生的 Playwright code 連同值印回對話。
 - 密碼最後填，填完下一個指令就是 `--raw click <送出按鈕>`，中間不 `snapshot`、不 `find`、不讀 `.playwright-cli/`。

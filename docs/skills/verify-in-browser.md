@@ -48,7 +48,7 @@ flowchart LR
 |---|---|
 | 新機器 | dotfiles chezmoi 選裝工具勾 `playwright-cli`（用 `headless-chrome` 裝的 Chrome）。WSL、ARM 不裝，agent 會改走 `chrome-mcp` 或把驗收列進「未驗」 |
 | 升級 `@playwright/cli` 後 | 官方 skill 釘在跟 CLI 同一版的 commit，要手動跟（見下方） |
-| 要 agent 驗需要登入的頁面 | 確認那個 repo 的 `.env` 有帳密（agent 只讀它要的那個 key） |
+| 要 agent 驗需要登入的頁面 | 確認帳密在環境變數或那個 repo e2e 用的 `.env` 裡（agent 先看環境變數，只讀它要的那個 key） |
 
 ### 升級 playwright-cli 後跟上 skill
 
