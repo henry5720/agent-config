@@ -1,8 +1,9 @@
 # 個人偏好
 
 > 這份是**跨 repo、跨 agent** 的個人偏好，只寫「換到任何一個 repo 都還成立」的事。
-> 專案技術棧、指令、慣例寫在該 repo 自己的 `CLAUDE.md`／`AGENTS.md`。
-> 多步驟流程（debug、TDD、對齊需求）寫成 skill，不寫在這裡。
+> 專案技術棧、指令、慣例寫在該 repo 的 `AGENTS.md`；重複的流程寫成 skill；連外部系統用 MCP；
+> 一定要發生的用 hook。拿不準放哪時看官方：[Claude Code](https://code.claude.com/docs/en/features-overview)、
+> [Codex](https://learn.chatgpt.com/docs/customization/overview)。
 
 ## 語言
 
