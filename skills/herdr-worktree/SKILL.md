@@ -19,6 +19,10 @@ herdr worktree create --cwd <repo> --branch <name> --base <ref> --no-focus   # �
 EnterWorktree --path <那個 path>
 ```
 
+進去後先初始化開發環境：worktree 是全新 checkout，沒有 `node_modules` 這類被 ignore 的目錄，
+git hook、lint、formatter 的 plugin 都載不到。repo 有 lockfile 就照它裝（`pnpm install --frozen-lockfile`、
+`npm ci`、`uv sync`…），裝完才開始改。
+
 - `--cwd` 給**主 checkout**；給 linked worktree 會回 `linked_worktree_source`。
 - `--base` 不給就用預設分支。要疊在別人剛做好的那顆 commit 上時指定它。
 - 使用 Herdr 預設位置 `~/.herdr/worktrees/<repo>/<branch>`；建立指令省略 `--path`。

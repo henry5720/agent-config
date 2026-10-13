@@ -20,6 +20,21 @@
 - **不要加 OpenCode target。** OpenCode 會讀 `~/.claude/skills` 和 `~/.agents/skills`，加了會
   同一支出現三次。
 
+## 放哪
+
+新增或改一條 agent 指引前，照「要的效果」對表決定放哪：
+
+| 要的效果 | 放哪 | 依據 |
+|---|---|---|
+| 每個 session 都該知道的事實、「一律怎麼做」 | `instructions/agents-md/AGENTS.md`（部署成全域 `CLAUDE.md`） | [memory](https://code.claude.com/docs/en/memory)：CLAUDE.md 只放每個 session 都要的事實與規則，控制在 200 行內 |
+| 特定時機才用的多步驟流程 | 自己的 skill `skills/<名字>/SKILL.md` | [memory](https://code.claude.com/docs/en/memory)：multi-step procedure 移到 skill；[skills](https://code.claude.com/docs/en/skills)：觸發時才載入 |
+| 不論 agent 怎麼判斷都要擋下或一定要發生 | hook（`settings.json`，由 dotfiles 的 chezmoi 管） | [memory](https://code.claude.com/docs/en/memory)：CLAUDE.md 是 context 不是強制，要強制用 hook |
+| 讓 agent 連外部工具或資料 | MCP，`skillshare mcp add` 寫進 `mcp.yaml` | [MCP](https://code.claude.com/docs/en/mcp) |
+| 補第三方 skill 沒寫的步驟 | 另寫自己的 skill，第三方原檔不動 | 上方「第三方 skill 不要手改」 |
+| 給人看的說明 | `docs/` | 上方「給人看的文件放 `docs/`」 |
+
+對不到任何一列時，先查官方文件（[索引](https://code.claude.com/docs/llms.txt)）再決定，決定後把那一列補進這張表。
+
 ## 改完怎麼驗證
 
 ```bash
