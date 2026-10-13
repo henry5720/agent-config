@@ -40,7 +40,7 @@ flowchart LR
 - 整套回歸交給 CI 和 e2e；選擇瀏覽器驗收時，只做足以回答驗證目的的操作，不要求走遍所有狀態或每個狀態都截圖。
 - 截圖、錄影只存在本機暫存資料夾（`$CLAUDE_JOB_DIR/tmp/verify-<session>` 或 `/tmp/verify-<session>`），這支 skill 不上傳到 GitHub。
 - 要附到 PR 時，由 `pr-review-and-verify` 依 reviewer 需要挑選、遮蔽秘密後上傳；沒走那支 skill 就由你自己決定傳不傳。說明圖不代表已實際驗證，未驗項目照實列出。
-- 「每個 PR 都寫驗證段」這條是全域規則，寫在 dotfiles 的 `~/.claude/CLAUDE.md`，不是這支 skill。
+- 「每個 PR 都寫驗證段」這條是全域規則，寫在這個 repo 的 `instructions/agents-md/AGENTS.md`（部署成 `~/.claude/CLAUDE.md`），不是這支 skill。
 
 ## 你要做的事
 
