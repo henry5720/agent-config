@@ -417,8 +417,9 @@ mcp:
   because the Agent reads its global and project files together; do not repeat them. A
   `disabled` entry only switches one off in that folder.
 - No command edits `mcp.projects`; `mcp add` leaves it as written. Edit `config.yaml`, or
-  use the dashboard: the MCP page's **Projects** tab adds and removes projects, turns
-  global servers off per project and edits project servers.
+  use the dashboard: the **Projects** page adds and removes projects, and each project's
+  **MCP** tab turns global servers off there, edits project servers and lists the
+  project's Agent files with **Open folder**, **Open in editor** and **Copy path**.
 - `disabled` under `mcp.projects` cannot target `claude`. Use project mode in that
   folder instead.
 - It is refused inside a project config. A folder whose own `.skillshare/config.yaml`
