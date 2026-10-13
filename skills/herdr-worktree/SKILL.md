@@ -36,4 +36,6 @@ EnterWorktree --path <那個 path>
 一做完就收，worktree 和分支才不會越積越多。
 
 收掉不會弄丟東西：分支 ref 住在主 checkout 的 `.git/refs/heads/`，`worktree remove` 不刪分支也不刪 commit。
+本機分支另外刪：一般 merge 用 `git branch -d`；squash merge 後 `-d` 認不出已合併，先確認
+`git diff --stat <分支 head> <merge commit> -- <PR 改到的路徑>` 是空的，再用 `git branch -D`。
 所以子分支只在換裝置、換人接手、過夜離開機器時才 push，合併後當天 `git push origin --delete`。
