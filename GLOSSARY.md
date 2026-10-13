@@ -1,11 +1,11 @@
 # agent-config
 
-三台機器共用的 AI agent skills 與 MCP。這份只是詞彙表。
+三台機器共用的 AI agent skills、MCP 與 agent instructions。這份只是詞彙表。
 
 ## Language
 
 **Source**:
-這個 repo 裡的 `skills/` 與 `mcp.yaml`，所有機器上 skill 和 MCP 的唯一來源。
+這個 repo 裡的 `skills/`、`mcp.yaml` 與 `extras/`，所有機器上 skill、MCP 和 **Instructions** 的唯一來源。
 _Avoid_: 本機 skill
 
 **Target**:
@@ -26,8 +26,16 @@ _Avoid_: local skill、personal skill
 **Third-party skill**:
 用 `skillshare install` 從別人的 repo 裝進來的 skill，來源記在 `skills/.metadata.json`。`update --all` 會覆蓋它。
 
+**Instructions**:
+給模型讀的指令文字，每台機器都一樣，例如全域 `AGENTS.md`（Claude 那邊叫 `CLAUDE.md`）與 commit 指引。放在 `extras/<名字>/`，由 **Sync** 以 symlink 放到各 client 讀的位置。
+_Avoid_: 設定、rules
+
+**Settings**:
+給程式讀的設定：依機器不同、要合併進 app 自己會改寫的檔案，或是安裝腳本，例如 `settings.json`、`config.toml`、`opencode.json`、skillshare 自己的 `config.yaml`。由 dotfiles 的 chezmoi 管，不放這個 repo；`mcp.yaml` 是例外，由 **MCP sync** 寫進各 client。
+_Avoid_: 指令、instructions
+
 **Sync**:
-把 source 的 skill 以 symlink 放進各 target（`skillshare sync`）。只處理 skill，不處理 MCP。
+把 source 的 skill 以 symlink 放進各 target（`skillshare sync`），以及把 `extras/` 的 **Instructions** 以 symlink 放到 `config.yaml` 列的路徑（`skillshare sync extras`）。不處理 MCP；`skillshare sync --all` 會連 **MCP sync** 一起做。
 
 **MCP sync**:
 把 `mcp.yaml` 的 server 寫進各 client 的原生設定檔（`skillshare sync mcp -g`），只動 skillshare 自己寫的條目。`pull` 不會做這一步。
@@ -35,13 +43,14 @@ _Avoid_: local skill、personal skill
 ## Relationships
 
 - 一個 **Source** 會 **Sync** 到多個 **Target**
+- **Instructions** 在 **Source** 裡；**Settings** 在 chezmoi，包括告訴 skillshare 把 **Instructions** 連到哪的 `config.yaml`
 - 一個 **Client** 可以讀多個 **Target**（OpenCode 同時讀兩個）
 - **Own skill** 和 **Third-party skill** 都在 **Source** 裡；**Local skill** 只在 **Target** 裡
 
 ## Flagged ambiguities
 
 - 「local」在 skillshare 是「不是它放的」，不是「自己寫的」。自己寫的一律叫 **Own skill**。
-- 「sync」單講只指 skill。要寫進 client 的 MCP，一定講 **MCP sync**。
+- 「sync」單講指 skill 與 extras 的 symlink，不含 MCP；要寫進 client 的 MCP，一定講 **MCP sync**。注意 `skillshare sync` 這個指令不帶子指令時只同步 skill。
 
 ## PR 收尾詞彙
 
