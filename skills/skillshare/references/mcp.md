@@ -4,14 +4,14 @@ Skillshare keeps MCP server definitions in one source and writes each Agent's na
 config file from it. It writes settings only: it never starts a configured server, checks
 connectivity, resolves a secret or copies OAuth credentials. The exceptions are
 `mcp check --live`, which starts or calls servers only when asked, and `mcp serve`,
-which runs Skillshare's own read-only skills server.
+which runs Skillshare's own skills server, read-only unless `mcp.serve.edit` is set.
 
 ## Commands
 
 ```bash
 skillshare mcp --no-tui                             # Plain status (bare mcp opens the TUI)
 skillshare mcp add docs --url https://example.com/mcp --target claude --sync --no-tui
-skillshare mcp add local --target claude --no-tui -- npx -y @modelcontextprotocol/server-filesystem /path/to/docs
+skillshare mcp add local --target claude --no-tui -- npx -y @modelcontextprotocol/server-filesystem@1.0.0 /path/to/docs
 skillshare mcp edit docs --url https://updated.example/mcp --no-tui
 skillshare mcp import --from claude --json           # Inspect candidates without saving
 skillshare mcp import docs --from claude --target claude --sync --no-tui
@@ -21,10 +21,11 @@ skillshare mcp remove docs --sync --no-tui           # Remove unchanged managed 
 skillshare mcp remove docs --keep-files --no-tui     # Stop managing; Agent entries stay as they are
 skillshare mcp restore BACKUP_ID --dry-run --json     # Preview entry-level restoration
 skillshare mcp restore BACKUP_ID --no-tui            # Apply restoration; source stays unchanged
-skillshare mcp check --json                          # Static check: variables, commands, DNS, sync state
+skillshare mcp check --json                          # Static check: variables, commands, version pins, DNS, sync state
 skillshare mcp check --live --timeout 30s --json     # Also start/call each server: serverInfo, protocol, tools
-skillshare mcp serve [--target NAME] [--http ADDR [--tls-cert F --tls-key F]]  # Serve skills read-only over MCP (SEP-2640)
-skillshare mcp serve --check [--target NAME]         # List skills serve would skip, then exit
+skillshare mcp check docs --live --accept-tools      # Accept the tool definitions docs lists now as the baseline
+skillshare mcp serve [--target NAME] [--http ADDR [--tls-cert F --tls-key F]]  # Serve skills over MCP (SEP-2640)
+skillshare mcp serve --check [--target NAME]         # List skipped and editable skills, then exit
 ```
 
 ## Automation rules
@@ -45,14 +46,21 @@ skillshare mcp serve --check [--target NAME]         # List skills serve would s
   fail with a message. See [Upgrading Pi from 0.22](#upgrading-pi-from-022).
 - Preview with `skillshare sync mcp --dry-run --json`, then apply with
   `skillshare sync mcp --revision <revision>` to reject a stale plan.
-- `mcp check [name...] [--json] [--no-dns]` is read-only; without `--live` it starts nothing. It exits 1
+- `mcp check [name...] [--json] [--no-dns]` writes no config file; without `--live` it starts nothing
+  and writes nothing. It exits 1
   on an error (unset `fromEnv` variable, command not on PATH, client rule, conflict);
-  an unresolved host or an unsynced entry is only a warning. In global mode it also checks
+  an unresolved host, an unpinned package or image (`pin`) or an unsynced entry is only a warning. In global mode it also checks
   servers under `mcp.projects`; `--json` marks each with its `project` root.
 - `mcp check --live [--timeout 10s]` also starts each local server (your environment plus
   its `env`) and POSTs to each remote one, skipping servers with a static error. A 401 is a
   warning with the resource metadata URL; it never signs in. Use it only for trusted
   servers. `--json` adds `live: {protocolVersion, serverInfo, tools, toolNames}`.
+- `mcp check --live` also pins each tool's definition (hash of name, description and input
+  schema) on a server's first probe, in `mcp/tool-pins.json` of the state directory. Later
+  probes warn (`tool-change`) about a changed or new tool and note a removed one; the pin is
+  kept until `--accept-tools` (only with `--live`) re-baselines every probed server, so
+  review the changes first; each acceptance is recorded in the operations log. An unreadable pin file is never rewritten; move it away to pin
+  again. Without `--live` the pins are untouched.
 - `mcp serve` serves skills to Agents that cannot reach the synced folders (VMs, MCP
   gateways): stdio by default, global unless `-p`. `--target NAME` applies that target's
   filters. Skipped skills (`SKILL.md` a link or not starting with frontmatter, name not matching
@@ -63,8 +71,19 @@ skillshare mcp serve --check [--target NAME]         # List skills serve would s
   remote `url` with `bearerToken: {fromEnv: SKILLSHARE_MCP_TOKEN}`. Agents with the Skills
   extension load skills natively; as of October 2026 Codex, Cursor, VS Code, Goose and Pi
   lack it and Claude Code's is off by default, so the server also offers `list_skills`
-  (`query` filters) and `read_skill` tools, hidden from clients that declare the extension. Verify the server with
+  (`query` filters) and `read_skill` tools, marked `readOnlyHint` and hidden from clients that declare the extension. Verify the server with
   `npx @modelcontextprotocol/inspector --cli skillshare mcp serve --method skills/list --verify`.
+- `mcp.serve.edit.skills` (flat-name patterns, like `include`) lets clients change
+  existing files of those skills; `preview_ttl` defaults to `30m`. `preview_skill_edit`
+  (uri, `read_skill`'s revision, full content) writes nothing and returns the diff, audit
+  and a preview id; `apply_skill_edit` (preview id, `destructiveHint`) saves exactly that.
+  With editing on, `read_skill` ends with `Revision: sha256:...` (the `skills/list` digest),
+  which is not part of the content. Refusals write nothing: `not_writable` (unlisted,
+  tracked repo, installed or nested in an installed skill), `conflict`, `invalid`,
+  `audit_blocked` (any finding at or above `audit.block_threshold` not accepted with
+  `install --force`; findings are marked new or existing), `expired`. No create, delete
+  or rename. Apply re-checks the whole skill. Saves are logged as `mcp serve`, audits in
+  `audit.log`. A legacy `registry.yaml` keeps every skill read-only until migrated.
 - Noninteractive `import` without a name only lists candidates. Use `--replace` only
   when replacing is intended.
 - An `update` with the message `same settings, laid out one field per line` is a
@@ -88,7 +107,7 @@ mcp:
         X-Api-Key: {fromEnv: DOCS_KEY}     # a reference, never the secret itself
     files:
       command: npx
-      args: ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/docs"]
+      args: ["-y", "@modelcontextprotocol/server-filesystem@1.0.0", "/path/to/docs"]
       targets: [claude, opencode]
 ```
 
@@ -399,7 +418,7 @@ mcp:
   servers:
     context7:
       command: npx
-      args: ["-y", "@upstash/context7-mcp"]
+      args: ["-y", "@upstash/context7-mcp@4.4.1"]
   projects:
     ~/work/project01:
       servers:
