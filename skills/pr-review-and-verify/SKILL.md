@@ -78,7 +78,7 @@ inline 意見回原 thread；一般留言與整體 review 回原對話，不另�
 2. 列出該 head 上 `gh pr checks` 每一項的狀態。有失敗 → 不算完成；pending → 列為未驗，不等它跑完；PR 是 draft → 寫明「CI 沒跑，轉 ready 才會跑」。
 3. 過 [head 閘門]，發一則本輪唯一的收尾 comment：已核對的 head、最終驗證結果、未驗原因、待 reviewer 確認的項目，以及結束狀態。不重貼整份 body；有新增風險才補 Merge Danger。
 
-**附件**：從 `verify-in-browser` 回報的本機證據挑選，用 `gh pr comment <PR> --body "<結果>" --attach '<路徑>'` 上傳（限制見 `playwright-cli` 的 PR attachments）。附件不 commit，要對應實測的操作與 SHA。測試環境預設附上有助判讀的真實截圖，正常的測試業務資料（姓名、email、對話）照常保留；發布前遮蔽實際出現的密碼、token、API key 與登入憑證。遮蔽截圖不等於清理了 trace、影片或 storage state，那些各自檢查。附截圖還是影片，照 `verify-in-browser` 的證據判準。
+**附件**：`verify-in-browser` 回報的就是照它 `report-template.md` 寫好的 comment，存成檔案直接發，在證據資料夾裡執行，body 引用的每張圖各帶一個同樣相對路徑的 `--attach`：`cd <E> && gh pr comment <PR> -F <回報檔> --attach './x.png'`。body 裡的 `./x.png` 會被換成上傳後的網址（限制見 `playwright-cli` 的 PR attachments）。L0 沒有瀏覽器驗收 comment，只寫進 `## 驗證`。附件不 commit，要對應實測的操作與 SHA。測試環境預設附上有助判讀的真實截圖，正常的測試業務資料（姓名、email、對話）照常保留；發布前遮蔽實際出現的密碼、token、API key 與登入憑證。遮蔽截圖不等於清理了 trace、影片或 storage state，那些各自檢查。附截圖還是影片，照 `verify-in-browser` 的證據判準。
 
 **完成條件：** 收尾 comment 的 URL 已取得，內文含 head、驗證結果、CI 狀態、未驗原因與結束狀態；重新讀取 PR body，`## 驗證` 對應同一個 head。
 
