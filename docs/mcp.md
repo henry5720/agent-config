@@ -41,7 +41,7 @@ client 專屬的欄位 skillshare 不寫。例如 Codex 的 `startup_timeout_sec
 
 | 條目從哪來 | 怎麼處理 |
 |---|---|
-| 舊版 chezmoi 寫的 | `chezmoi apply` 時 dotfiles 的 [`run_once_after_remove-chezmoi-mcp.py.tmpl`](https://github.com/henry5720/dotfiles/blob/main/home/run_once_after_remove-chezmoi-mcp.py.tmpl) 自動刪掉：Claude 的 chrome-devtools；Codex 的 chrome-devtools、codegraph、context7；OpenCode 的 chrome-devtools、codegraph。只刪跟舊版內容一字不差的，Codex 的 context7 例外（key 是各台自己的值，只比對 url 與欄位）。刪掉時會印出來 |
+| 舊版 chezmoi 寫的 | `chezmoi apply` 時 dotfiles 的 [`run_once_after_remove-chezmoi-mcp.py.tmpl`](https://github.com/henry5720/dotfiles/blob/main/home/.chezmoiscripts/run_once_after_remove-chezmoi-mcp.py.tmpl) 自動刪掉：Claude 的 chrome-devtools；Codex 的 chrome-devtools、codegraph、context7；OpenCode 的 chrome-devtools、codegraph。只刪跟舊版內容一字不差的，Codex 的 context7 例外（key 是各台自己的值，只比對 url 與欄位）。刪掉時會印出來 |
 | 舊版 chezmoi 放的 skill | `~/.codex/skills/`、`~/.config/opencode/skills/` 底下的 `company-imagegen-fallback` 已搬來這個 repo，dotfiles 的 `.chezmoiremove` 讓 `chezmoi apply` 把舊的刪掉，不然 Codex 會看到兩份 |
 | 手動加的（`claude mcp add`、`codegraph install`）、OpenCode 的空殼 `opencode.jsonc` | 見 [README 的〈sync mcp 撞到衝突〉](../README.md#sync-mcp-撞到衝突) |
 
@@ -58,4 +58,4 @@ chezmoi update → skillshare sync mcp -g --dry-run → 處理 conflict → skil
 | server | 看哪 |
 |---|---|
 | chrome-devtools | [docs/skills/chrome-mcp.md](skills/chrome-mcp.md)：桌機要連 Windows 的 Chrome（遠端主機也能自己開 headless Chrome）、要關掉官方 plugin、版本釘在 `mcp.yaml` |
-| codegraph | dotfiles 的 [ai-agent-setup.md〈codegraph〉](https://github.com/henry5720/dotfiles/blob/main/docs/ai-agent-setup.md#codegraph設定會回來但它塞進-claudemd-的那段不會)：CLI 安裝、索引、worktree 與 git hook 都由 dotfiles 管 |
+| codegraph | dotfiles 的 [codegraph.md](https://github.com/henry5720/dotfiles/blob/main/docs/codegraph.md)：CLI 安裝、索引、worktree 與 git hook 都由 dotfiles 管 |

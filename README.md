@@ -14,8 +14,9 @@ flowchart LR
   dotfiles -. "裝 skillshare、放 config.yaml" .-> agentconfig
 ```
 
-怎麼在新機器裝起來、規則和 client 設定在哪，看
-[dotfiles](https://github.com/henry5720/dotfiles/blob/main/docs/ai-agent-setup.md)。
+規則、skill、MCP、plugin 各歸誰管、檔案在哪，看 dotfiles 的
+[ai-agent-setup.md](https://github.com/henry5720/dotfiles/blob/main/docs/ai-agent-setup.md)；
+新機器怎麼裝起來看 [new-machine-setup.md](https://github.com/henry5720/dotfiles/blob/main/docs/new-machine-setup.md)。
 這份只管「裝好之後怎麼用」。詞彙（source、target、local…）見 [GLOSSARY.md](GLOSSARY.md)。
 
 **公開 repo。** 秘密不進來：MCP 的 key 用 `fromEnv`，skill 的 token 放 `~/.config/<skill>/.env`。
