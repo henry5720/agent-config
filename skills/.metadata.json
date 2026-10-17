@@ -343,7 +343,7 @@
     "show-me": {
       "source": "https://github.com/humanlayer/skills.git/plugins/show-me/skills/show-me",
       "type": "github-subdir",
-      "installed_at": "2026-10-09T05:59:58.173031844Z",
+      "installed_at": "2026-10-17T08:57:25.750394208Z",
       "repo_url": "https://github.com/humanlayer/skills.git",
       "subdir": "plugins/show-me/skills/show-me",
       "version": "653b641",
