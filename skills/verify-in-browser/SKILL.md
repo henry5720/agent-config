@@ -24,7 +24,15 @@ description: 當使用者要求瀏覽器驗收，或 agent 判斷需要透過瀏
 
 **[引擎差異清單]**：iframe 嵌入、third-party cookie、SSO／跨網域登入、clipboard、原生 `date`／`file` input、檔案下載、使用者明說要看 Safari。這些是 Safari（WebKit）和 Chrome 已知行為不同的地方；不在清單上的改動只跑 Chromium，回報寫「僅 Chromium」。
 
-**改前對照**：修 bug 或改既有畫面時加做，新功能免做（沒有改前畫面）。見步驟 3。
+**改前對照**：依改動決定，合併後線上就變成改後，改前只留得住在 PR 上。
+
+| 改動 | 改前 |
+|---|---|
+| 修 bug | 必拍，證明 bug 重現過；照步驟 3 |
+| 改既有畫面 | PR body 用文字寫改前怎樣即可；順手拿得到就拍，拿不到不必寫原因 |
+| 新功能 | 不拍 |
+
+使用者要求改前截圖時照「修 bug」辦。
 
 **截圖看不到的狀態**（hover、窄螢幕）各算一個斷言，各自留證據；沒驗就列進「未驗」。
 
@@ -39,6 +47,7 @@ description: 當使用者要求瀏覽器驗收，或 agent 判斷需要透過瀏
    - session `S` = `<repo 名>-<分支名>`，`/` 換成 `-`（例：`agent-config-feat-login`）。L3 的 WebKit 用 `S-webkit`；改前對照用 `S-before`。
    - 證據資料夾 `E` = 絕對路徑。有 `$CLAUDE_JOB_DIR` 用 `$CLAUDE_JOB_DIR/tmp/verify-<S>`，沒有用 `/tmp/verify-<S>`。先 `mkdir -p <E> && chmod 700 <E>`：裡面會有 `auth.json` 和含明文密碼的 `.playwright-cli/`，只給自己讀。
 3. **定環境，整趟固定：** viewport 預設 `1440 900`（`resize 1440 900`），語系、主題、角色帳號、後端（local／staging）。改前改後必須相同；改前取自線上部署時例外，見步驟 3。
+   - **後端版本對得上才開瀏覽器。** PR 寫了依賴的後端 commit 時，確認後端 HEAD 包含它：`git -C <後端 repo> merge-base --is-ancestor <PR 寫的 commit> <後端 HEAD>`。PR 沒寫才退回查 openapi 有沒有這次的新欄位，回報註明「用欄位推斷」。對不上就停下回報。
 
 ## 每個指令的寫法
 
@@ -55,10 +64,10 @@ cd <E> && playwright-cli -s=<S> <指令>
 
 1. **起 dev server，`open <url>`，`resize` 成固定 viewport。**
 2. **登入**（頁面要登入才看得到時），見下一節。
-3. **改前對照（需要時）。** 照順序取，拿到就停。截圖都存 `<E>/before-<狀態>.png`，用 session `S-before`，viewport、操作與改後相同。
-   - **base 的線上部署**：該 repo 的 `AGENTS.md`／docs 寫了網址與查部署 commit 的方法，且下面兩條都成立才用：部署 commit 與 merge-base 在這次改到的路徑上沒有差異（`git diff --name-only <merge-base> <部署 commit> -- <改到的路徑>` 輸出為空）；這張 PR 依賴的後端改動還沒部署。只截唯讀畫面，不在共用環境寫入。回報的環境表為改前另寫一列：網址、部署 commit、資料來源。
-   - **本機 base**：`git worktree add <tmp>/before <merge-base>`，另一個 port 起 dev server，用和改後相同的資料。
-   - 都拿不到（base 起不來、後端對不上）：回報寫「只有改後：<原因>」。
+3. **改前對照（修 bug 或使用者要求時）。** 照順序取，拿到就停。截圖都存 `<E>/before-<狀態>.png`，用 session `S-before`，viewport、操作與改後相同。
+   - **base 的線上部署**：該 repo 的 `AGENTS.md`／docs 寫了網址與查部署 commit 的方法，且下面三條都成立才用：部署 commit 與 merge-base 在這次改到的路徑上沒有差異（`git diff --name-only <merge-base> <部署 commit> -- <改到的路徑>` 輸出為空）；這張 PR 依賴的後端改動還沒部署；部署端開得到改到的頁面（模組開關、feature flag）。只截唯讀畫面，不在共用環境寫入。回報的環境表為改前另寫一列：網址、部署 commit、資料來源。
+   - **本機 base**：`git worktree add <tmp>/before <merge-base>`，另一個 port 起 dev server。後端用 base 時期的版本：這張 PR 沒改後端契約就用改後那台；改了就用不含那些改動的舊版後端，回報註明資料來源。
+   - 都拿不到：回報寫「只有改後：<原因>」。
 4. **依級別操作並留證據。** 截圖 `screenshot --filename=<E>/after-<狀態>.png`（L3 加引擎：`after-webkit-<狀態>.png`），截完查看圖片。斷言是先後順序或過程（暫存 → 儲存 → 重開一致、處理中無法關閉、按上一頁回到哪頁）時，錄 60 秒內的影片 `video-start <E>/<流程>.webm`／`video-stop` 取代那串截圖，登入完才開始錄。確認結構用 `snapshot --filename=<E>/<狀態>.yml` 或 `find "<文字>"`。檢查 `console error`，分清這次改出來的和原本就有的。每張截圖記下資料來源：真實 API，或 mock／`route` 攔截。
 5. **收尾：** `close`（每個 session）；`git worktree remove <tmp>/before`；`rm -rf <E>/.playwright-cli <E>/auth.json`。dev server 是你起的就關掉。
 6. **發布（呼叫者不是 `pr-review-and-verify` 時）。** 這個分支有 PR（`gh pr view --json number`）就問使用者一次：「要把這份回報發成 PR #<N> 的 comment 嗎？」
