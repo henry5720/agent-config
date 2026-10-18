@@ -1,9 +1,10 @@
 ---
 name: pr-review-and-verify
 description: >-
-  使用者明確呼叫本 skill、說「收這個 PR」，或要求完整執行 PR 獨立審查與驗收時使用；
-  開 PR 或一般要求 review 本身不啟動收尾流程。
+  完整執行一輪 PR 獨立審查與驗收（派審查、修正、驗證、回覆、發布收尾）。
+  會在 PR 留言與 resolve threads，只由使用者以 `/pr-review-and-verify` 開頭的訊息啟動。
 argument-hint: "<PR> [draft]"
+disable-model-invocation: true
 ---
 
 # PR 獨立審查與驗收

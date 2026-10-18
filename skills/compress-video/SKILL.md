@@ -1,6 +1,6 @@
 ---
 name: compress-video
-description: 把螢幕錄影壓成能貼進 Slack 回報的證據影片。當使用者說「影片太大」「壓一下影片」「錄了測試影片要傳給 PM」時使用；其他 skill 要把錄影附進回報前也用。
+description: 把螢幕錄影壓成能貼進 Slack 回報或 PR comment 的證據影片。當使用者說「影片太大」「壓一下影片」「錄了測試影片要傳給 PM」時使用；其他 skill 要把錄影附進回報前也用。
 ---
 
 # 證據影片
@@ -121,6 +121,9 @@ ls -l out.mp4
 影片貼上去之後，回報進度走 `slack-list`，見
 [slack-list skill](../slack-list/SKILL.md) —— 影片本身不是回報，
 留言串裡那段「怎麼重現、預期什麼、實際什麼」才是。
+
+要附到 PR 時改用 `gh pr comment --attach out.mp4`，回報 body 引用同樣的相對路徑。
+上傳被拒（檔案太大）再回第 3 步「還是太大」往下砍，不預設大小上限。
 
 ---
 
