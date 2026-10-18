@@ -7,7 +7,7 @@ description: 當使用者要求瀏覽器驗收，或 agent 判斷需要透過瀏
 
 指令用法看 `playwright-cli` skill（或 `playwright-cli --help`）。這份只補它沒寫的：驗多少、怎麼登入、留什麼證據、怎麼回報、卡住換什麼。
 
-本 skill 只做驗收：證據存在本機暫存資料夾，回報給呼叫者。不 commit 證據，也不自己發布到 PR／issue；要附到 PR 時，由 `pr-review-and-verify` 發布，或由使用者自己上傳。
+本 skill 只做驗收：證據存在本機暫存資料夾，回報給呼叫者。不 commit 證據，不經使用者同意不發布到 PR／issue；呼叫者是 `pr-review-and-verify` 時由它發布，其他情況見步驟 6。
 
 ## 決定驗多少
 
@@ -17,7 +17,7 @@ description: 當使用者要求瀏覽器驗收，或 agent 判斷需要透過瀏
 |---|---|---|---|
 | L0 | 沒碰畫面（純邏輯、型別、文件、設定） | 不開 | 測試輸出；回報環境寫「未開瀏覽器」 |
 | L1 | 單一畫面狀態（欄位、顏色、文案、版面） | Chromium 走一次 | 每個改到的狀態 1 張截圖 |
-| L2 | 操作流程（mutation、toast、按鈕狀態、route） | Chromium 走每個改到的操作的成功路徑 | 截圖；要證明先後順序才錄影 |
+| L2 | 操作流程（mutation、toast、按鈕狀態、route） | Chromium 走每個改到的操作的成功路徑 | 一個斷言一份證據：看最後狀態就截 1 張；斷言是先後順序或過程時，1 支影片取代整串截圖 |
 | L3 | L2，且命中[引擎差異清單] | Chromium + WebKit | 同 L2，每張截圖標引擎 |
 
 一次改動跨多級時取最高級。使用者指定範圍時照使用者的。
@@ -25,6 +25,8 @@ description: 當使用者要求瀏覽器驗收，或 agent 判斷需要透過瀏
 **[引擎差異清單]**：iframe 嵌入、third-party cookie、SSO／跨網域登入、clipboard、原生 `date`／`file` input、檔案下載、使用者明說要看 Safari。這些是 Safari（WebKit）和 Chrome 已知行為不同的地方；不在清單上的改動只跑 Chromium，回報寫「僅 Chromium」。
 
 **改前對照**：修 bug 或改既有畫面時加做，新功能免做（沒有改前畫面）。見步驟 3。
+
+**截圖看不到的狀態**（hover、窄螢幕）各算一個斷言，各自留證據；沒驗就列進「未驗」。
 
 **斷斷續續的問題**（閃爍、race、效能、偶發錯誤）：單張截圖證明不了，要重複 N 次記發生次數，並附一列反向對照（改前本來就正常的情境），說清楚修法在哪裡有效、哪裡無關。
 
@@ -36,7 +38,7 @@ description: 當使用者要求瀏覽器驗收，或 agent 判斷需要透過瀏
 2. **定名字，整趟照抄成字面值：**
    - session `S` = `<repo 名>-<分支名>`，`/` 換成 `-`（例：`agent-config-feat-login`）。L3 的 WebKit 用 `S-webkit`；改前對照用 `S-before`。
    - 證據資料夾 `E` = 絕對路徑。有 `$CLAUDE_JOB_DIR` 用 `$CLAUDE_JOB_DIR/tmp/verify-<S>`，沒有用 `/tmp/verify-<S>`。先 `mkdir -p <E> && chmod 700 <E>`：裡面會有 `auth.json` 和含明文密碼的 `.playwright-cli/`，只給自己讀。
-3. **定環境，整趟固定：** viewport 預設 `1440 900`（`resize 1440 900`），語系、主題、角色帳號、後端（local／staging）。改前改後必須相同。
+3. **定環境，整趟固定：** viewport 預設 `1440 900`（`resize 1440 900`），語系、主題、角色帳號、後端（local／staging）。改前改後必須相同；改前取自線上部署時例外，見步驟 3。
 
 ## 每個指令的寫法
 
@@ -53,11 +55,17 @@ cd <E> && playwright-cli -s=<S> <指令>
 
 1. **起 dev server，`open <url>`，`resize` 成固定 viewport。**
 2. **登入**（頁面要登入才看得到時），見下一節。
-3. **改前對照（需要時）。** `git worktree add <tmp>/before <base SHA>`，在那裡另一個 port 起 dev server，用 session `S-before` 照同樣資料、viewport、操作截 `<E>/before-<狀態>.png`。拿不到改前（base 起不來、資料已變）就明說只有改後。
-4. **依級別操作並留證據。** 截圖 `screenshot --filename=<E>/after-<狀態>.png`（L3 加引擎：`after-webkit-<狀態>.png`），截完查看圖片。要證明先後（暫存 → 儲存 → 重開一致、刪除 → 取消 → 還原）時錄 60 秒內的影片 `video-start <E>/<流程>.webm`／`video-stop`，登入完才開始錄。確認結構用 `snapshot --filename=<E>/<狀態>.yml` 或 `find "<文字>"`。檢查 `console error`，分清這次改出來的和原本就有的。每張截圖記下資料來源：真實 API，或 mock／`route` 攔截。
+3. **改前對照（需要時）。** 照順序取，拿到就停。截圖都存 `<E>/before-<狀態>.png`，用 session `S-before`，viewport、操作與改後相同。
+   - **base 的線上部署**：該 repo 的 `AGENTS.md`／docs 寫了網址與查部署 commit 的方法，且下面兩條都成立才用：部署 commit 與 merge-base 在這次改到的路徑上沒有差異（`git diff --name-only <merge-base> <部署 commit> -- <改到的路徑>` 輸出為空）；這張 PR 依賴的後端改動還沒部署。只截唯讀畫面，不在共用環境寫入。回報的環境表為改前另寫一列：網址、部署 commit、資料來源。
+   - **本機 base**：`git worktree add <tmp>/before <merge-base>`，另一個 port 起 dev server，用和改後相同的資料。
+   - 都拿不到（base 起不來、後端對不上）：回報寫「只有改後：<原因>」。
+4. **依級別操作並留證據。** 截圖 `screenshot --filename=<E>/after-<狀態>.png`（L3 加引擎：`after-webkit-<狀態>.png`），截完查看圖片。斷言是先後順序或過程（暫存 → 儲存 → 重開一致、處理中無法關閉、按上一頁回到哪頁）時，錄 60 秒內的影片 `video-start <E>/<流程>.webm`／`video-stop` 取代那串截圖，登入完才開始錄。確認結構用 `snapshot --filename=<E>/<狀態>.yml` 或 `find "<文字>"`。檢查 `console error`，分清這次改出來的和原本就有的。每張截圖記下資料來源：真實 API，或 mock／`route` 攔截。
 5. **收尾：** `close`（每個 session）；`git worktree remove <tmp>/before`；`rm -rf <E>/.playwright-cli <E>/auth.json`。dev server 是你起的就關掉。
+6. **發布（呼叫者不是 `pr-review-and-verify` 時）。** 這個分支有 PR（`gh pr view --json number`）就問使用者一次：「要把這份回報發成 PR #<N> 的 comment 嗎？」
+   - 同意：影片先照 `compress-video` 壓成 mp4，再照 `pr-review-and-verify` 的「附件」規則發（`--attach`、遮蔽憑證）。在整合分支上驗某張子票時，標題寫票號。
+   - 不同意或沒有 PR：回報列出 `<E>` 路徑，並說明暫存資料夾不會長久保留。
 
-步驟 4 的完成條件：達到該級別的下限，證據已查看並留在 `<E>`；與驗證目的相關但沒走到的，列進「未驗」。不為湊截圖去截無關的狀態。
+步驟 4 的完成條件：達到該級別的下限，證據已查看並留在 `<E>`；需要改前對照卻沒有時，回報寫了原因；與驗證目的相關但沒走到的，列進「未驗」。不為湊截圖去截無關的狀態。
 
 ## 登入
 

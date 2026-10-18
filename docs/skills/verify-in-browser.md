@@ -33,13 +33,14 @@ flowchart LR
   D -- 否 --> S["不開瀏覽器<br/>回報未做及原因"]
   V --> P["回報實測結果、未驗<br/>與本機證據路徑"]
   S --> P
-  P --> U["要附到 PR：<br/>pr-review-and-verify 發布，或你自己傳"]
+  P --> U["要附到 PR：<br/>pr-review-and-verify 發布，<br/>或它問過你同意後發"]
 ```
 
 - 互動 session 和 agent-runner 規則一樣。互動時你說「不用驗」它就跳過；agent 也不會因為改了 UI 就自動啟動驗收。
 - 整套回歸交給 CI 和 e2e；選擇瀏覽器驗收時，只做足以回答驗證目的的操作，不要求走遍所有狀態或每個狀態都截圖。
-- 截圖、錄影只存在本機暫存資料夾（`$CLAUDE_JOB_DIR/tmp/verify-<session>` 或 `/tmp/verify-<session>`），這支 skill 不上傳到 GitHub。
-- 要附到 PR 時，由 `pr-review-and-verify` 依 reviewer 需要挑選、遮蔽秘密後上傳；沒走那支 skill 就由你自己決定傳不傳。說明圖不代表已實際驗證，未驗項目照實列出。
+- 截圖、錄影先存在本機暫存資料夾（`$CLAUDE_JOB_DIR/tmp/verify-<session>` 或 `/tmp/verify-<session>`）。
+- 要附到 PR 時，由 `pr-review-and-verify` 依 reviewer 需要挑選、遮蔽秘密後上傳；沒走那支 skill 時，分支有 PR 它會問你一次要不要發成 comment，你同意才發。說明圖不代表已實際驗證，未驗項目照實列出。
+- 改前畫面先找 base 的線上部署（repo 文件要寫網址和查部署 commit 的方法，且能證明部署內容等於改前），不行才在本機開 base；都拿不到要寫原因。
 - 「每個 PR 都寫驗證段」這條是全域規則，寫在這個 repo 的 `instructions/agents-md/AGENTS.md`（部署成 `~/.claude/CLAUDE.md`），不是這支 skill。
 
 ## 你要做的事

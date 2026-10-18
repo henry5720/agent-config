@@ -1,0 +1,5 @@
+interface:
+  display_name: "PR Review and Verify"
+  short_description: "Run one full round of independent PR review, fixes, verification, and PR wrap-up."
+policy:
+  allow_implicit_invocation: false
