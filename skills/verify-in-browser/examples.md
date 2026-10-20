@@ -19,9 +19,9 @@
 
 **結論：** 空清單改顯示「尚無維護計畫」，有資料時畫面不變。
 
-| SHA | 引擎 | 視窗 | 語系／主題 | 角色 | 後端 | 資料 |
+| SHA | 工具／引擎 | 視窗 | 語系／主題 | 角色 | 後端 | 資料 |
 |---|---|---|---|---|---|---|
-| `a2f11e9` | Chromium | 1440×900 | zh-TW／淺色 | admin | staging | 真實 API |
+| `a2f11e9` | Claude in Chrome／Chrome | 1440×900 | zh-TW／淺色 | admin | staging | 真實 API |
 
 **怎麼驗的：** 開 `/inventory/maintenance`，篩選到沒有結果的部門，再切回有資料的部門。
 
@@ -41,9 +41,9 @@
 
 **結論：** 批次清除走完確認 → 執行 → toast → 清單更新，取消時不送出 request。
 
-| SHA | 引擎 | 視窗 | 語系／主題 | 角色 | 後端 | 資料 |
+| SHA | 工具／引擎 | 視窗 | 語系／主題 | 角色 | 後端 | 資料 |
 |---|---|---|---|---|---|---|
-| `a2f11e9` | Chromium | 1440×900 | zh-TW／淺色 | admin | staging | 真實 API |
+| `a2f11e9` | playwright-cli／Chromium | 1440×900 | zh-TW／淺色 | admin | staging | 真實 API |
 
 **怎麼驗的：** 勾 3 筆 → 清除 → 取消；再勾 3 筆 → 清除 → 確認，看 toast 和清單筆數。
 
@@ -65,10 +65,10 @@
 
 **結論：** 兩個引擎都能在 app 內開啟 dashboard，關閉後舊 session 回 401。
 
-| SHA | 引擎 | 視窗 | 語系／主題 | 角色 | 後端 | 資料 |
+| SHA | 工具／引擎 | 視窗 | 語系／主題 | 角色 | 後端 | 資料 |
 |---|---|---|---|---|---|---|
-| `523849a` | Chromium | 1440×900 | zh-TW／淺色 | company A member | staging | 真實 API（403／404 為 mock） |
-| `523849a` | WebKit（Linux Playwright，不等於 Safari） | 1440×900 | zh-TW／淺色 | company A member | staging | 真實 API（403／404 為 mock） |
+| `523849a` | playwright-cli／Chromium | 1440×900 | zh-TW／淺色 | company A member | staging | 真實 API（403／404 為 mock） |
+| `523849a` | playwright-cli／WebKit（Linux，不等於 Safari） | 1440×900 | zh-TW／淺色 | company A member | staging | 真實 API（403／404 為 mock） |
 
 **怎麼驗的：** 點 dashboard 卡片 → 看 iframe 內 3 筆資料 → 工具列 reload → 關閉 → 用舊 bearer 重送。
 
@@ -88,9 +88,9 @@
 
 **結論：** 修法有效：大量 re-mount 已快取圖示時不再閃空白；單顆圖示本來就不閃。
 
-| SHA | 引擎 | 視窗 | 語系／主題 | 角色 | 後端 | 資料 |
+| SHA | 工具／引擎 | 視窗 | 語系／主題 | 角色 | 後端 | 資料 |
 |---|---|---|---|---|---|---|
-| `b765f45` | Chromium | 1440×900 | zh-TW／淺色 | admin | local | 真實 API |
+| `b765f45` | playwright-cli／Chromium | 1440×900 | zh-TW／淺色 | admin | local | 真實 API |
 
 **怎麼驗的：** 兩個 dev server（`origin/dev`、PR head），同一份 React 反覆 mount 已快取圖示，每個 `requestAnimationFrame` 檢查有沒有 `opacity: 0` 佔位。
 

@@ -149,8 +149,8 @@ done
 
 | skill | 你要做的事 |
 |---|---|
-| [chrome-mcp](chrome-mcp.md) | 開 Chrome 給 agent 用、轉發到 EC2、排錯 9222 |
-| [verify-in-browser](verify-in-browser.md) | 裝 `playwright-cli`、升級後跟上官方 skill；也講瀏覽器工具怎麼分工 |
+| [remote-chrome](remote-chrome.md) | 開 Chrome 給 agent 用、轉發到 EC2、排錯 9222 |
+| [verify-in-browser](verify-in-browser.md) | 選瀏覽器工具（playwright-cli、Claude in Chrome、Codex）、裝 ffmpeg 轉影片、升級 playwright-cli 後跟上官方 skill |
 | [slack-list](slack-list.md) | 建 Slack app、填 `.env`、排錯 |
 | [daily-worklog](daily-worklog.md) | 兩種用法：裝成 skill，或整份貼給其他 agent |
 

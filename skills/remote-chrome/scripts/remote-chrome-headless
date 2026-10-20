@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # 在遠端主機(company-ec2)自己開 headless Chrome 佔 127.0.0.1:9222,給 chrome-devtools MCP 連。
-# 跟桌機的 chrome-mcp 二選一：不用看畫面就用這個，agent 自己開得起來;要看畫面或用桌機的登入狀態就 Ctrl+C 掉它，改跑 chrome-mcp。
+# 跟桌機的 remote-chrome 二選一：不用看畫面就用這個，agent 自己開得起來;要看畫面或用桌機的登入狀態就 Ctrl+C 掉它，改跑 remote-chrome。
 # MCP 設定不用改 —— 它只認 9222,不管後面是哪個 Chrome。
 # Chrome 由 dotfiles chezmoi 選裝工具的 headless-chrome 裝(官方 .deb + 中文/emoji 字型)。
-# 怎麼用見同一個 skill 的 SKILL.md；背景與排錯見 agent-config 的 docs/skills/chrome-mcp.md。
+# 怎麼用見同一個 skill 的 SKILL.md；背景與排錯見 agent-config 的 docs/skills/remote-chrome.md。
 
 set -euo pipefail
 
@@ -18,6 +18,7 @@ done
 
 PORT=9222
 # 登入狀態放這裡，關掉再開還在。是狀態不是快取，所以不放 ~/.cache。
+# 目錄名沿用 skill 改名前的 chrome-mcp-profile:改了會換成新的空 profile,EC2 上登入過的網站要重登。
 PROFILE="${XDG_STATE_HOME:-$HOME/.local/state}/chrome-mcp-profile"
 LOG="$PROFILE.log"
 
@@ -25,12 +26,12 @@ endpoint_browser() {
   curl -s --max-time 2 "http://127.0.0.1:$PORT/json/version" | jq -er '.Browser // empty' 2>/dev/null
 }
 
-# 1. 9222 已經有 Chrome 就不開。可能是桌機的 chrome-mcp 正在轉發，也可能是上一次的
-#    chrome-headless 還開著;不管哪個，MCP 現在就能用。9222 有別的東西(不是 Chrome)就失敗。
+# 1. 9222 已經有 Chrome 就不開。可能是桌機的 remote-chrome 正在轉發，也可能是上一次的
+#    remote-chrome-headless 還開著;不管哪個，MCP 現在就能用。9222 有別的東西(不是 Chrome)就失敗。
 if browser=$(endpoint_browser); then
   echo "127.0.0.1:$PORT 已經有 Chrome($browser),不用開。"
   curl -s --max-time 2 "http://127.0.0.1:$PORT/json/version" | jq -r '."User-Agent"' | grep -q 'Windows NT' &&
-    echo "那是桌機轉發過來的 Windows Chrome —— 要改用 headless,先去桌機把 chrome-mcp Ctrl+C 掉。"
+    echo "那是桌機轉發過來的 Windows Chrome —— 要改用 headless,先去桌機把 remote-chrome Ctrl+C 掉。"
   exit 0
 fi
 if curl -s --max-time 2 -o /dev/null "http://127.0.0.1:$PORT/"; then
@@ -56,7 +57,7 @@ google-chrome \
   >"$LOG" 2>&1 &
 chrome_pid=$!
 
-# 開著就是在用,Ctrl+C / 關終端機就收掉，不留著佔 9222(不然桌機的 chrome-mcp 轉發會失敗)。
+# 開著就是在用,Ctrl+C / 關終端機就收掉，不留著佔 9222(不然桌機的 remote-chrome 轉發會失敗)。
 cleanup() {
   trap - EXIT
   echo "關掉 headless Chrome..." 2>/dev/null || true
