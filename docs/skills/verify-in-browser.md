@@ -53,6 +53,7 @@ flowchart LR
 | 什麼時候 | 做什麼 |
 |---|---|
 | 新機器 | 備一個能操作瀏覽器的工具。這台用 `playwright-cli`：dotfiles chezmoi 選裝工具勾它（用 `headless-chrome` 裝的 Chrome），或 `npm i -g @playwright/cli`；WSL、ARM 不裝。Claude in Chrome 不支援 WSL。都沒有時 agent 把驗收列進「未驗」 |
+| 要把驗收影片發到 PR | 裝 `ffmpeg`（要有 `libx264`）：`playwright-cli` 錄的 `.webm` 會照 `compress-video` 轉成 H.264 mp4。沒裝就附原 `.webm`，回報會註明 Safari 可能播不出；GIF 不用轉 |
 | 升級 `@playwright/cli` 後 | 官方 skill 釘在跟 CLI 同一版的 commit，要手動跟（見下方） |
 | 要 agent 驗需要登入的頁面 | 確認帳密在環境變數或那個 repo e2e 用的 `.env` 裡（agent 先看環境變數，只讀它要的那個 key） |
 
