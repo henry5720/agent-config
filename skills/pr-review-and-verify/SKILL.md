@@ -12,6 +12,7 @@ disable-model-invocation: true
 本 skill 由使用者明確啟動一輪。你是**流程負責人**：派獨立審查、修正、驗證、回覆、發布收尾。依序完成每一步的完成條件再進下一步。
 
 ```text
+0. 檢查環境        gh 登入與寫入權限、playwright-cli、帳密檔；缺項一次回報
 1. 固定範圍        head SHA、需求、既有意見、有沒有 reviewer
 2. 獨立審查        乾淨 context 審 → 你逐條驗證 → [head 閘門] → 發 report
 3. 修正與驗證      只修明確 bug；測試、typecheck、瀏覽器（看整張 PR）
@@ -34,6 +35,18 @@ disable-model-invocation: true
 **[blocked comment]**：遇到規則衝突、待決需求、驗證受阻等已知阻塞時，先完成不受影響的工作，過 [head 閘門]，發一則「收尾未完成」PR comment：已完成工作、阻塞來源與檔案／行號、影響、未完成與未驗範圍、需要使用者做的決定。若 PR body 的 `## 驗證` 會把舊 head 或未通過的結果寫成完成，先一起更正。發布後才問使用者。沒有發布權限時，把同樣內容留在 session 並說明原因。
 
 ## 一輪流程
+
+### 0. 檢查環境
+
+開工前把下列各項全部查完，再一次回報結果：
+
+- **發布權限**：`gh auth status` 已登入，且 `gh repo view <owner/repo> --json viewerPermission -q .viewerPermission` 是 `WRITE`、`MAINTAIN` 或 `ADMIN`。
+- **瀏覽器**：`command -v playwright-cli`，缺時給 `npm i -g @playwright/cli`。缺它時 `verify-in-browser` 會改走 `chrome-mcp`，不算硬性阻擋。
+- **帳密檔**：找出該 repo e2e 讀的帳密檔（e2e 設定或登入 helper 載入的 `.env`），只用 `test -f <絕對路徑>` 確認存在，不讀、不印內容；所需變數已在環境變數裡時免查。
+
+有缺項就列出缺什麼與安裝／設定指令，停下來問使用者。缺發布權限是硬性阻擋：本輪無法發布，等使用者處理完再開始。其他缺項經使用者同意可繼續，受影響的驗收列進「未驗」。
+
+**完成條件：** 每項都有檢查結果；有缺項時，使用者已處理或已同意帶著缺項繼續。
 
 ### 1. 固定範圍
 
