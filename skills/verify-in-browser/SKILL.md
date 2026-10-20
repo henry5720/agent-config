@@ -71,7 +71,7 @@ cd <E> && playwright-cli -s=<S> <指令>
 4. **依級別操作並留證據。** 截圖 `screenshot --filename=<E>/after-<狀態>.png`（L3 加引擎：`after-webkit-<狀態>.png`），截完查看圖片。斷言是先後順序或過程（暫存 → 儲存 → 重開一致、處理中無法關閉、按上一頁回到哪頁）時，錄 60 秒內的影片 `video-start <E>/<流程>.webm`／`video-stop` 取代那串截圖，登入完才開始錄。確認結構用 `snapshot --filename=<E>/<狀態>.yml` 或 `find "<文字>"`。檢查 `console error`，分清這次改出來的和原本就有的。每張截圖記下資料來源：真實 API，或 mock／`route` 攔截。
 5. **收尾：** `close`（每個 session）；`git worktree remove <tmp>/before`；`rm -rf <E>/.playwright-cli <E>/auth.json`。dev server 是你起的就關掉。
 6. **發布（呼叫者不是 `pr-review-and-verify` 時）。** 這個分支有 PR（`gh pr view --json number`）就問使用者一次：「要把這份回報發成 PR #<N> 的 comment 嗎？」
-   - 同意：影片先照 `compress-video` 壓成 mp4，再照 `pr-review-and-verify` 的「附件」規則發（`--attach`、遮蔽憑證）。在整合分支上驗某張子票時，標題寫票號。
+   - 同意：影片照 `report-template.md` 的影片規則轉檔，再照 `pr-review-and-verify` 的「附件」規則發（`--attach`、遮蔽憑證）。在整合分支上驗某張子票時，標題寫票號。
    - 不同意或沒有 PR：回報列出 `<E>` 路徑，並說明暫存資料夾不會長久保留。
 
 步驟 4 的完成條件：達到該級別的下限，證據已查看並留在 `<E>`；需要改前對照卻沒有時，回報寫了原因；與驗證目的相關但沒走到的，列進「未驗」。不為湊截圖去截無關的狀態。
