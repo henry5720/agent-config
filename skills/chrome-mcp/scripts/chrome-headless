@@ -7,6 +7,15 @@
 
 set -euo pipefail
 
+# 判斷 Chrome 起來沒要靠 curl 和 jq。少了它們判斷永遠為假，會等滿 15 秒才說「還是不通」，
+# 看起來像 Chrome 的問題 —— 所以一開始就檢查。
+for required_command in curl jq; do
+  if ! command -v "$required_command" >/dev/null 2>&1; then
+    echo "找不到 $required_command。Debian/Ubuntu: sudo apt install $required_command;macOS: brew install $required_command。" >&2
+    exit 1
+  fi
+done
+
 PORT=9222
 # 登入狀態放這裡，關掉再開還在。是狀態不是快取，所以不放 ~/.cache。
 PROFILE="${XDG_STATE_HOME:-$HOME/.local/state}/chrome-mcp-profile"
