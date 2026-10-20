@@ -1,4 +1,4 @@
-# chrome-mcp：讓 agent 開你的瀏覽器
+# remote-chrome：讓 agent 開你的瀏覽器
 
 Claude Code、Codex、OpenCode 都接了 `chrome-devtools-mcp`。它留給兩件事：**查原因**（performance
 trace、lighthouse、heap snapshot、minify 過的 code 下斷點），和**你要看著 agent 在你的 Chrome 上操作**。
@@ -7,9 +7,9 @@ trace、lighthouse、heap snapshot、minify 過的 code 下斷點），和**你�
 這份記的是**這幾台機器上為什麼要這樣設**，不是這個 MCP
 的用法（用法看[官方 repo](https://github.com/ChromeDevTools/chrome-devtools-mcp)）。
 
-教 agent 怎麼用的是 [`skills/chrome-mcp/SKILL.md`](../../skills/chrome-mcp/SKILL.md)，
-script 本體是 [`skills/chrome-mcp/scripts/chrome-mcp`](../../skills/chrome-mcp/scripts/chrome-mcp)，
-遠端主機自己開 headless 用的是 [`scripts/chrome-headless`](../../skills/chrome-mcp/scripts/chrome-headless)。
+教 agent 怎麼用的是 [`skills/remote-chrome/SKILL.md`](../../skills/remote-chrome/SKILL.md)，
+script 本體是 [`skills/remote-chrome/scripts/remote-chrome`](../../skills/remote-chrome/scripts/remote-chrome)，
+遠端主機自己開 headless 用的是 [`scripts/remote-chrome-headless`](../../skills/remote-chrome/scripts/remote-chrome-headless)。
 
 ## 全貌
 
@@ -38,21 +38,23 @@ flowchart LR
 ## 怎麼用
 
 ```bash
-chrome-mcp        # 開 Windows Chrome(9222)+ 轉發到 EC2，停在前景；Ctrl+C 全部關掉
+remote-chrome     # 開 Windows Chrome(9222)+ 轉發到 EC2，停在前景；Ctrl+C 全部關掉
 ```
 
 它像 server 一樣停在前景：開著就是在用，用完 Ctrl+C。
 
 ```mermaid
 flowchart LR
-  A["chrome-mcp"] --> B{"9222 已經有<br/>Chrome？"}
+  A["remote-chrome"] --> B{"9222 已經有<br/>Chrome？"}
   B -- 有 --> D
   B -- 沒有 --> C["開 Chrome<br/>等 9222 通（最多 15 秒）"] --> D["前景跑<br/>ssh -N company-ec2-chrome"]
   D -- "Ctrl+C／ssh 斷了" --> E["trap：斷轉發<br/>關 MCP Chrome"]
 ```
 
-`~/.local/bin/chrome-mcp` 是 dotfiles 放的 symlink，指到這個 repo 的 script。新機器要等
+`~/.local/bin/remote-chrome` 是 dotfiles 放的 symlink，指到這個 repo 的 script。新機器要等
 `skillshare pull` 之後 symlink 才有目標。
+
+ssh config 裡帶 RemoteForward 的 Host 不叫 `company-ec2-chrome` 時，用 `REMOTE_CHROME_TUNNEL_HOST=<Host> remote-chrome` 指定。
 
 **Chrome 要先跑起來，MCP client 才連得上。** Claude Code 在 session 裡 `/mcp` 重連；其他
 client 用它自己的 reconnect，`/mcp` 不是通用指令。
@@ -91,7 +93,7 @@ MCP 設定跟 WSL 那份一樣
 （`--browser-url=http://127.0.0.1:9222`），把桌機的 9222 用 ssh 反向轉過去：
 
 ```bash
-chrome-mcp                                                               # 桌機：開 Chrome + 轉發
+remote-chrome                                                            # 桌機：開 Chrome + 轉發
 ssh company-ec2 'curl -s 127.0.0.1:9222/json/version | grep User-Agent'  # 要看到 Windows NT
 ```
 
@@ -106,19 +108,19 @@ RemoteForward，每條連線（每個終端機、herdr、Windows 端的 ssh）�
 連線照常。搶到的那條常常是另一頭沒開 Chrome 的連線（2026-09-30 在 laptop 上就是這樣，
 EC2 那邊 Connection refused）。
 
-現在誰的 `chrome-mcp` 開著，位子就是誰的；關掉位子就空出來。換台：
+現在誰的 `remote-chrome` 開著，位子就是誰的；關掉位子就空出來。換台：
 
 ```mermaid
 sequenceDiagram
   participant D as desktop
   participant E as EC2 :9222
   participant L as laptop
-  D->>E: chrome-mcp（佔著位子）
-  L->>E: chrome-mcp
+  D->>E: remote-chrome（佔著位子）
+  L->>E: remote-chrome
   E-->>L: remote port forwarding failed
   Note over L: 印「轉發斷了」<br/>關掉 laptop 的 Chrome、exit 1
   D->>E: Ctrl+C（位子空出來）
-  L->>E: 重跑 chrome-mcp
+  L->>E: 重跑 remote-chrome
   E-->>L: 通
 ```
 
@@ -142,15 +144,15 @@ sudo sshd -t && sudo systemctl reload ssh
 EC2 自己開 headless Chrome 佔 9222。MCP 設定一個字都不改 —— 它只認 9222，不管後面是誰。
 兩種隨時都能用，看需求挑：
 
-| | headless（`chrome-headless`） | 桌機 Chrome（`chrome-mcp`） |
+| | headless（`remote-chrome-headless`） | 桌機 Chrome（`remote-chrome`） |
 |---|---|---|
 | 看畫面 | 看不到，叫 agent 截圖 | 看得到視窗 |
 | 登入狀態 | EC2 自己那份 | 你在桌機登入過的那份 |
-| 要你做什麼 | 不用，agent 自己開 | 在桌機 WSL 跑 `chrome-mcp`、終端機開著 |
+| 要你做什麼 | 不用，agent 自己開 | 在桌機 WSL 跑 `remote-chrome`、終端機開著 |
 | 什麼時候用 | 不需要看畫面（一般偵錯、截圖、跑流程），或手邊沒桌機（平板） | 要看著它操作，或要用桌機登入過的網站 |
 
 ```bash
-chrome-headless                                          # EC2：開 headless Chrome，停在前景；Ctrl+C 關掉
+remote-chrome-headless                                   # EC2：開 headless Chrome，停在前景；Ctrl+C 關掉
 curl -s 127.0.0.1:9222/json/version | grep User-Agent    # 要看到 HeadlessChrome
 ```
 
@@ -160,8 +162,8 @@ agent 照 SKILL.md 會自己開，不用你動手。看不到畫面，要看就�
 
 | 正在跑 | 再開另一個 |
 |---|---|
-| EC2 的 `chrome-headless` | 桌機的 `chrome-mcp` 轉發失敗（`remote port forwarding failed`）→ 先去 EC2 把 headless Ctrl+C 掉 |
-| 桌機的 `chrome-mcp` | `chrome-headless` 看到 9222 已有 Windows Chrome，直接沿用、不開，提示要先關桌機那邊 |
+| EC2 的 `remote-chrome-headless` | 桌機的 `remote-chrome` 轉發失敗（`remote port forwarding failed`）→ 先去 EC2 把 headless Ctrl+C 掉 |
+| 桌機的 `remote-chrome` | `remote-chrome-headless` 看到 9222 已有 Windows Chrome，直接沿用、不開，提示要先關桌機那邊 |
 
 **登入狀態跟桌機不共用。** profile 在 EC2 的 `~/.local/state/chrome-mcp-profile`，關掉再開還在，
 但跟桌機 `ChromeDevToolsMCP` 那份是兩份。沒有畫面，要登入的網站讓 agent 自己填表登入。
@@ -176,9 +178,9 @@ agent 照 SKILL.md 會自己開，不用你動手。看不到畫面，要看就�
 | 設定 | 在哪個 repo | 路徑 | 作用 |
 |---|---|---|---|
 | MCP 條目 | agent-config（這個 repo） | [`mcp.yaml`](../../mcp.yaml) | `chrome-devtools` 的參數、版本 |
-| skill 與 script | agent-config（這個 repo） | [`skills/chrome-mcp/`](../../skills/chrome-mcp/) | `SKILL.md` 教 agent；`chrome-mcp`、`chrome-headless` 兩支 script |
+| skill 與 script | agent-config（這個 repo） | [`skills/remote-chrome/`](../../skills/remote-chrome/) | `SKILL.md` 教 agent；`remote-chrome`、`remote-chrome-headless` 兩支 script |
 | ssh 轉發 | dotfiles（chezmoi） | [`home/private_dot_ssh/private_config`](https://github.com/henry5720/dotfiles/blob/main/home/private_dot_ssh/private_config) | 部署成 `~/.ssh/config`；只有 `Host company-ec2-chrome` 帶 RemoteForward |
-| 指令 symlink | dotfiles（chezmoi） | [`home/dot_local/bin/symlink_chrome-mcp.tmpl`](https://github.com/henry5720/dotfiles/blob/main/home/dot_local/bin/symlink_chrome-mcp.tmpl)、[`symlink_chrome-headless.tmpl`](https://github.com/henry5720/dotfiles/blob/main/home/dot_local/bin/symlink_chrome-headless.tmpl) | 部署成 `~/.local/bin/chrome-mcp`、`chrome-headless`（EC2 用），指到這個 repo 的 script |
+| 指令 symlink | dotfiles（chezmoi） | [`home/dot_local/bin/symlink_remote-chrome.tmpl`](https://github.com/henry5720/dotfiles/blob/main/home/dot_local/bin/symlink_remote-chrome.tmpl)、[`symlink_remote-chrome-headless.tmpl`](https://github.com/henry5720/dotfiles/blob/main/home/dot_local/bin/symlink_remote-chrome-headless.tmpl) | 部署成 `~/.local/bin/remote-chrome`、`remote-chrome-headless`（EC2 用），指到這個 repo 的 script |
 | 關官方 plugin | dotfiles（chezmoi） | [`home/dot_claude/modify_settings.json.tmpl`](https://github.com/henry5720/dotfiles/blob/main/home/dot_claude/modify_settings.json.tmpl) | 改 `~/.claude/settings.json`，關掉官方 chrome-devtools plugin |
 
 MCP server 的定義在這個 repo 的 [`mcp.yaml`](../../mcp.yaml)。`skillshare sync mcp -g`
@@ -224,22 +226,22 @@ Protocol error (Target.setDiscoverTargets): Target closed
 | 症狀 | 原因 |
 |---|---|
 | `Target closed` / `Target.setDiscoverTargets` | 走到沒有 `--browser-url` 的設定了 —— 官方 plugin 又被開起來（dotfiles `chezmoi apply` 修回來），或 MCP 條目被改掉（`skillshare sync mcp -g` 修回來） |
-| `chrome-mcp` 卡在等 9222、15 秒後失敗 | 先 `curl 127.0.0.1:9222/json/version`；不通就查 `.wslconfig` 是不是 mirrored |
+| `remote-chrome` 卡在等 9222、15 秒後失敗 | 先 `curl 127.0.0.1:9222/json/version`；不通就查 `.wslconfig` 是不是 mirrored |
 | Chrome 開起來但 9222 不通 | 日常 profile 已經開著，Chrome 忽略了 `--remote-debugging-port`。關掉全部 Chrome 視窗（含系統匣的背景常駐）再跑 |
 | 開出來的分頁一直是 `about:blank`，`new_page` 等 30 秒逾時 | 9222 被 WSL 裡別的 Chrome 搶走了（例如 Playwright 起的 `ms-playwright/chromium`）。mirrored 模式下 WSL 裡有人在聽 9222，連 `127.0.0.1:9222` 就先到它，而且不報錯。`ss -ltnp \| grep 9222` 看得到行程就是這個；關掉它 |
-| `chrome-mcp` 印「轉發斷了」、`remote port forwarding failed` | EC2 的 9222 被別的連線佔著：另一台的 `chrome-mcp` 還開著（去那台 Ctrl+C），或是死連線（EC2 上 `sudo ss -ltnp \| grep 9222` 看是哪個 `sshd-session`；開了 `ClientAliveInterval` 約 90 秒會自己清） |
+| `remote-chrome` 印「轉發斷了」、`remote port forwarding failed` | EC2 的 9222 被別的連線佔著：另一台的 `remote-chrome` 還開著（去那台 Ctrl+C），或是死連線（EC2 上 `sudo ss -ltnp \| grep 9222` 看是哪個 `sshd-session`；開了 `ClientAliveInterval` 約 90 秒會自己清） |
 | 一般的 `ssh company-ec2` 印 `remote port forwarding failed` | 這台的 `~/.ssh/config` 是舊版，`Host company-ec2` 還帶 RemoteForward。dotfiles `chezmoi apply ~/.ssh/config` |
 | 任何方式開 Chrome 都只剩 main + crashpad-handler 兩個 process，沒視窗、9222 不通 | 2026-10-02 遇過，連不帶參數的預設 profile、從 explorer 開捷徑都一樣卡；Windows 重開機就好，原因沒查到 |
-| Windows 的 MCP Chrome 還在跑，9222 卻不通 | 9222 被搶過一次之後，Windows Chrome 的 listener 就掉了，不會自己回來；再叫一次 Chrome，新參數也會被轉給舊的 process 然後丟掉。只關 `ChromeDevToolsMCP` profile 那個 Chrome，再跑 `chrome-mcp` |
+| Windows 的 MCP Chrome 還在跑，9222 卻不通 | 9222 被搶過一次之後，Windows Chrome 的 listener 就掉了，不會自己回來；再叫一次 Chrome，新參數也會被轉給舊的 process 然後丟掉。只關 `ChromeDevToolsMCP` profile 那個 Chrome，再跑 `remote-chrome` |
 | agent 看到的網站沒登入 | 獨立 profile 是新的，手動登入一次 |
 | `claude mcp list` 顯示 Failed | 先確認 Chrome 在跑，再 `/mcp` 重連 |
-| `chrome-headless` 說「Chrome 啟動失敗」 | 看 `~/.local/state/chrome-mcp-profile.log`。dbus／UPower 的 ERROR 是沒有桌面環境的正常雜訊，不是原因 |
+| `remote-chrome-headless` 說「Chrome 啟動失敗」 | 看 `~/.local/state/chrome-mcp-profile.log`。dbus／UPower 的 ERROR 是沒有桌面環境的正常雜訊，不是原因 |
 | headless 截圖中文或 emoji 是方框 | 字型沒裝。確認 `chezmoi edit-config` 的 `tools` 有 `headless-chrome`，再 `chezmoi apply` |
 
 驗證整條路通了：
 
 ```bash
-chrome-mcp                                         # 另一個終端機：Chrome 起來、轉發開著
+remote-chrome                                      # 另一個終端機：Chrome 起來、轉發開著
 curl -s 127.0.0.1:9222/json/version | jq .Browser  # 看得到版本號
 claude mcp list                                    # chrome-devtools 顯示 Connected
 ```

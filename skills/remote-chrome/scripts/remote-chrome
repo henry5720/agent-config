@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 啟動 Windows 側的 Chrome 並開 remote debugging port,給 chrome-devtools MCP 連。
 # WSL 這邊不裝 Linux Chrome —— 設定本來就是連 Windows 那台,在 WSL 另開一個是白費工。
-# 怎麼用見同一個 skill 的 SKILL.md；背景與排錯見 agent-config 的 docs/skills/chrome-mcp.md。
+# 怎麼用見同一個 skill 的 SKILL.md；背景與排錯見 agent-config 的 docs/skills/remote-chrome.md。
 
 set -euo pipefail
 
@@ -70,7 +70,9 @@ trap 'exit 130' INT TERM HUP
 
 # 只有這條連線帶 RemoteForward(見 ~/.ssh/config 的 Host company-ec2-chrome):EC2 的
 # 9222 只有一個位子，每條 ssh 都帶的話先連的搶到、其他默默失敗。
-EC2_TUNNEL_HOST=company-ec2-chrome
+# ssh config 裡帶 RemoteForward 的 Host 叫別的名字(例如轉到另一台遠端主機)時，
+# 用 REMOTE_CHROME_TUNNEL_HOST 指定，不用改這支 script。
+EC2_TUNNEL_HOST=${REMOTE_CHROME_TUNNEL_HOST:-company-ec2-chrome}
 hold() {
   # ssh config 沒有這個 Host(只在本機用的機器)就只守著 Chrome。
   if ! ssh -G "$EC2_TUNNEL_HOST" 2>/dev/null | grep -qi '^remoteforward '; then
@@ -84,7 +86,7 @@ hold() {
   # 被 Ctrl+C 打斷時 trap 已經在處理，走不到這裡;走到這裡是 ssh 自己斷了。
   echo "轉發斷了(ssh exit $status)。" >&2
   echo "一連上就斷、印了 remote port forwarding failed:company-ec2 的 9222 被別台占著," >&2
-  echo "去那台把 chrome-mcp 關掉(Ctrl+C)再重跑;那台已經關機的話等 EC2 清掉死連線(約 90 秒)。" >&2
+  echo "去那台把 remote-chrome 關掉(Ctrl+C)再重跑;那台已經關機的話等 EC2 清掉死連線(約 90 秒)。" >&2
   exit 1
 }
 
