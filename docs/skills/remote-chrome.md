@@ -1,11 +1,16 @@
 # remote-chrome：讓 agent 開你的瀏覽器
 
-Claude Code、Codex、OpenCode 都接了 `chrome-devtools-mcp`。它留給兩件事：**查原因**（performance
-trace、lighthouse、heap snapshot、minify 過的 code 下斷點），和**你要看著 agent 在你的 Chrome 上操作**。
-一般的操作頁面、改完驗收改用 `playwright-cli`，見 [verify-in-browser.md](verify-in-browser.md)。
+`remote-chrome` 開一個 CDP 9222 可連的 Chrome，誰接都行：
 
-這份記的是**這幾台機器上為什麼要這樣設**，不是這個 MCP
-的用法（用法看[官方 repo](https://github.com/ChromeDevTools/chrome-devtools-mcp)）。
+- **chrome-devtools MCP**（Claude Code、Codex、OpenCode 都接了）拿來**查原因**：performance
+  trace、lighthouse、heap snapshot、minify 過的 code 下斷點。
+- **`playwright-cli attach --cdp`** 拿來操作、截圖、錄影；接的是桌機 Chrome 時，**你看得到 agent 在你的 Chrome 上操作**。
+  見下方〈[用 playwright-cli 接](#用-playwright-cli-接)〉。
+
+驗收的規矩（驗多少、證據、回報）見 [verify-in-browser.md](verify-in-browser.md)。
+
+這份記的是**這幾台機器上為什麼要這樣設**，不是這些工具的用法（MCP 看[官方 repo](https://github.com/ChromeDevTools/chrome-devtools-mcp)，
+playwright-cli 看 [`microsoft/playwright-cli`](https://github.com/microsoft/playwright-cli)）。
 
 教 agent 怎麼用的是 [`skills/remote-chrome/SKILL.md`](../../skills/remote-chrome/SKILL.md)，
 script 本體是 [`skills/remote-chrome/scripts/remote-chrome`](../../skills/remote-chrome/scripts/remote-chrome)，
@@ -13,13 +18,13 @@ script 本體是 [`skills/remote-chrome/scripts/remote-chrome`](../../skills/rem
 
 ## 全貌
 
-平常 Chrome 開在桌機（desktop 或 laptop）的 Windows 上。WSL 和 EC2 的 MCP 都連
+平常 Chrome 開在桌機（desktop 或 laptop）的 Windows 上。WSL 和 EC2 的 CDP client 都連
 `127.0.0.1:9222`，只是 EC2 那邊要靠 ssh 把 9222 轉回來。EC2 也可以改用自己的
 headless Chrome，見〈[EC2：自己開 headless](#ec2自己開-headless)〉。
 
 ```mermaid
 flowchart LR
-  EM["EC2 MCP"] --> EP["EC2 :9222<br/>sshd 代為監聽"]
+  EM["EC2 MCP／playwright-cli"] --> EP["EC2 :9222<br/>sshd 代為監聽"]
   EP == "ssh -N company-ec2-chrome<br/>（RemoteForward）" ==> WP["WSL :9222"]
   WM["WSL MCP"] --> WP
   WP -- "mirrored 網路<br/>共用 localhost" --> C["Windows Chrome<br/>ChromeDevToolsMCP"]
@@ -58,6 +63,22 @@ ssh config 裡帶 RemoteForward 的 Host 不叫 `company-ec2-chrome` 時，用 `
 
 **Chrome 要先跑起來，MCP client 才連得上。** Claude Code 在 session 裡 `/mcp` 重連；其他
 client 用它自己的 reconnect，`/mcp` 不是通用指令。
+
+### 用 playwright-cli 接
+
+`playwright-cli` 平常自己開瀏覽器（走 pipe，不佔 9222）；`attach --cdp` 改接 9222 上這台：
+
+```bash
+playwright-cli -s=<session> attach --cdp=http://127.0.0.1:9222
+playwright-cli -s=<session> goto https://example.com
+playwright-cli -s=<session> screenshot --filename=/tmp/shot.png
+playwright-cli -s=<session> video-start /tmp/flow.webm   # …操作… 再 video-stop
+playwright-cli -s=<session> detach                       # 斷開 session，Chrome 繼續開著
+```
+
+2026-10-20 用 `playwright-cli` 0.1.22 實測：attach 後 `goto`、截圖（真實頁面）、錄影（vp8 800×600）都正常，`detach` 不關瀏覽器。
+收尾用 `detach`：它只拆 attach 建的 session、不碰外部瀏覽器（playwright-cli skill 的
+`references/session-management.md`〈Detach〉）。Chrome 由 `remote-chrome` 的 Ctrl+C 收。
 
 ### script 做的事，每件都是踩過才加的
 
@@ -141,7 +162,7 @@ sudo sshd -t && sudo systemctl reload ssh
 
 ## EC2：自己開 headless
 
-EC2 自己開 headless Chrome 佔 9222。MCP 設定一個字都不改 —— 它只認 9222，不管後面是誰。
+EC2 自己開 headless Chrome 佔 9222。MCP 設定、`attach --cdp` 的網址一個字都不改 —— 它們只連 9222，不管後面是誰。
 兩種隨時都能用，看需求挑：
 
 | | headless（`remote-chrome-headless`） | 桌機 Chrome（`remote-chrome`） |

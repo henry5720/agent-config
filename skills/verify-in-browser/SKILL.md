@@ -38,13 +38,14 @@ description: 當使用者要求瀏覽器驗收，或 agent 判斷需要透過瀏
 
 **斷斷續續的問題**（閃爍、race、效能、偶發錯誤）：單張截圖證明不了，要重複 N 次記發生次數，並附一列反向對照（改前本來就正常的情境），說清楚修法在哪裡有效、哪裡無關。
 
-使用者要用他的 Chrome（含它的登入狀態）、或要看著操作時，用 Claude in Chrome；有設定 `remote-chrome` skill 時也可改走它。整套回歸交給 CI 和 e2e。
+使用者要用他的 Chrome（含它的登入狀態）、或要看著操作時，用 Claude in Chrome；有設定 `remote-chrome` skill 時也可用 `playwright-cli` 接它開的桌機 Chrome（見「選工具」）。整套回歸交給 CI 和 e2e。
 
 ## 開始前
 
 1. **選工具。** 用手上能操作瀏覽器的工具（看自己的工具清單與 `command -v playwright-cli`），依序偏好：
    - 能錄影的：`playwright-cli`（錄 `.webm`）、Claude in Chrome（`claude --chrome`，錄 GIF）。
-   - 只能截圖的：Codex app 內建瀏覽器；有設定 `remote-chrome` skill 時，它也屬這類。
+     有設定 `remote-chrome` skill 時，`playwright-cli attach --cdp=http://127.0.0.1:9222` 接上它的 Chrome 也能錄影；接的是桌機 Chrome 時使用者看得到畫面。
+   - 只能截圖的：Codex app 內建瀏覽器。
 
    都沒有就把整個驗收列進「未驗」，並提示使用者可裝 `npm i -g @playwright/cli`。L3 的 WebKit 要用 `playwright-cli`（見 [playwright-cli.md](playwright-cli.md)）；開不了就把 WebKit 列進「未驗」，Chromium 照做。
 2. **定證據資料夾 `E`，整趟照抄成字面值：** 絕對路徑，有 `$CLAUDE_JOB_DIR` 用 `$CLAUDE_JOB_DIR/tmp/verify-<名字>`，沒有用 `/tmp/verify-<名字>`；`<名字>` = `<repo 名>-<分支名>`，`/` 換成 `-`（例：`agent-config-feat-login`）。先 `mkdir -p <E> && chmod 700 <E>`：裡面會有登入狀態和工具暫存檔，只給自己讀。證據檔都落在 `<E>`；工具存到別處（例如下載資料夾）就搬進來。
@@ -91,6 +92,6 @@ L0：不發 comment，PR body 的 `## 驗證` 寫一行「未開瀏覽器：<原
 
 ## 卡住時換工具
 
-要查**為什麼**（慢、記憶體、minify 過的錯誤、斷點），有設定 `remote-chrome` skill 時換它；沒有就用手上工具看得到的 console／network，查不出原因列進「未驗」。
+要查**為什麼**（慢、記憶體、minify 過的錯誤、斷點），有設定 `remote-chrome` skill 時用它開的 Chrome 接 chrome-devtools MCP；沒有就用手上工具看得到的 console／network，查不出原因列進「未驗」。
 
 值得防回歸的流程，驗完提議寫成該 repo 的 Playwright e2e；要長期守住的視覺，提議 `toHaveScreenshot`。

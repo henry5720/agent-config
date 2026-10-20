@@ -20,12 +20,12 @@ Codex app 內建瀏覽器（截圖）都能照著做完。偏好能錄影的；�
 |---|---|---|
 | 需要時操作頁面驗證 | 手上的瀏覽器工具（偏好能錄影的 `playwright-cli`、Claude in Chrome） | `verify-in-browser`（自己寫的）＋ 該工具的文件；用 `playwright-cli` 時另有 `playwright-cli`（官方） |
 | 查原因：慢、記憶體、minify 過的錯誤 | chrome-devtools MCP（有設定時） | [`remote-chrome`](remote-chrome.md) |
-| 你要看著 agent 操作、或要用你桌機的登入狀態 | Claude in Chrome；或 chrome-devtools MCP 接桌機 Chrome（有設定時） | — ／ [`remote-chrome`](remote-chrome.md) |
+| 你要看著 agent 操作、或要用你桌機的登入狀態 | Claude in Chrome；或 `playwright-cli attach --cdp` 接 `remote-chrome` 開的桌機 Chrome（有設定時，能錄影） | — ／ [`remote-chrome`](remote-chrome.md) |
 | 值得防回歸的流程 | 寫成該 repo 的 Playwright e2e | — |
 
 官方的 `playwright-cli` 是第三方（`.metadata.json` 記來源），`update` 會蓋掉，所以驗收的規矩另外寫成
-`verify-in-browser`，不併進去。`playwright-cli` 的瀏覽器走 pipe，不佔 9222，跟
-`remote-chrome`／`remote-chrome-headless` 可以同時開。`remote-chrome` 是這台機器的設定，
+`verify-in-browser`，不併進去。`playwright-cli` 用 `open` 自己開的瀏覽器走 pipe，不佔 9222，跟
+`remote-chrome`／`remote-chrome-headless` 可以同時開；要用 9222 那台時改 `attach --cdp=http://127.0.0.1:9222`。`remote-chrome` 是這台機器的設定，
 同事多半沒有，所以 skill 只把它寫成「有設定時」的選項。
 
 ## 什麼時候驗、證據放哪
