@@ -17,6 +17,7 @@ cd <E> && playwright-cli -s=<S> <指令>
 - **每次都要 `cd <E> &&`。** cwd 不會留到下一個指令，而 `playwright-cli` 會在當下目錄寫 `.playwright-cli/`。少了 `cd`，這些檔會落在 repo 裡。
 - **每次都要 `-s=<S>`。** 不帶就用 `default` session，平行的 agent 會搶同一個瀏覽器。
 - `--filename`、`state-save`、`state-load` 給絕對路徑 `<E>/…`。`auth.json` 是登入憑證，絕不能落在 repo。
+- 接 `remote-chrome` 開的 Chrome：`open <url>` 換成 `attach --cdp=http://127.0.0.1:9222` 再 `goto <url>`；收尾用 `detach`，只斷開 session、Chrome 留著（playwright-cli skill `references/session-management.md`〈Detach〉）。
 - WebKit：先確認有裝 `ls ~/.cache/ms-playwright | grep -q webkit`，沒有就 `playwright-cli install-browser webkit`；裝不起來把 WebKit 列進「未驗」，Chromium 照做。開啟用 `open --browser=webkit <url>`，搭配 `-s=<S>-webkit`。
 
 ## 步驟對應的指令
@@ -29,7 +30,7 @@ cd <E> && playwright-cli -s=<S> <指令>
 | 4. 確認結構 | `snapshot --filename=<E>/<狀態>.yml` 或 `find "<文字>"` |
 | 4. console | `console error` |
 | 4. mock | `route` 攔截，資料來源記「mock」 |
-| 5. 收尾 | 每個 session `close`；`rm -rf <E>/.playwright-cli <E>/auth.json` |
+| 5. 收尾 | 每個 session `close`（`attach` 的用 `detach`）；`rm -rf <E>/.playwright-cli <E>/auth.json` |
 
 ## 登入
 
