@@ -1,0 +1,2 @@
+# 逐條判定 fixtures 使用的 JSON Schema draft-07 validator。
+jsonschema==4.19.2
