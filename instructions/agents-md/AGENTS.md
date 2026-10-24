@@ -41,6 +41,15 @@
 - 講風險、講影響範圍時要附檔案路徑、行號或指令輸出。憑印象講的不算數。
 - 回覆裡提到的路徑、檔名、函式名，先確認存在再寫出來。
 
+## Issue 狀態
+
+處理 issue 時，先讀 repo 的 `AGENTS.md`／`CLAUDE.md` 指向的 issue tracker 規則；若未指向，檢查 `docs/agents/issue-tracker.md`。repo 明寫的項目優先，未寫的沿用以下預設；有 tracker 文件不代表整段預設失效。
+
+1. **認領**：動工前讀取 issue 狀態、assignees 與 blockers。已關閉、有未解除的 blocker 或其他人承接時，先回報並處理該條件，再動工；可承接時先 assign 自己，確認寫入成功。GitHub 用 `gh issue edit <number> --add-assignee @me`；其他 tracker 用對應操作。
+2. **卡住**：在 issue 留言寫明卡點、解除條件及已完成的工作，保留 open 與 assignee。有原生 dependency 欄位時同步維護 blocker 關係，解除後更新。
+3. **完成**：更新完成清單，附 PR／commit 與實際驗證結果，依 repo 規則關單。預設有 PR 就等 merge 後關；無 PR 則在實作與必要驗收完成後關。仍缺驗收時保留 open，寫明剩餘項目。使用 `Closes` 時確認目標分支會觸發自動關單；不會觸發時，在滿足關單條件後手動關閉。
+4. **交接**：結束回覆前，重新讀取本次處理的每張 issue，確認 assignee、blockers、完成清單及 open／closed 與實際進度一致；修正不符處。寫入失敗時明確回報未同步的項目與原因。
+
 ## Commit 共同作者
 
 修改 Git repo、交接未提交工作、建立或 amend commit 前，讀 `~/.config/agent-commit/instructions.md`，累積並保留實際參與的 agent。
