@@ -121,6 +121,9 @@ OpenCode 同時有 `opencode.json` 和只含 `$schema` 的空殼 `opencode.jsonc
 
 ## 測試
 
+[uv](https://docs.astral.sh/uv/) 會在隔離環境準備 `tests/requirements.txt` 的依賴，再執行既有 unittest；首次下載套件需要連網。
+
 ```bash
-python3 -m unittest discover -s tests
+uv run --isolated --no-project --with-requirements tests/requirements.txt \
+  python3 -B -m unittest discover -s tests
 ```

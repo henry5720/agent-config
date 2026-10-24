@@ -1,29 +1,8 @@
-# 瀏覽器驗收回報格式
+# 瀏覽器驗收發布規則
 
-照下面格式回報給呼叫者。要發成 PR comment 時（由 `pr-review-and-verify` 發，或照 SKILL.md 步驟 6 經使用者同意後發），`./x.png` 由 `gh pr comment --attach` 換成上傳網址。
+驗收結果是 [result.schema.json](result.schema.json) 規定的 JSON；給人看的 Markdown 由 `scripts/render-report.py` 產生。發布權限照 SKILL.md 步驟 6，runner 自行寫 PR body，不由本 skill 發 comment。
 
-```markdown
-## 瀏覽器驗收<（#子票號，只在整合分支上驗某張子票時寫）>
-
-**結論：** <一句話>
-
-| SHA | 工具／引擎 | 視窗 | 語系／主題 | 角色 | 後端 | 資料 |
-|---|---|---|---|---|---|---|
-| <SHA> | <工具>／<引擎> | <寬×高> | <語系>／<主題> | <角色> | <local\|staging> | <真實 API\|mock：哪些> |
-
-**怎麼驗的：** <L1/L2 一句：開哪頁、走哪些操作。斷斷續續的問題：對照組、量測方法、次數>
-
-| 狀態 | 改前（<base>） | 改後（PR） |
-|---|---|---|
-| <狀態> | ![](./before-<狀態>.png) | ![](./after-<狀態>.png) |
-
-**console：** <新錯誤數與原文；原本就有的註明>
-**未驗：** <項目 — 原因>；沒有寫「無」
-```
-
-- 環境表一次驗收一列；L3 每個引擎一列；改前取自線上部署時另一列，SHA 欄寫部署 commit，後端欄寫網址。L0 沒有這張表。
-- 沒有改前截圖時，表格只留「改後」一欄。修 bug 或使用者要求改前卻拿不到時，表格上方寫一行「只有改後：<原因>」；改既有畫面沒拍改前不必寫原因，改前怎樣寫在 PR body。L3 每個引擎各一欄或各一張表。
-- 影片放在對應狀態那一列，取代那串截圖。工具錄不了影時，那一列放依序編號的連續截圖，並寫「無錄影：<工具>」。
-- `.webm` 影片發布前轉成 H.264 mp4（照 `compress-video`；playwright 只錄得出 VP8 `.webm`，Safari 不一定播得動），回報引用轉完的 `.mp4`。GIF 直接附，不必轉。沒有 ffmpeg 就附原 `.webm`，回報註明「未轉檔，Safari 可能播不出」。`--attach` 被拒說太大時，照 `compress-video` 剪短再傳。
-- 截圖、錄影是實測證據，不用示意圖替代。畫面上拍到密碼、token、API key、登入憑證時，標明哪個檔。
-- snapshot、trace 不列進回報。
+- 把 render 結果存成檔案，在證據資料夾執行 `gh pr comment <PR> -F <回報檔> --attach './x.png'`。body 中各證據路徑改成 `./<相對路徑>`，每個附件各帶一個相同路徑的 `--attach`，上傳後會換成網址。整合分支驗某張子票時，標題加票號。
+- `.webm` 發布前照 `compress-video` 轉成 H.264 mp4，JSON 證據路徑改成 `.mp4` 後重新 render。GIF 直接附。沒有 ffmpeg 就附原 `.webm`，在該條 observed 註明「未轉檔，Safari 可能播不出」。`--attach` 被拒太大時，照 `compress-video` 剪短再傳。
+- 截圖、錄影須是對應 SHA 的實測證據，不用示意圖替代。發布前遮蔽實際出現的密碼、token、API key 與登入憑證；trace、影片、storage state 各自檢查，遮蔽截圖不代表清理了其他檔案。
+- snapshot、trace、`auth*.json`、`.playwright-cli/` 不附、不 commit。正常測試業務資料（姓名、email、對話）照常保留。
