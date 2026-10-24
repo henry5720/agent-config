@@ -33,7 +33,8 @@
 ## 改完怎麼驗證
 
 ```bash
-python3 -m unittest discover -s tests   # 動到自己寫的 skill 的 script 時
+uv run --isolated --no-project --with-requirements tests/requirements.txt \
+  python3 -B -m unittest discover -s tests  # 動到自己寫的 skill 的 script 時
 skillshare sync --dry-run               # skill 會怎麼落到 target
 skillshare sync mcp -g --dry-run        # MCP 會怎麼寫進三個 client
 ```
