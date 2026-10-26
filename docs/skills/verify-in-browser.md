@@ -1,10 +1,11 @@
 # verify-in-browser：需要時用瀏覽器驗收
 
 使用者要求瀏覽器驗收，或 agent 判斷需要透過畫面／操作確認時，用手上能操作瀏覽器的工具驗證。
-skill 規定的是驗多少、證據與回報，不綁工具：
-[`playwright-cli`](https://github.com/microsoft/playwright-cli)（headless，截圖、錄 webm）、
-Claude Code 的 [Claude in Chrome](https://code.claude.com/docs/en/chrome)（`claude --chrome`，錄 GIF）、
-Codex app 內建瀏覽器（截圖）都能照著做完。偏好能錄影的；只能截圖時，過程類斷言改連續截圖並註明「無錄影」。
+skill 規定的是驗多少、證據與回報。agent-runner 的驗收 run（AFK）只用
+[`playwright-cli`](https://github.com/microsoft/playwright-cli)（headless，截圖、錄 webm）；
+你在旁邊時，Claude Code 的 [Claude in Chrome](https://code.claude.com/docs/en/chrome)（`claude --chrome`，錄 GIF）、
+Codex app 內建瀏覽器（截圖）也能照著做完，這些只有互動時才有的分支寫在
+[`skills/verify-in-browser/hitl.md`](../../skills/verify-in-browser/hitl.md)。偏好能錄影的；只能截圖時，過程類斷言改連續截圖並註明「無錄影」。
 一般 UI 改動不會自動要求瀏覽器驗收；依驗證目的選擇狀態與證據，回報實際結果及未驗項目。
 
 這項觸發與證據原則的研究脈絡及來源限制，見[瀏覽器驗收政策研究記錄](browser-verification-research.md)；分類表是曾考慮的建議，未採用為固定政策。
@@ -40,11 +41,11 @@ flowchart LR
   P --> U["要附到 PR：<br/>pr-review-and-verify 發布，<br/>或它問過你同意後發"]
 ```
 
-- 互動 session 和 agent-runner 規則一樣。互動時你說「不用驗」它就跳過；agent 也不會因為改了 UI 就自動啟動驗收。
+- 互動 session 和 agent-runner 走同一套主幹（驗多少、證據、逐條判定 JSON）；換工具、請你代登入、問你要不要發 PR comment 只在互動時發生（[hitl.md](../../skills/verify-in-browser/hitl.md)）。互動時你說「不用驗」它就跳過；agent 也不會因為改了 UI 就自動啟動驗收。
 - 整套回歸交給 CI 和 e2e；選擇瀏覽器驗收時，只做足以回答驗證目的的操作，不要求走遍所有狀態或每個狀態都截圖。
 - 截圖、錄影先存在本機暫存資料夾（`$CLAUDE_JOB_DIR/tmp/verify-<session>` 或 `/tmp/verify-<session>`）。
 - 要附到 PR 時，由 `pr-review-and-verify` 依 reviewer 需要挑選、遮蔽秘密後上傳；沒走那支 skill 時，分支有 PR 它會問你一次要不要發成 comment，你同意才發。說明圖不代表已實際驗證，未驗項目照實列出。
-- 改前截圖只在修 bug（證明 bug 重現過）或你要求時必拍；改既有畫面用 PR body 文字寫改前，順手拿得到才拍；新功能不拍。要拍時先找 base 的線上部署（能證明部署內容等於改前、頁面開得到），不行才在本機開 base；都拿不到要寫原因。
+- 改前截圖只在修 bug（issue 有 `bug` label 或分支 commit 是 `fix`；證明 bug 重現過）或你要求時必拍；改既有畫面用 PR body 文字寫改前，順手拿得到才拍；新功能不拍。要拍時先找 base 的線上部署（能證明部署內容等於改前、頁面開得到），不行才在本機開 base；都拿不到要寫原因。
 - 開瀏覽器前先確認後端版本：PR 寫了依賴的後端 commit 就用 `git merge-base --is-ancestor` 檢查，沒寫才看 openapi 欄位。
 - 「每個 PR 都寫驗證段」這條是全域規則，寫在這個 repo 的 `instructions/agents-md/AGENTS.md`（部署成 `~/.claude/CLAUDE.md`），不是這支 skill。
 

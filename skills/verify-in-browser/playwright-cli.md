@@ -6,8 +6,6 @@
 
 session `S` = 證據資料夾的 `<名字>`（`<repo 名>-<分支名>`，`/` 換成 `-`），整趟照抄成字面值。L3 的 WebKit 用 `S-webkit`；改前對照用 `S-before`。
 
-`<E>` 要 `chmod 700`，是因為裡面會有 `auth.json` 和含明文密碼的 `.playwright-cli/`。
-
 ## 每個指令的寫法
 
 ```bash
@@ -16,21 +14,20 @@ cd <E> && playwright-cli -s=<S> <指令>
 
 - **每次都要 `cd <E> &&`。** cwd 不會留到下一個指令，而 `playwright-cli` 會在當下目錄寫 `.playwright-cli/`。少了 `cd`，這些檔會落在 repo 裡。
 - **每次都要 `-s=<S>`。** 不帶就用 `default` session，平行的 agent 會搶同一個瀏覽器。
-- `--filename`、`state-save`、`state-load` 給絕對路徑 `<E>/…`。`auth.json`、`auth-<前綴>.json` 是登入憑證，絕不能落在 repo。多角色各用 `<S>-<前綴>` session 與 `auth-<前綴>.json`，下方單角色例子照此替換。
-- 接 `remote-chrome` 開的 Chrome：`open <url>` 換成 `attach --cdp=http://127.0.0.1:9222` 再 `goto <url>`；收尾用 `detach`，只斷開 session、Chrome 留著（playwright-cli skill `references/session-management.md`〈Detach〉）。
-- WebKit：先確認有裝 `ls ~/.cache/ms-playwright | grep -q webkit`，沒有就 `playwright-cli install-browser webkit`；裝不起來把 WebKit 列進「未驗」，Chromium 照做。開啟用 `open --browser=webkit <url>`，搭配 `-s=<S>-webkit`。
+- `--filename`、`state-save`、`state-load` 給絕對路徑 `<E>/…`，登入憑證 `auth.json`、`auth-<前綴>.json` 才會留在 `<E>`、不落進 repo。多角色各用 `<S>-<前綴>` session 與 `auth-<前綴>.json`，下方單角色例子照此替換。
+- WebKit：先確認有裝 `ls ~/.cache/ms-playwright | grep -q webkit`，沒有就 `playwright-cli install-browser webkit`。開啟用 `open --browser=webkit <url>`，搭配 `-s=<S>-webkit`。
 
 ## 步驟對應的指令
 
 | SKILL.md 步驟 | 指令 |
 |---|---|
-| 1. 開頁面、固定 viewport | `open --config=<設定檔絕對路徑> <url>`（repo 有設定檔時）、`open <url>`、`resize 1440 900` |
+| 1. 開頁面、固定 viewport | repo 有設定檔時先解析絕對路徑，`open --config=<設定檔絕對路徑> <url>`，切到 `<E>` 後仍用該路徑；沒有就 `open <url>`。再 `resize 1440 900`。語系設在設定檔的 `browser.contextOptions.locale`，頂層不生效 |
 | 4. 截圖 | `screenshot --filename=<E>/after-<狀態>.png` |
 | 4. 錄影 | `video-start <E>/<流程>.webm`／`video-stop` |
 | 4. 確認結構 | `snapshot --filename=<E>/<狀態>.yml` 或 `find "<文字>"` |
 | 4. console | `console error` |
 | 4. mock | `route` 攔截，資料來源記「mock」 |
-| 5. 收尾 | 每個 session `close`（`attach` 的用 `detach`）；刪掉 `<E>/.playwright-cli/` 與所有 `<E>/auth*.json` |
+| 5. 收尾 | 每個 session `close`（`attach` 的見 [hitl.md](hitl.md)）；刪掉 `<E>/.playwright-cli/` 與所有 `<E>/auth*.json` |
 
 ## 登入
 
@@ -44,10 +41,9 @@ cd <E> && playwright-cli -s=<S> <指令>
      ```
 
    - 每個 `fill`、`localstorage-set` 都加 `--raw`：不加會把產生的 Playwright code 連同值印回對話。
-   - 填完密碼的下一個指令就是 `--raw click <送出按鈕>`，中間不 `snapshot`、不 `find`、不讀 `.playwright-cli/`。
-   - 送出後馬上 `rm -rf <E>/.playwright-cli`，再確認登入：`--raw eval "<判斷式>"` 只回 true／false。
-   - 失敗就先 `goto` 登入頁清掉欄位，再查原因。
-   - 成功就 `state-save <E>/auth.json`，之後用第 1 種方式。
+   - 填完密碼的下一個指令就是 `--raw click <送出按鈕>`。
+   - 送出後馬上 `rm -rf <E>/.playwright-cli`，再確認登入：`--raw eval "<判斷式>"`。
+   - 失敗時重開登入頁用 `goto`；成功就 `state-save <E>/auth.json`。
 
 ## 0.1.22 踩過的雷
 
