@@ -351,7 +351,7 @@ container cron／entrypoint 可呼叫：
 避免重複附件。
 
 這條流程的 external dependency scopes 是 `files:write`、`chat:write`，以及查找既有 item 留言串沿用的讀取
-scopes（目前私有 channel 使用 `groups:read`、`groups:history`）。新增或調整 scope 後必須重新 Install app，
+scopes（目前私有 channel 使用 `groups:history`；程式只呼叫 `conversations.history`、`conversations.replies`，不需要 `groups:read`）。新增或調整 scope 後必須重新 Install app，
 並使用 rotation 後的新 token；不要拿舊 token 直接重試。
 
 ### 驗收報告固定四段
