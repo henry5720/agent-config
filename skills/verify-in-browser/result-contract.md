@@ -16,10 +16,10 @@
 
 `sha` 是實際驗的 commit。`evidenceDir` 是呼叫端可讀取的證據資料夾絕對路徑；runner 呼叫時填 runner 主機上的路徑，sandbox 掛載路徑不同時以呼叫端提供的對照為準。
 
-`evidence` 放相對 `evidenceDir` 的證據檔名，可用子目錄；每個證據檔都要出現在某條的 `evidence`（`unverifiable` 時在 `unverifiableReason`）。絕對路徑、`..`、登入狀態、snapshot、trace 不算證據。`account` 是帳號變數前綴（例如 `E2E_ADMIN`），不登入填 `null`，不填帳密。`observed` 三種 status 都必填；記實際操作、引擎／環境、真實 API 或 mock、必要的改前對照或沒拿到的原因，讓人能判讀證據。
+`evidence` 放相對 `evidenceDir` 的證據檔名，可用子目錄；每個證據檔都要出現在某條的 `evidence`（`unverifiable` 時在 `unverifiableReason`）。絕對路徑、`..`、登入狀態、snapshot、trace 不算證據。證據檔都要能發布到 PR：圖片用 PNG、JPEG、GIF、WebP、SVG，影片用 MP4、MOV、WebM，交給 `--attach` 上傳；其他證據（console、request、測試輸出）存成 UTF-8 文字檔（`.txt`、`.json`），由 render 內嵌，因為 `--attach` 不收文字檔。`account` 是帳號變數前綴（例如 `E2E_ADMIN`），不登入填 `null`，不填帳密。`observed` 三種 status 都必填；記實際操作、引擎／環境、真實 API 或 mock、必要的改前對照或沒拿到的原因，讓人能判讀證據。
 
 `verifier.model` 寫實際判定 model，`same_model` 寫是否與實作相同，不知道時不可猜 true。`consoleErrors` 保留錯誤原文；`related` 對照 diff 分 yes／no／unknown，不確定就 unknown。`stagingRecords` 是 `<E>/state.json` 的筆數，沒有建立資料為 0。
 
 ## Render
 
-表格欄位固定為 `條件 | 結果 | 帳號 | 看到什麼／原因 | 證據`。failed／skipped 同時顯示 observed 與 reason；沒有帳號或證據用「—」。console error 的 yes／unknown 逐條列，no 只列數量。附上 model、staging 資料筆數與 inferred 註記。runner 的 PR body 用同欄位與文字自行 render，不呼叫 script。
+表格欄位固定為 `條件 | 結果 | 帳號 | 看到什麼／原因 | 證據`。failed／skipped 同時顯示 observed 與 reason；沒有帳號或證據用「—」。console error 的 yes／unknown 逐條列，no 只列數量。附上 model、staging 資料筆數與 inferred 註記。證據欄直接嵌入圖片、影片（`![檔名](./路徑)`），讀者在該條旁邊就看得到；文字證據在證據欄寫檔名，內容摺疊在表格下方，過長時保留頭尾並註明截斷；輸出裡的證據資料夾換成 `.`、家目錄換成 `~`。runner 的 PR body 用同欄位與文字自行 render，不呼叫 script。
