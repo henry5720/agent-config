@@ -5,7 +5,7 @@ description: 瀏覽器驗收：照驗收條件逐條判定，留截圖證據。�
 
 # 瀏覽器驗收
 
-這份規定驗多少、怎麼登入、留什麼證據、怎麼回報。產出兩樣：證據檔留在證據資料夾 `<E>`，逐條判定 JSON 交給呼叫者。證據檔不進 git，`evidence` 列到的每個檔都會發布到 PR：圖片與影片由呼叫者 `--attach` 上傳，文字證據由 render 內嵌。發布由呼叫者負責（runner 自己寫 PR body，`pr-review-and-verify` 自己發 comment），發布前照 [report-template.md](report-template.md) 清掉密碼、token 與登入狀態。
+這份規定驗多少、怎麼登入、留什麼證據、怎麼回報。產出兩樣：證據檔留在證據資料夾 `<E>`，逐條判定 JSON 交給呼叫者。證據檔不進 git，`evidence` 列到的每個檔都會發布到 PR；發布由呼叫者照 [report-template.md](report-template.md) 做（runner 自己寫 PR body，`pr-review-and-verify` 併進收尾 comment）。
 
 瀏覽器工具用 `playwright-cli`，指令寫法、登入指令、踩過的雷看 [playwright-cli.md](playwright-cli.md)。runner 驗收 run（AFK）只走本檔與 playwright-cli.md。**有人在旁邊（互動 session）時另讀 [hitl.md](hitl.md)**：改用使用者的 Chrome 或其他瀏覽器工具、請使用者代登入、把回報發到 PR、查原因換工具，都在那裡。
 
@@ -61,7 +61,7 @@ description: 瀏覽器驗收：照驗收條件逐條判定，留截圖證據。�
 步驟 4 的完成條件：
 
 - 達到該級別的下限，證據已查看並留在 `<E>`。
-- 每個證據檔都是可發布的格式（見[契約](result-contract.md)「證據與來源」），且對應一條條件，檔名寫進結果 JSON：寫在該條 criterion 的 `evidence`；`unverifiable` 時沒有 `evidence` 可放，寫進 `unverifiableReason`。
+- 每個證據檔都對應一條條件，檔名寫進結果 JSON：寫在該條 criterion 的 `evidence`；`unverifiable` 時沒有 `evidence` 可放，寫進 `unverifiableReason`。
 - 需要改前對照卻沒有時，回報寫了原因；與驗證目的相關但沒走到的，列進「未驗」。
 
 ## 登入
