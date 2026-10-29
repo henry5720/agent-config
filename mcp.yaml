@@ -25,3 +25,7 @@ servers:
   gh_grep:
     url: https://mcp.grep.app
     targets: [claude, codex, opencode]
+  # 公司 PMS。OAuth（DCR），各 client 第一次用時自己登入，repo 不存 token。
+  teamsync-pms:
+    url: https://dev-pms.teamsync.com.tw/c/tnt_68c03cf5b8ee43d3bf8f907430e0402b/mcp/work
+    targets: [claude, codex, opencode]
