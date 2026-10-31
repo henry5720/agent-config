@@ -35,7 +35,7 @@ _Avoid_: 設定、rules
 _Avoid_: 指令、instructions
 
 **Agent**:
-skillshare 的 native agent，也就是一個 subagent 定義檔（`agents/<名字>.md`），由主 agent 派工時才載入。目前沒有使用；要用時先在 target 加上 `agents` 路徑。
+skillshare 的 native agent，也就是一個 subagent 定義檔（`agents/<名字>.md`），由主 agent 派工時才載入。目前沒有使用；Claude target 的 `agents` 路徑已由 dotfiles 釘好，放進 `agents/` 再 `skillshare sync agents` 就生效。
 _Avoid_: 用來指 `AGENTS.md`（那是 **Instructions**）
 
 **Sync**:
