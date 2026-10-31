@@ -1,12 +1,12 @@
 # agent-config
 
 [skillshare](https://github.com/runkids/skillshare) 的設定目錄（`~/.config/skillshare`），整個目錄進版控
-（`git_root: root`）。三台機器共用同一份：Claude Code、Codex、OpenCode 的 skills 和 MCP 都從這裡來。
+（`git_root: root`）。三台機器共用同一份：Claude Code、Codex、OpenCode 的規則、skills 和 MCP 都從這裡來。
 
 ```mermaid
 flowchart LR
-  dotfiles["dotfiles（chezmoi）<br/>規則、client 設定"]
-  agentconfig["agent-config（skillshare）<br/>skills、MCP"]
+  dotfiles["dotfiles（chezmoi）<br/>client 設定"]
+  agentconfig["agent-config（skillshare）<br/>規則、skills、MCP"]
   clients["Claude Code<br/>Codex<br/>OpenCode"]
 
   dotfiles --> clients
@@ -36,8 +36,8 @@ tests/                自己寫的 skill 的 script 測試
 ```
 
 `config.yaml` 不在 repo 裡：skillshare 的 root 模式會自動 ignore 它，`push` 時就算 commit 了也會被
-拿出來，因為它寫的是這台機器的路徑。所以由 dotfiles 用 chezmoi 放（`create_config.yaml`，內容只有
-source 路徑和 targets）。以後要不同機器不同配置，改那份就好。
+拿出來，因為它寫的是這台機器的路徑。所以由 dotfiles 用 chezmoi 放（`modify_config.yaml.tmpl`：新機器給 source 路徑和 targets，
+之後每次 apply 只釘 `extras` 段，也就是規則連到哪）。以後要不同機器不同配置，改那份就好。
 
 ## 日常操作
 

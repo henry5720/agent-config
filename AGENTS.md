@@ -26,7 +26,7 @@
 
 | 機制 | 放哪 |
 |---|---|
-| 全域規則 | `instructions/agents-md/AGENTS.md`；chezmoi 連到 `~/.claude/CLAUDE.md`、`~/.codex/AGENTS.md`、`~/.config/opencode/AGENTS.md` |
+| 全域規則 | `instructions/agents-md/AGENTS.md`；skillshare extras 連到 `~/.claude/CLAUDE.md`、`~/.codex/AGENTS.md`、`~/.config/opencode/AGENTS.md`。要加連結改 dotfiles 的 `modify_config.yaml.tmpl`，不要用 `skillshare extras` 指令（下次 `chezmoi apply` 會蓋回去） |
 | skill | `skills/<名字>/`；補第三方 skill 沒寫的步驟也是另寫一支 |
 | MCP | `skillshare mcp add`，寫進 `mcp.yaml` |
 | hook | dotfiles（chezmoi 管 `settings.json`） |
