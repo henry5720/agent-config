@@ -29,3 +29,9 @@ servers:
   teamsync-pms:
     url: https://dev-pms.teamsync.com.tw/c/tnt_68c03cf5b8ee43d3bf8f907430e0402b/mcp/work
     targets: [claude, codex, opencode]
+  # 操作 Windows 桌面（localhost 模式）。包裝腳本只在桌機 WSL 找得到 windows-mcp.exe，
+  # 其他機器會直接結束，這個 server 顯示連不上。經 sh 展開 $HOME，各台的家目錄不同也能用。
+  windows-mcp:
+    command: sh
+    args: [-c, 'exec "$HOME/.claude/skills/windows-mcp/scripts/windows-mcp-stdio"']
+    targets: [claude, codex, opencode]

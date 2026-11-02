@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# remote 模式：換新 key → 在 0.0.0.0:8000 起 server → Tailscale Funnel 開 8443 → 從公開 IP 驗證。
+# 在桌機 WSL 跑。key 不印出來，最後複製到 Windows 剪貼簿。
+set -euo pipefail
+
+PORT=8000
+FUNNEL_PORT=8443
+
+# PowerShell 查無結果也會回 exit 1，成敗一律看最後的驗證
+pwsh() { powershell.exe -NoProfile -Command "$1" </dev/null | tr -d '\r' || true; }
+listening() { pwsh "(Get-NetTCPConnection -LocalPort $PORT -State Listen -ErrorAction SilentlyContinue | Measure-Object).Count"; }
+
+command -v powershell.exe >/dev/null || { echo "找不到 powershell.exe：要在桌機 WSL 跑" >&2; exit 1; }
+
+win_home=$(wslpath "$(pwsh '$env:USERPROFILE')")
+exe_win=$(pwsh '"$env:USERPROFILE\.local\bin\windows-mcp.exe"')
+config="$win_home/.windows-mcp/config.toml"
+[ -f "$(wslpath "$exe_win")" ] || { echo "沒裝 windows-mcp，照 SKILL.md「第一次安裝」裝好再跑" >&2; exit 1; }
+[ "$(listening)" = 0 ] || { echo "$PORT 已經有程式在聽，先跑 windows-mcp-remote-close" >&2; exit 1; }
+
+# 防火牆要擋住區網直連 8000：server 綁 0.0.0.0，只靠 key 擋
+allow=$(pwsh "Get-NetFirewallRule -Direction Inbound -Action Allow -Enabled True | Where-Object { (\$_ | Get-NetFirewallApplicationFilter).Program -match 'windows-mcp|\\\\uv\\\\' } | ForEach-Object DisplayName")
+[ -z "$allow" ] || { echo "防火牆有放行 windows-mcp 的 inbound 規則，區網可直連 8000：$allow" >&2; exit 1; }
+
+echo "換新 key…"
+pwsh "& '$exe_win' auth --transport streamable-http --host 0.0.0.0 --port $PORT --force *> \$null"
+
+echo "啟動 server（最小化視窗，log 在那個視窗裡）…"
+pwsh "Start-Process -WindowStyle Minimized -FilePath '$exe_win' -ArgumentList 'serve','--host','0.0.0.0'"
+for _ in $(seq 1 30); do [ "$(listening)" = 0 ] || break; sleep 1; done
+[ "$(listening)" != 0 ] || { echo "server 30 秒內沒在 $PORT 起來" >&2; exit 1; }
+
+echo "開 Funnel :$FUNNEL_PORT…"
+pwsh "tailscale funnel --bg --https=$FUNNEL_PORT http://127.0.0.1:$PORT" >/dev/null
+host=$(pwsh "(tailscale status --json | ConvertFrom-Json).Self.DNSName.TrimEnd('.')")
+url="https://$host:$FUNNEL_PORT/mcp"
+
+# 本機用 ts.net 名稱會解析到 tailnet IP 而逾時，改用公開 DNS 的 IP 走 Funnel
+public_ip=$(curl -s 'https://cloudflare-dns.com/dns-query?name='"$host"'&type=A' -H 'accept: application/dns-json' \
+  | python3 -c 'import sys,json;print(json.load(sys.stdin)["Answer"][-1]["data"])')
+key=$(grep -oP 'auth_key\s*=\s*"\K[^"]+' "$config")
+probe() {
+  curl -s -m 30 -o /dev/null -w '%{http_code}' --resolve "$host:$FUNNEL_PORT:$public_ip" -X POST "$url" \
+    -H 'Accept: application/json, text/event-stream' -H 'Content-Type: application/json' "$@" \
+    -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"probe","version":"0"}}}'
+}
+for _ in $(seq 1 10); do no_auth=$(probe || true); [ "$no_auth" = 401 ] && break; sleep 3; done
+with_key=$(probe -H "Authorization: Bearer $key" || true)
+echo "公開 IP 驗證：不帶 key=$no_auth（要 401），帶 key=$with_key（要 200）"
+[ "$no_auth" = 401 ] && [ "$with_key" = 200 ] || { echo "驗證沒過，跑 windows-mcp-remote-close 收掉再查" >&2; exit 1; }
+
+pwsh "([regex]::Match((Get-Content '$(wslpath -w "$config")' -Raw), 'auth_key\s*=\s*\"([^\"]+)\"').Groups[1].Value) | Set-Clipboard"
+echo "endpoint：$url"
+echo "key 已複製到 Windows 剪貼簿（沒有印出來）"

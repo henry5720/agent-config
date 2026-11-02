@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# localhost 模式的 MCP 進入點：skillshare 的 mcp.yaml 指向這支，各 client 用 stdio 啟動。
+# 只有桌機 WSL 找得到 windows-mcp.exe；其他機器印一行就結束，client 會顯示這個 server 連不上。
+set -euo pipefail
+
+command -v powershell.exe >/dev/null || { echo "windows-mcp：這台不是 Windows 桌機的 WSL，沒有 Windows 桌面可操作" >&2; exit 1; }
+
+# powershell.exe 會讀 stdin，不擋掉會吃掉 client 送來的 MCP 訊息
+home=$(wslpath "$(powershell.exe -NoProfile -Command '$env:USERPROFILE' </dev/null | tr -d '\r')")
+exe="$home/.local/bin/windows-mcp.exe"
+[ -x "$exe" ] || { echo "windows-mcp：找不到 $exe，照 windows-mcp skill 的「第一次安裝」裝" >&2; exit 1; }
+
+# 一定要帶 --transport stdio：不帶時會照 ~/.windows-mcp/config.toml 起 HTTP server
+exec "$exe" serve --transport stdio
