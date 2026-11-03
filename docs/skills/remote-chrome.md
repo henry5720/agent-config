@@ -200,7 +200,7 @@ agent 照 SKILL.md 會自己開，不用你動手。看不到畫面，要看就�
 |---|---|---|---|
 | MCP 條目 | agent-config（這個 repo） | [`mcp.yaml`](../../mcp.yaml) | `chrome-devtools` 的參數、版本 |
 | skill 與 script | agent-config（這個 repo） | [`skills/remote-chrome/`](../../skills/remote-chrome/) | `SKILL.md` 教 agent；`remote-chrome`、`remote-chrome-headless` 兩支 script |
-| ssh 轉發 | dotfiles（chezmoi） | [`home/private_dot_ssh/private_config`](https://github.com/henry5720/dotfiles/blob/main/home/private_dot_ssh/private_config) | 部署成 `~/.ssh/config`；只有 `Host company-ec2-chrome` 帶 RemoteForward |
+| ssh 轉發 | dotfiles（chezmoi） | [`home/private_dot_ssh/private_config.tmpl`](https://github.com/henry5720/dotfiles/blob/main/home/private_dot_ssh/private_config.tmpl) | 部署成 `~/.ssh/config`；只有 `Host company-ec2-chrome` 帶 RemoteForward |
 | 指令 symlink | dotfiles（chezmoi） | [`home/dot_local/bin/symlink_remote-chrome.tmpl`](https://github.com/henry5720/dotfiles/blob/main/home/dot_local/bin/symlink_remote-chrome.tmpl)、[`symlink_remote-chrome-headless.tmpl`](https://github.com/henry5720/dotfiles/blob/main/home/dot_local/bin/symlink_remote-chrome-headless.tmpl) | 部署成 `~/.local/bin/remote-chrome`、`remote-chrome-headless`（EC2 用），指到這個 repo 的 script |
 | 關官方 plugin | dotfiles（chezmoi） | [`home/dot_claude/modify_settings.json.tmpl`](https://github.com/henry5720/dotfiles/blob/main/home/dot_claude/modify_settings.json.tmpl) | 改 `~/.claude/settings.json`，關掉官方 chrome-devtools plugin |
 
