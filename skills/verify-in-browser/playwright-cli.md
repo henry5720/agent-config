@@ -27,7 +27,7 @@ cd <E> && playwright-cli -s=<S> <指令>
 | 4. 確認結構 | `snapshot --filename=<E>/<狀態>.yml` 或 `find "<文字>"` |
 | 4. console | `console error` |
 | 4. mock | `route` 攔截，資料來源記「mock」 |
-| 5. 收尾 | 每個 session `close`（`attach` 的見 [hitl.md](hitl.md)）；刪掉 `<E>/.playwright-cli/` 與所有 `<E>/auth*.json` |
+| 5. 收尾 | 每個 session `close`；刪掉 `<E>/.playwright-cli/` 與所有 `<E>/auth*.json` |
 
 ## 登入
 
