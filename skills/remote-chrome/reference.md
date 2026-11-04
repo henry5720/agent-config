@@ -99,4 +99,4 @@ AppArmor profile 放行它、`chrome-sandbox` 帶 setuid，不加 `--no-sandbox`
 
 以前 `remote-chrome` 還有一支在 WSL 開 Windows Chrome（專用 profile）、經 ssh 反向轉發把 9222 帶到遠端主機的 script。
 2026-11 拿掉（dotfiles #260、#261）：專用 profile 沒有人的登入狀態，Chrome 136 起又不能對日常 profile 開 debugging port。
-要用人自己的瀏覽器時改走 `playwright-cli attach --extension`（dotfiles #260 的 a2）。
+要用人自己的瀏覽器時改走 `personal-pc-tunnel` skill（[SKILL.md](../personal-pc-tunnel/SKILL.md)，`playwright-cli attach --extension`）。

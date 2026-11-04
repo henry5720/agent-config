@@ -22,7 +22,7 @@ Codex app 內建瀏覽器（截圖）也能照著做完，這些只有互動時�
 | 需要時操作頁面驗證 | 手上的瀏覽器工具（偏好能錄影的 `playwright-cli`、Claude in Chrome） | `verify-in-browser`（自己寫的）＋ 該工具的文件；用 `playwright-cli` 時另有 `playwright-cli`（官方） |
 | 查原因：慢、記憶體、minify 過的錯誤 | chrome-devtools MCP（有設定時） | [`remote-chrome`](remote-chrome.md) |
 | 你要看著 agent 操作、接手或替它登入 | `playwright-cli show --port`，你那台開 `ssh -L` 在自己的瀏覽器看 agent 的 headless 瀏覽器、點擊、打字；登入後 agent 用同一個 session 接著做 | `verify-in-browser`（[hitl.md](../../skills/verify-in-browser/hitl.md)） |
-| 一定要用你自己的瀏覽器（passkey、硬體金鑰、裝置 SSO） | 見 a2 skill（建置中）；agent 跟你的 Chrome 在同一台時也可用 Claude in Chrome | — |
+| 一定要用你自己的瀏覽器（passkey、硬體金鑰、裝置 SSO） | `playwright-cli attach --extension`：你那台開 `ssh -L`、把 agent 給的網址貼進日常 Chrome 的新分頁；agent 跟你的 Chrome 在同一台時也可用 Claude in Chrome | [`personal-pc-tunnel`](personal-pc-tunnel.md) |
 | 值得防回歸的流程 | 寫成該 repo 的 Playwright e2e | — |
 
 官方的 `playwright-cli` 是第三方（`.metadata.json` 記來源），`update` 會蓋掉，所以驗收的規矩另外寫成

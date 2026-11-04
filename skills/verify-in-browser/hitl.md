@@ -9,7 +9,7 @@
 - 能錄影的：`playwright-cli`（錄 `.webm`）、Claude in Chrome（`claude --chrome`，錄 GIF）。
   - 使用者要看著操作或替你登入：照下面〈讓使用者看畫面、接手〉，瀏覽器還是 `playwright-cli` 自己開的那個。
   - Claude in Chrome 只在你跟使用者的 Chrome 在同一台時能用；它開的是使用者的 Chrome，可能本來就登入了。
-  - 一定要使用者自己的瀏覽器（passkey、硬體金鑰、裝置 SSO），你又不在他那台：見 a2 skill（建置中）。還沒有之前，這條列進「未驗」並寫原因。
+  - 一定要使用者自己的瀏覽器（passkey、硬體金鑰、裝置 SSO），你又不在他那台：照 `personal-pc-tunnel` skill 接他日常的 Chrome，操作還是 `playwright-cli -s=<S>`。
 - 只能截圖的：Codex app 內建瀏覽器。
 
 都沒有就照 SKILL.md 回 `unverifiable`。L3 的 WebKit 一律用 `playwright-cli`。
