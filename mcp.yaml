@@ -1,6 +1,6 @@
 servers:
   # 版本釘死：@latest 每次啟動都抓新版，壞掉時不知道是哪一版。升級就改這裡。
-  # --browser-url 連 127.0.0.1:9222 的 Chrome（WSL 走 mirrored localhost，EC2 走 SSH -R），
+  # --browser-url 連 127.0.0.1:9222 的 Chrome，9222 由 remote-chrome skill 的 remote-chrome-headless 開；
   # 少了它 server 會想自己開一個 Chrome 然後失敗。
   chrome-devtools:
     command: npx
