@@ -11,8 +11,9 @@ agent 在已配置主機（例如 company-ec2）上做事，一定要用**你日
 1. **第一次**：日常 Chrome 裝 [Playwright Extension](https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm)。
 2. **每次**：個人電腦開 `ssh -N company-ec2-attach`（dotfiles 的 ssh config 帶的別名，等於
    `ssh -N -L 127.0.0.1:9555:127.0.0.1:9555 company-ec2`），開著別關。說 port 被佔就是你另一台還開著。
-3. agent 給你一個 `chrome-extension://…` 網址：貼進**新分頁**的網址列（agent 會直接改這個分頁）。
-   沒設 token 時，再在 extension 畫面選這個分頁、按允許。
+3. 拿 connect 網址，貼進**新分頁**的網址列（agent 會直接改這個分頁）：
+   - 沒設 token：agent 給你一個 `chrome-extension://…` 網址，貼完再在 extension 畫面選這個分頁、按允許。
+   - 有設 token：新分頁開 `http://127.0.0.1:9555/connect`（經你開的 ssh 轉發），按「複製」，貼進同一個分頁的網址列。
 4. agent 說 detach 了就關掉那條 ssh。Chrome 和分頁都會留著。
 
 agent 只看得到你貼網址的那一個分頁，其他分頁讀不到。
@@ -21,7 +22,10 @@ agent 只看得到你貼網址的那一個分頁，其他分頁讀不到。
 
 extension 的狀態頁上有一個 token（「Set this environment variable to bypass the connection dialog」）。
 把它設成**已配置主機那邊**的環境變數 `PLAYWRIGHT_MCP_EXTENSION_TOKEN`（agent 跑的那個 shell 看得到就好，
-不要放進任何 repo），之後只要貼網址，不用選分頁。
+不要放進任何 repo），之後貼網址就接上，不用選分頁。
+
+網址裡有 token，所以 agent 不印、不轉給你：它的輸出會進對話，背景跑時還會存成檔案。你改從
+`http://127.0.0.1:9555/connect` 拿（只經你的 ssh 轉發到你的瀏覽器）；這個網址每次都一樣，可以加書籤。
 
 ## 網站擋機房 IP
 

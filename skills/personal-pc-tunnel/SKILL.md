@@ -18,7 +18,8 @@ description: 要使用者在個人電腦開一條 ssh 轉發才做得到的瀏�
    - 第一次用：日常 Chrome 裝 [Playwright Extension](https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm)。
    - 在個人電腦開 ssh 轉發，開著別關：`ssh -N company-ec2-attach`（dotfiles 的 ssh config 有這個別名；沒有就用 `ssh -N -L 127.0.0.1:9555:127.0.0.1:9555 <你這台的 ssh host>`）。這條說 port 被佔而失敗，就是他另一台還開著。
 3. **跑腳本**：背景跑 `personal-chrome-attach -s=<S>`（Claude Code 的 Bash `run_in_background`），它會停在前景直到 session 結束。不帶 `-s` 時 session 名是 `personal-chrome`。等使用者的時間預設 300 秒，`--timeout=<秒>` 可改。
-   - 印出 `chrome-extension://…connect.html?…` 網址 → 原樣交給使用者，請他貼進日常 Chrome 的新分頁網址列。有印「沒設 PLAYWRIGHT_MCP_EXTENSION_TOKEN」時，提醒他貼完還要在 extension 畫面選這個分頁、按允許。
+   - 印出 `chrome-extension://…connect.html?…` 網址（沒設 token）→ 原樣交給使用者，請他貼進日常 Chrome 的新分頁網址列，貼完還要在 extension 畫面選這個分頁、按允許。
+   - 印出「connect 網址含 token,不印在這裡」（有設 token）→ 把它列的兩步轉給使用者：新分頁開 `http://127.0.0.1:9555/connect`、按「複製」、貼進同一個分頁的網址列。那一頁有 token，你不要自己開、不要 curl。
    - 說 9555 已經有人在聽 → 照它印出的 process 回報使用者，請他決定；不要自己殺。
    - 逾時或 attach 失敗 → 它已經收乾淨、exit 1。問使用者卡在哪一步，再重跑（網址每次不同）。
    完成條件：輸出出現「已接上,session:<S>」。
@@ -26,7 +27,7 @@ description: 要使用者在個人電腦開一條 ssh 轉發才做得到的瀏�
 5. **收尾**：`playwright-cli -s=<S> detach`（dotfiles #248 實測過：Chrome 和分頁留著）。
    完成條件：背景的 `personal-chrome-attach` 印出「session <S> 結束了」並 exit 0。最後請使用者關掉那條 ssh。
 
-使用者想每次只貼網址、不用選分頁：請他把 extension 狀態頁上的 token 設成**你這邊**的環境變數 `PLAYWRIGHT_MCP_EXTENSION_TOKEN`（他自己設在你跑的 shell 看得到的地方）。token 不進任何 repo，也不要叫他貼進對話。
+使用者想每次只貼網址、不用選分頁：請他把 extension 狀態頁上的 token 設成**你這邊**的環境變數 `PLAYWRIGHT_MCP_EXTENSION_TOKEN`（他自己設在你跑的 shell 看得到的地方）。token 不進任何 repo，也不要叫他貼進對話；你也不要印出、存檔或轉述它。所以有 token 時腳本不印網址，網址只經他的 ssh 轉發到他的瀏覽器。
 
 ## 借使用者的對外 IP（網站擋機房 IP）
 

@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
-# 讓這台的 playwright-cli 接上人日常的 Chrome(a2):跑 `playwright-cli attach --extension=chrome`,
-# 把 relay 轉到固定的 127.0.0.1:9555,印出給人貼進 Chrome 的 connect 網址。
-# 人那台要先開 `ssh -L 127.0.0.1:9555:127.0.0.1:9555 <這台>`,Chrome 裝好 Playwright Extension。
+# 讓這台的 playwright-cli 接上人在個人電腦上日常的 Chrome:跑 `playwright-cli attach --extension=chrome`,
+# 把 relay 轉到固定的 127.0.0.1:9555,給人一個貼進 Chrome 的 connect 網址。
+# 人的個人電腦要先開 `ssh -L 127.0.0.1:9555:127.0.0.1:9555 <這台>`,Chrome 裝好 Playwright Extension。
 # 怎麼用見同一個 skill 的 SKILL.md。
 #
 # 用法:personal-chrome-attach [-s=<session>] [--timeout=<秒>]
 #   -s          playwright-cli 的 session 名(預設 personal-chrome),接上後用 playwright-cli -s=<session> 操作
 #   --timeout   等人連進來的秒數(預設 300),時間到就收掉 attach 和轉發、exit 1
-# 環境變數 PLAYWRIGHT_MCP_EXTENSION_TOKEN:有設就帶進網址,人只要貼網址;沒設人要在 extension 畫面選分頁。
+# 環境變數 PLAYWRIGHT_MCP_EXTENSION_TOKEN:有設就帶進網址,人貼網址就接上;沒設人要在 extension 畫面選分頁。
+#   有 token 的網址不印出來(agent 的輸出會進對話和檔案):人經 ssh -L 開 http://127.0.0.1:9555/connect 拿。
+#   沒 token 的網址照常印出,這一頁也拿得到。
 #
 # 停在前景直到 detach:接上之後 agent 用 playwright-cli 操作,用完 `playwright-cli -s=<session> detach`,
 # 這支看到 session 結束就收掉轉發、exit 0。
@@ -94,7 +96,7 @@ child_of() {
   grep -l "^PPid:[[:space:]]*$1\$" /proc/[0-9]*/status 2>/dev/null | head -n1 | cut -d/ -f3
 }
 
-# 2. attach。PLAYWRIGHT_MCP_EXECUTABLE_PATH 換成這支自己(見 0.),connect 網址就從 pipe 回來,不會去開本機瀏覽器。
+# 2. attach。PLAYWRIGHT_MCP_EXECUTABLE_PATH 換成這支自己(見 0.),connect 網址就從 pipe 回來,不會在這台開瀏覽器。
 #    playwright 自己的逾時只在有 token 時生效、預設 30 秒(人來不及貼),調到比 --timeout 長,逾時一律由這支管。
 PERSONAL_CHROME_ATTACH_URL_PIPE=$pipe \
 PLAYWRIGHT_MCP_EXECUTABLE_PATH=$(readlink -f "$0") \
@@ -109,27 +111,45 @@ fi
 daemon_pid=$(child_of "$attach_pid")
 
 # 3. 拆出 relay 的位置,網址裡的 mcpRelayUrl 改成 127.0.0.1:9555,其他參數(含 token)照舊。
-read -r relay_host relay_port url < <(python3 -I - "$url" "$PORT" <<'EOF'
+#    網址從 stdin 給,不放 argv:argv 在 /proc/<pid>/cmdline,別的使用者也讀得到。
+read -r relay_host relay_port url < <(printf '%s\n' "$url" | python3 -I -c '
 import sys, urllib.parse as u
-url, port = sys.argv[1], sys.argv[2]
+url, port = sys.stdin.readline().strip(), sys.argv[1]
 p = u.urlsplit(url)
 q = u.parse_qsl(p.query)
-relay = u.urlsplit(dict(q)['mcpRelayUrl'])
-q = [(k, relay._replace(netloc=f'127.0.0.1:{port}').geturl() if k == 'mcpRelayUrl' else v) for k, v in q]
+relay = u.urlsplit(dict(q)["mcpRelayUrl"])
+q = [(k, relay._replace(netloc=f"127.0.0.1:{port}").geturl() if k == "mcpRelayUrl" else v) for k, v in q]
 print(relay.hostname, relay.port, p._replace(query=u.urlencode(q)).geturl())
-EOF
-)
+' "$PORT")
 
 # 4. 轉發 127.0.0.1:9555 → relay。只聽 127.0.0.1:relay 沒有驗證,人那邊經 ssh -L 進來。
+#    例外:GET /connect 不轉給 relay,回一頁 connect 網址(含 token)給人複製。網址只經 ssh 到人的瀏覽器,
+#    不進這支的輸出。網址用環境變數交給 node(不放 argv,理由同 3.)。
 #    argv 帶這支的名字,方便用指令列找出是誰。
-node -e '
+PERSONAL_CHROME_ATTACH_CONNECT_URL=$url node -e '
 const net = require("node:net");
 const [port, host, target] = process.argv.slice(1);  // node -e 沒有腳本路徑那一格
+const url = process.env.PERSONAL_CHROME_ATTACH_CONNECT_URL;
+delete process.env.PERSONAL_CHROME_ATTACH_CONNECT_URL;
+const esc = (s) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+const body = `<!doctype html><meta charset="utf-8"><title>personal-chrome-attach</title>
+<p>按「複製」,再把網址貼進<b>這個分頁</b>的網址列、按 Enter。agent 只看得到那個分頁,會直接改它的內容。</p>
+<p><input id="u" readonly size="100" value="${esc(url)}" onfocus="this.select()"> <button id="b">複製</button></p>
+<script>b.onclick = () => navigator.clipboard.writeText(u.value).then(() => { b.textContent = "已複製"; });</script>
+`;
+const page = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nCache-Control: no-store\r\n" +
+  "Referrer-Policy: no-referrer\r\nConnection: close\r\n" +
+  `Content-Length: ${Buffer.byteLength(body)}\r\n\r\n` + body;
 net.createServer((c) => {
-  const u = net.connect(Number(target), host);
-  c.pipe(u).pipe(c);
-  c.on("error", () => u.destroy());
-  u.on("error", () => c.destroy());
+  c.on("error", () => c.destroy());
+  c.once("data", (first) => {
+    if (/^GET \/connect[ ?]/.test(first.toString("latin1", 0, 32))) { c.end(page); return; }
+    const u = net.connect(Number(target), host);
+    u.on("error", () => c.destroy());
+    c.on("error", () => u.destroy());
+    u.write(first);
+    c.pipe(u).pipe(c);
+  });
 }).on("error", (e) => { console.error(`轉發開不起來:${e.message}`); process.exit(1); })
   .listen(Number(port), "127.0.0.1");
 ' "$PORT" "$relay_host" "$relay_port" personal-chrome-attach-forward &
@@ -140,13 +160,26 @@ for _ in $(seq 1 50); do
   sleep 0.1
 done
 
-cat <<EOF
+# 有 token 的網址不印:這支的輸出 agent 看得到,背景跑時還會存成檔案。
+if [ -n "${PLAYWRIGHT_MCP_EXTENSION_TOKEN:-}" ]; then
+  cat <<EOF
+connect 網址含 token,不印在這裡。請使用者在 $TIMEOUT 秒內:
+  1. 日常 Chrome 開新分頁,網址列輸入 http://127.0.0.1:$PORT/connect
+  2. 按「複製」,把網址貼進同一個分頁的網址列、按 Enter(agent 只看得到這個分頁,會直接改它的內容)
+不要自己去開那一頁,網址裡有 token。
+
+使用者那台要先開好:ssh -N -L 127.0.0.1:$PORT:127.0.0.1:$PORT <這台的 ssh host>
+EOF
+else
+  cat <<EOF
 connect 網址(請使用者在 $TIMEOUT 秒內貼進日常 Chrome 的「新分頁」網址列;agent 只看得到這個分頁,會直接改它的內容):
 $url
 
 使用者那台要先開好:ssh -N -L 127.0.0.1:$PORT:127.0.0.1:$PORT <這台的 ssh host>
+沒設 PLAYWRIGHT_MCP_EXTENSION_TOKEN:使用者貼網址後還要在 extension 畫面選分頁、按允許。
 EOF
-[ -n "${PLAYWRIGHT_MCP_EXTENSION_TOKEN:-}" ] || echo "沒設 PLAYWRIGHT_MCP_EXTENSION_TOKEN:使用者貼網址後還要在 extension 畫面選分頁、按允許。"
+fi
+url=''
 
 # 5. 等 attach 結束(接上或失敗),自己計時:沒 token 時 attach 沒人連進來會一直等。
 deadline=$((SECONDS + TIMEOUT))
