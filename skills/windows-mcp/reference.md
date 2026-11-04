@@ -2,7 +2,7 @@
 
 出問題、或要改用 Funnel 以外的對外方式時才讀。坑照原因分層：先看 server 本身，再看經過代理的，最後看各方式專屬的。
 
-## remote 入口要滿足的條件
+## 對外入口要滿足的條件
 
 不管用哪種對外方式，入口都要做到：
 - 對外是 HTTPS，外面只連得到 `/mcp` 這個 endpoint。
@@ -11,7 +11,7 @@
 
 | 方式 | server 綁哪裡 | 狀態 |
 |------|--------------|------|
-| Tailscale Funnel | `0.0.0.0` | 預設，有 remote-open / remote-close 腳本 |
+| Tailscale Funnel | `0.0.0.0` | 預設，有 funnel-open / funnel-close 腳本 |
 | Cloudflare quick tunnel | 可以留在 `127.0.0.1` | 未實測，這台還沒裝 cloudflared |
 | 防火牆 inbound 直連 | `0.0.0.0` | 未實測 |
 
@@ -29,12 +29,12 @@
 
 - **`Host` 是公開網址**：代理預設把對外網址當成 `Host` 轉進來，會撞到上面的 loopback 檢查。解法二選一：server 綁 `0.0.0.0`（Funnel 只能這樣做），或讓代理改寫成 `localhost`（cloudflared 用 `--http-host-header localhost`）。
 - **`--ip-allowlist` 不能用**：請求是代理從 127.0.0.1 轉進來的，uvicorn 預設信任 127.0.0.1 帶的 `X-Forwarded-For`，會把來源 IP 改成真正的外部 IP。allowlist 填 `127.0.0.1` 就會連代理的請求一起擋掉，回 `403 … not in the IP allowlist`。
-- **綁 `0.0.0.0` 時**，區網直連 8000 只靠 Windows 防火牆擋。remote-open 會先確認沒有放行 windows-mcp 的 inbound 規則。
+- **綁 `0.0.0.0` 時**，區網直連 8000 只靠 Windows 防火牆擋。funnel-open 會先確認沒有放行 windows-mcp 的 inbound 規則。
 
 ## Funnel 專屬
 
 - **只能用 443、8443、10000**：443 常被其他 `tailscale serve` 佔用，所以腳本用 8443。
-- **在本機驗不到 Funnel**：本機查 ts.net 名稱會拿到 tailnet IP，連線會逾時。要用公開 DNS 查到的 IP 加 `curl --resolve`，remote-open 已經這樣做。
+- **在本機驗不到 Funnel**：本機查 ts.net 名稱會拿到 tailnet IP，連線會逾時。要用公開 DNS 查到的 IP 加 `curl --resolve`，funnel-open 已經這樣做。
 
 ## Cloudflare quick tunnel 專屬（未實測）
 

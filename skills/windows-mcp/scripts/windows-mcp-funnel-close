@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 收掉 remote 模式：關 Funnel → 停 server → 換掉 key（給出去的那把就作廢）。重跑也安全。
+# 收掉 Funnel 模式：關 Funnel → 停 server → 換掉 key（給出去的那把就作廢）。重跑也安全。
 set -euo pipefail
 
 PORT=8000
