@@ -1,7 +1,8 @@
 # personal-pc-tunnel
 
 agent 在已配置主機（例如 company-ec2）上做事，一定要用**你日常的 Chrome**（passkey、硬體金鑰、裝置 SSO）時，
-它會照這個 skill 請你開一條 ssh 轉發、貼一個網址。agent 怎麼做寫在
+它會照這個 skill 請你開一條 ssh 轉發、貼一個網址；網站擋機房 IP 時，它會請你開另一條轉發借你的對外 IP
+（見〈網站擋機房 IP〉）。agent 怎麼做寫在
 [`skills/personal-pc-tunnel/SKILL.md`](../../skills/personal-pc-tunnel/SKILL.md)，這份只寫你要做的事。
 只是要看 agent 的畫面或替它登入，不走這條：見 [verify-in-browser](verify-in-browser.md)。
 
@@ -22,9 +23,17 @@ extension 的狀態頁上有一個 token（「Set this environment variable to b
 把它設成**已配置主機那邊**的環境變數 `PLAYWRIGHT_MCP_EXTENSION_TOKEN`（agent 跑的那個 shell 看得到就好，
 不要放進任何 repo），之後只要貼網址，不用選分頁。
 
+## 網站擋機房 IP
+
+agent 說某個網站擋了機房 IP（驗證碼迴圈、影片不能播）時，它還是用自己的 headless 瀏覽器，只是流量改從你這台出去：
+
+1. 個人電腦開 `ssh -N company-ec2-socks`（等於 `ssh -N -R 127.0.0.1:1080 company-ec2`，反向 SOCKS），開著別關。
+2. agent 會給你看它那邊的對外 IP，確認是你這台的（你有 IPv6 時常是 IPv6）。
+3. agent 說用完了就 Ctrl-C 關掉。開著的時候 agent 帶 proxy 的流量都走你的網路，所以只在被擋時開。
+
 ## 為什麼這樣接
 
-relay 在已配置主機上、只綁 127.0.0.1、沒有驗證，所以只能經 ssh 轉發進去。`playwright-cli` 每次給的 relay
+relay 和反向 SOCKS 都在已配置主機上、只綁 127.0.0.1、沒有驗證，所以只能經 ssh 轉發。`playwright-cli` 每次給的 relay
 port 是隨機的，`personal-chrome-attach` 把它轉到固定的 9555，你的 ssh 指令才能每次一樣。決策與實測見
 dotfiles [#248](https://github.com/henry5720/dotfiles/issues/248)、ADR
 [0001](https://github.com/henry5720/dotfiles/blob/main/docs/adr/0001-browser-tools-drive-vs-debug.md)。

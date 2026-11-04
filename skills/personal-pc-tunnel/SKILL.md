@@ -1,6 +1,6 @@
 ---
 name: personal-pc-tunnel
-description: 要使用者在個人電腦開一條 ssh 轉發才做得到的瀏覽器工作：接上使用者日常的 Chrome（passkey、硬體金鑰、裝置 SSO）。一定要使用者自己的瀏覽器、你又不在他那台時使用。
+description: 要使用者在個人電腦開一條 ssh 轉發才做得到的瀏覽器工作：接上使用者日常的 Chrome（passkey、硬體金鑰、裝置 SSO），或借他那台的對外 IP。一定要使用者自己的瀏覽器、或網站擋機房 IP（headless 瀏覽器被擋、對方要驗證你不是機器人）時使用。
 ---
 
 # personal-pc-tunnel
@@ -27,3 +27,16 @@ description: 要使用者在個人電腦開一條 ssh 轉發才做得到的瀏�
    完成條件：背景的 `personal-chrome-attach` 印出「session <S> 結束了」並 exit 0。最後請使用者關掉那條 ssh。
 
 使用者想每次只貼網址、不用選分頁：請他把 extension 狀態頁上的 token 設成**你這邊**的環境變數 `PLAYWRIGHT_MCP_EXTENSION_TOKEN`（他自己設在你跑的 shell 看得到的地方）。token 不進任何 repo，也不要叫他貼進對話。
+
+## 借使用者的對外 IP（網站擋機房 IP）
+
+只在 headless 瀏覽器**因為 IP 被擋**時用：同一頁在使用者那台正常，這台卻是 403、驗證碼迴圈、「unusual traffic」、影片不能播。這時還是用 headless 瀏覽器，只是讓流量從使用者那台出去，不用改接他的 Chrome。平常不開：開著的時候你所有走 proxy 的流量都經過他的網路。
+
+1. **請使用者開反向 SOCKS**，開著別關：`ssh -N company-ec2-socks`（dotfiles 的 ssh config 有這個別名；沒有就用 `ssh -N -R 127.0.0.1:1080 <你這台的 ssh host>`）。說 port 被佔而失敗，就是他另一台還開著。
+   完成條件：`ss -ltn 'sport = :1080'` 看得到 `127.0.0.1:1080` 在聽。
+2. **開帶 proxy 的 headless 瀏覽器**：proxy 只在瀏覽器啟動時讀，session 已經開著就先 `playwright-cli -s=<S> close`，再
+   `PLAYWRIGHT_MCP_PROXY_SERVER=socks5://127.0.0.1:1080 playwright-cli -s=<S> open <網址>`。之後照常用 `playwright-cli -s=<S>` 指令。
+   完成條件：在這個 session 開 `https://api64.ipify.org`，印出來的 IP 跟沒帶 proxy 時不同，而且使用者認得是他那台的。
+   - Chrome 的 SOCKS5 在使用者那端解析 DNS，看到的是他那邊的 DNS 結果；他那台有 IPv6 時，對外 IP 常是 IPv6，跟他核對時兩種都要看。
+3. **收尾**：`playwright-cli -s=<S> close`，請使用者在那個視窗按 Ctrl-C 關掉 ssh。
+   完成條件：`ss -ltn 'sport = :1080'` 沒有東西在聽。

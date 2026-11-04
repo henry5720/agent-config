@@ -150,7 +150,7 @@ done
 | skill | 你要做的事 |
 |---|---|
 | [remote-chrome](remote-chrome.md) | 查原因前在本機開 headless Chrome 佔 9222 給 chrome-devtools MCP、排錯 9222 |
-| [personal-pc-tunnel](personal-pc-tunnel.md) | 讓 agent 接你日常的 Chrome：裝 Playwright Extension、開 ssh 轉發、設 token 只貼網址 |
+| [personal-pc-tunnel](personal-pc-tunnel.md) | 讓 agent 接你日常的 Chrome：裝 Playwright Extension、開 ssh 轉發、設 token 只貼網址；網站擋機房 IP 時開反向 SOCKS 借你的對外 IP |
 | [verify-in-browser](verify-in-browser.md) | 選瀏覽器工具（playwright-cli、Claude in Chrome、Codex）、裝 ffmpeg 轉影片、升級 playwright-cli 後跟上官方 skill |
 | [slack-list](slack-list.md) | 建 Slack app、填 `.env`、排錯 |
 | [daily-worklog](daily-worklog.md) | 兩種用法：裝成 skill，或整份貼給其他 agent |
