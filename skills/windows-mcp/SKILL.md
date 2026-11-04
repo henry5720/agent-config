@@ -30,7 +30,7 @@ uv tool update-shell
 
 ## tailnet 外的 agent（經 Funnel + key）
 
-1. 在桌機 WSL 跑 `~/.claude/skills/windows-mcp/scripts/windows-mcp-funnel-open`。它會換新 key、在 0.0.0.0:8000 起 server、開 Funnel :8443，再從公開 IP 驗證，最後印出 endpoint，並把 key 複製到 Windows 剪貼簿。
+1. 在這台 Windows 的 WSL 跑 `~/.claude/skills/windows-mcp/scripts/windows-mcp-funnel-open`。它會換新 key、在 0.0.0.0:8000 起 server、開 Funnel :8443，再從公開 IP 驗證，最後印出 endpoint，並把 key 複製到 Windows 剪貼簿。
    完成條件：印出 `不帶 key=401` `帶 key=200` 和 endpoint。驗證沒過就跑 funnel-close，再看 reference.md。
 2. **交 key**：請使用者把剪貼簿裡的 key 交給對方 agent，最好設成它的環境變數 `WINDOWS_MCP_AUTH_KEY`。agent 自己讀 key、或把 key 傳到別的服務，都要先取得使用者明說同意。用聊天訊息交的話，用完一定要 funnel-close 換 key。
 3. 交代對方 agent：endpoint 用 `/mcp`，不帶結尾斜線；先跑 `tools/list` 和 `Screenshot`。`PowerShell`、`Registry`、`FileSystem` 寫入，要使用者同意才用。
