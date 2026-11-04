@@ -92,8 +92,9 @@ trap cleanup EXIT
 trap 'exit 130' INT TERM HUP
 
 # daemon 是 attach 起的子 process,自己 setsid,不在同一個 process group,要從 /proc 找。
+# 掃到一半有 process 結束時 grep 回 2,pipefail + set -e 會讓整支默默結束,所以吞掉 exit code。
 child_of() {
-  grep -l "^PPid:[[:space:]]*$1\$" /proc/[0-9]*/status 2>/dev/null | head -n1 | cut -d/ -f3
+  { grep -l "^PPid:[[:space:]]*$1\$" /proc/[0-9]*/status 2>/dev/null || true; } | head -n1 | cut -d/ -f3
 }
 
 # 2. attach。PLAYWRIGHT_MCP_EXECUTABLE_PATH 換成這支自己(見 0.),connect 網址就從 pipe 回來,不會在這台開瀏覽器。
