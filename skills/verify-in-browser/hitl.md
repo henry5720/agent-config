@@ -22,7 +22,7 @@
 `playwright-cli` 開的瀏覽器是 headless 的，使用者要看或接手時，你開 dashboard、他從自己的瀏覽器連進來。
 
 1. 背景跑 `playwright-cli show --port 9377 --host=127.0.0.1`（阻塞的 http server；port 被佔就換一個）。`--host` 一定寫 `127.0.0.1`：dashboard 沒有驗證，不能聽 `0.0.0.0`；不寫時聽 `localhost`，有的機器解析成 `::1`，下一步的 `ssh -L` 就連不到。
-2. 跟使用者說：在他的電腦開 `ssh -L 9377:127.0.0.1:9377 <你這台的 ssh host>`，瀏覽器開 `http://127.0.0.1:9377`。點 session `<S>` 放大，點進畫面就能用滑鼠、鍵盤操作，按 Escape 交還。
+2. 跟使用者說：在他的電腦開 `ssh -L 127.0.0.1:9377:127.0.0.1:9377 <你這台的 ssh host>`，瀏覽器開 `http://127.0.0.1:9377`。點 session `<S>` 放大，點進畫面就能用滑鼠、鍵盤操作，按 Escape 交還。
 3. 用完 `playwright-cli show --kill`，再收掉背景的 `show`。
 
 ## 登入
