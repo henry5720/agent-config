@@ -17,7 +17,7 @@ description: 要使用者在個人電腦開一條 ssh 轉發才做得到的瀏�
 2. **請使用者做準備**（一次講完，等他說好）：
    - 第一次用：日常 Chrome 裝 [Playwright Extension](https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm)。
    - 在個人電腦開 ssh 轉發，開著別關：`ssh -N company-ec2-attach`（dotfiles 的 ssh config 有這個別名；沒有就用 `ssh -N -L 127.0.0.1:9555:127.0.0.1:9555 <你這台的 ssh host>`）。這條說 port 被佔而失敗，就是他另一台還開著。
-3. **跑腳本**：背景跑 `personal-chrome-attach -s=<S>`（Claude Code 的 Bash `run_in_background`），它會停在前景直到 session 結束。等使用者的時間預設 300 秒，`--timeout=<秒>` 可改。
+3. **跑腳本**：背景跑 `personal-chrome-attach -s=<S>`（Claude Code 的 Bash `run_in_background`），它會停在前景直到 session 結束。不帶 `-s` 時 session 名是 `personal-chrome`。等使用者的時間預設 300 秒，`--timeout=<秒>` 可改。
    - 印出 `chrome-extension://…connect.html?…` 網址 → 原樣交給使用者，請他貼進日常 Chrome 的新分頁網址列。有印「沒設 PLAYWRIGHT_MCP_EXTENSION_TOKEN」時，提醒他貼完還要在 extension 畫面選這個分頁、按允許。
    - 說 9555 已經有人在聽 → 照它印出的 process 回報使用者，請他決定；不要自己殺。
    - 逾時或 attach 失敗 → 它已經收乾淨、exit 1。問使用者卡在哪一步，再重跑（網址每次不同）。

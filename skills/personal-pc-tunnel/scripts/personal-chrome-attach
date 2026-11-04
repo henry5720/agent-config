@@ -5,7 +5,7 @@
 # 怎麼用見同一個 skill 的 SKILL.md。
 #
 # 用法:personal-chrome-attach [-s=<session>] [--timeout=<秒>]
-#   -s          playwright-cli 的 session 名(預設 a2),接上後用 playwright-cli -s=<session> 操作
+#   -s          playwright-cli 的 session 名(預設 personal-chrome),接上後用 playwright-cli -s=<session> 操作
 #   --timeout   等人連進來的秒數(預設 300),時間到就收掉 attach 和轉發、exit 1
 # 環境變數 PLAYWRIGHT_MCP_EXTENSION_TOKEN:有設就帶進網址,人只要貼網址;沒設人要在 extension 畫面選分頁。
 #
@@ -14,7 +14,7 @@
 
 set -euo pipefail
 
-# 0. 被 playwright-cli 當成「瀏覽器執行檔」叫起來時(見 3.):不開瀏覽器,只把 connect 網址(最後一個參數)
+# 0. 被 playwright-cli 當成「瀏覽器執行檔」叫起來時(見 2.):不開瀏覽器,只把 connect 網址(最後一個參數)
 #    交給等在 named pipe 另一頭的主程式。用 pipe 不用檔案:網址裡有 token,不落地。
 if [ -n "${PERSONAL_CHROME_ATTACH_URL_PIPE:-}" ]; then
   printf '%s\n' "${!#}" >"$PERSONAL_CHROME_ATTACH_URL_PIPE"
@@ -22,7 +22,7 @@ if [ -n "${PERSONAL_CHROME_ATTACH_URL_PIPE:-}" ]; then
 fi
 
 PORT=9555
-SESSION=a2
+SESSION=personal-chrome
 TIMEOUT=300
 for arg in "$@"; do
   case "$arg" in
