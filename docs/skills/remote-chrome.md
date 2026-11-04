@@ -32,7 +32,7 @@ flowchart LR
 
 前提：WSL interop 叫得動 Windows 的 `cmd.exe`／`powershell.exe`、Windows 裝了 Chrome、
 `.wslconfig` 是 `networkingMode=mirrored`（見 dotfiles 的
-[`wsl/.wslconfig`](https://github.com/henry5720/dotfiles/blob/main/wsl/.wslconfig)）。
+[`home/dot_wslconfig`](https://github.com/henry5720/dotfiles/blob/main/home/dot_wslconfig)）。
 
 > ⚠️ `9222` 等於**完整瀏覽器控制權**，包含那個 profile 裡所有登入狀態。只綁 localhost，
 > 不要對 LAN 或網際網路開放。
