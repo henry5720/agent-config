@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# remote 模式：換新 key → 在 0.0.0.0:8000 起 server → Tailscale Funnel 開 8443 → 從公開 IP 驗證。
+# Funnel 模式（給 tailnet 外的 agent）：換新 key → 在 0.0.0.0:8000 起 server → Tailscale Funnel 開 8443 → 從公開 IP 驗證。
 # 在桌機 WSL 跑。key 不印出來，最後複製到 Windows 剪貼簿。
 set -euo pipefail
 
@@ -16,7 +16,7 @@ win_home=$(wslpath "$(pwsh '$env:USERPROFILE')")
 exe_win=$(pwsh '"$env:USERPROFILE\.local\bin\windows-mcp.exe"')
 config="$win_home/.windows-mcp/config.toml"
 [ -f "$(wslpath "$exe_win")" ] || { echo "沒裝 windows-mcp，照 SKILL.md「第一次安裝」裝好再跑" >&2; exit 1; }
-[ "$(listening)" = 0 ] || { echo "$PORT 已經有程式在聽，先跑 windows-mcp-remote-close" >&2; exit 1; }
+[ "$(listening)" = 0 ] || { echo "$PORT 已經有程式在聽，先跑 windows-mcp-funnel-close" >&2; exit 1; }
 
 # 防火牆要擋住區網直連 8000：server 綁 0.0.0.0，只靠 key 擋
 allow=$(pwsh "Get-NetFirewallRule -Direction Inbound -Action Allow -Enabled True | Where-Object { (\$_ | Get-NetFirewallApplicationFilter).Program -match 'windows-mcp|\\\\uv\\\\' } | ForEach-Object DisplayName")
@@ -47,7 +47,7 @@ probe() {
 for _ in $(seq 1 10); do no_auth=$(probe || true); [ "$no_auth" = 401 ] && break; sleep 3; done
 with_key=$(probe -H "Authorization: Bearer $key" || true)
 echo "公開 IP 驗證：不帶 key=$no_auth（要 401），帶 key=$with_key（要 200）"
-[ "$no_auth" = 401 ] && [ "$with_key" = 200 ] || { echo "驗證沒過，跑 windows-mcp-remote-close 收掉再查" >&2; exit 1; }
+[ "$no_auth" = 401 ] && [ "$with_key" = 200 ] || { echo "驗證沒過，跑 windows-mcp-funnel-close 收掉再查" >&2; exit 1; }
 
 pwsh "([regex]::Match((Get-Content '$(wslpath -w "$config")' -Raw), 'auth_key\s*=\s*\"([^\"]+)\"').Groups[1].Value) | Set-Clipboard"
 echo "endpoint：$url"
