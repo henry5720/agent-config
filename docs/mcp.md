@@ -57,5 +57,5 @@ chezmoi update → skillshare sync mcp -g --dry-run → 處理 conflict → skil
 
 | server | 看哪 |
 |---|---|
-| chrome-devtools | [skills/remote-chrome/reference.md](../skills/remote-chrome/reference.md)：9222 由 `remote-chrome-headless` 開、要關掉官方 plugin、版本釘在 `mcp.yaml` |
+| chrome-devtools | dotfiles 的[瀏覽器](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access/browser.md)：9222 上要先有 Chrome（headless 或使用者的獨立 profile）；版本釘在 `mcp.yaml` |
 | codegraph | dotfiles 的 [codegraph.md](https://github.com/henry5720/dotfiles/blob/main/docs/codegraph.md)：CLI 安裝、索引、worktree 與 git hook 都由 dotfiles 管 |

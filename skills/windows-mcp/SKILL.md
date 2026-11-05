@@ -38,7 +38,7 @@ uv tool update-shell
 
 ### 選連法
 
-照 [remote-access 的判準](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access.md#判準)，先看對方 agent 在哪：
+照 [remote-access 的判準](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access/README.md#判準)，先看對方 agent 在哪：
 
 - **對方 agent 在使用者的 tailnet 內** → [tailnet 內](#tailnet-內)：ssh 轉發或 tailscale serve，不開公網、不叫 `expose-port`。
 - **在 tailnet 外，那台 Windows 加進使用者的 tailnet**（WSL 裡的 tailscale、Windows 原生 tailscale 都算）→ [Funnel](#funnel)。
@@ -76,7 +76,7 @@ uv tool update-shell
 
 ### tailnet 內
 
-對方 agent 直接連那台，照 remote-access 的 [tailnet 內](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access.md#tailnet-內)。這條**未實測**。
+對方 agent 直接連那台，照 remote-access 的 [tailnet 內](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access/README.md#tailnet-內)。這條**未實測**。
 
 1. **挑做法、起 server**：
    - **ssh 轉發**（預設；對方那台 ssh 得到一個接得到那台 Windows `127.0.0.1:8000` 的端點，例如 Windows 的 OpenSSH、或 mirrored networking 的 WSL）：server 綁 loopback，`Host` 是 `127.0.0.1`，過得了檢查，也不用放行防火牆。server 照[〈使用者在那台 PowerShell 貼〉](#使用者在那台-powershell-貼)起，`<綁的位址>` 填 `127.0.0.1`。

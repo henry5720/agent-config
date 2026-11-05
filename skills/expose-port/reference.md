@@ -11,7 +11,7 @@
 ## Funnel 專屬
 
 - **只能用 443、8443、10000**（[官方文件](https://tailscale.com/docs/features/tailscale-funnel)）。443 常被其他 `tailscale serve` 佔用，所以預設 8443。
-- **開不起來**：tailnet 要開 MagicDNS 和 HTTPS 憑證，policy 要有 `funnel` node attribute。細節看 remote-access 的 [Tailscale Funnel](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access.md#tailscale-funnel)。
+- **開不起來**：tailnet 要開 MagicDNS 和 HTTPS 憑證，policy 要有 `funnel` node attribute。細節看 remote-access 的 [Tailscale Funnel](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access/README.md#tailscale-funnel)。
 - **剛開時公開 DNS 查不到 ts.net 名稱**：2026-11-05 在 henry-laptop 實測，開 Funnel 後立刻查公開 DNS 是查無此名，之後才查得到。`expose-port-funnel open` 會每隔幾秒重查，最多約 60 秒；一直查不到就撤掉 Funnel、exit 1。
 - **在本機驗不到 Funnel**：在 tailnet 內的機器查 ts.net 名稱會拿到 tailnet IP，連線會逾時。要用公開 DNS 查到的 IP 加 `curl --resolve`，`expose-port-funnel open` 已經這樣做。手動驗（那台沒有腳本時）：
 

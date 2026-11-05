@@ -7,11 +7,11 @@ description: 把本機某個 port 開成 tailnet 外連得到的公開網址：�
 
 公開網址誰拿到都能連，擋陌生人的只剩 app 自己的驗證。所以這支只開**有驗證的 app**，交出網址前從公網確認「不帶驗證被拒、帶了通過」，用完一定收掉。
 
-連的人在 tailnet 內就不用這支：直接連 tailnet IP，不開公網（[判準](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access.md#判準)）。
+連的人在 tailnet 內就不用這支：直接連 tailnet IP，不開公網（[判準](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access/README.md#判準)）。
 
 ## 選分支
 
-開出去的那台**跑得到登入使用者 tailnet 的 tailscale** → [Funnel](#funnel)。那台不加進使用者的 tailnet（別人的機器、臨時借用）→ [quick tunnel](#quick-tunnel)。差異看 [比較表](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access.md#比較表)。
+開出去的那台**跑得到登入使用者 tailnet 的 tailscale** → [Funnel](#funnel)。那台不加進使用者的 tailnet（別人的機器、臨時借用）→ [quick tunnel](#quick-tunnel)。差異看 [比較表](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access/README.md#比較表)。
 
 ## 跟 app 要的輸入
 
@@ -29,7 +29,7 @@ description: 把本機某個 port 開成 tailnet 外連得到的公開網址：�
 
 ## Funnel
 
-腳本：`~/.claude/skills/expose-port/scripts/expose-port-funnel`（`--help` 看參數）。它照[共通規則](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access.md#共通規則)前景跑：不加 `--bg`，停著直到收到 Ctrl+C／SIGTERM 才撤掉 Funnel。
+腳本：`~/.claude/skills/expose-port/scripts/expose-port-funnel`（`--help` 看參數）。它照[共通規則](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access/README.md#共通規則)前景跑：不加 `--bg`，停著直到收到 Ctrl+C／SIGTERM 才撤掉 Funnel。
 
 **收乾淨的判準**（這支和下面手動的做法都一樣）：那個對外 port 的 tailscale CLI 行程剩 0 個，**而且**從公網打公開網址連不上（`000`，或公開 DNS 查不到）。`tailscale funnel status` 不算數：前景 Funnel 不會列成 serve config，印 `No serve config` 時公網照樣回 `401`（2026-11-05 在 henry-laptop 實測）。停掉叫 tailscale 的那一端（ssh、WSL 的 `powershell.exe`）也不會停掉 Windows 上的 `tailscale.exe`，口子會一直開著。
 
