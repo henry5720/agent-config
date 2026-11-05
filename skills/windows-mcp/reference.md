@@ -4,6 +4,7 @@
 
 ## server 本身
 
+- **從 ssh 起的 server 一啟動就結束**：ssh 進 Windows（或 ssh 進去再叫 `wsl.exe`、`powershell.exe`）是沒有互動桌面的 session，`serve` 在 lifespan 丟 `RuntimeError: No active interactive desktop for physical input control` 就結束，`windows-mcp-serve` 會等滿 30 秒後報「server 30 秒內沒在 8000 起來」（2026-11-05 在 henry-laptop 實測）。server 要從使用者登入的桌面 session 起：在那台桌面開的終端機（WSL 或 PowerShell）跑。
 - **`/mcp/` 會 307 轉到 `/mcp`**：有些 client 不跟 POST redirect，所以直接給 `/mcp`。
 - **log 在 server 的最小化視窗**：手動 `serve` 不寫檔；`~\.windows-mcp\server.log` 只有 scheduled task 會寫。
 - **`serve` 沒帶 `--transport` 時**，會照 `config.toml` 的 transport 起 server。`auth` 會把它寫成 HTTP，所以 stdio 一定要明寫 `--transport stdio`。

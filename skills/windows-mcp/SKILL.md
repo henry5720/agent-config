@@ -44,7 +44,7 @@ uv tool update-shell
 - **在 tailnet 外，那台 Windows 加進使用者的 tailnet**（WSL 裡的 tailscale、Windows 原生 tailscale 都算）→ [Funnel](#funnel)。
 - **在 tailnet 外，那台不加進使用者的 tailnet**（別人的機器、臨時借用）→ [quick tunnel](#quick-tunnel)。
 
-有沒有 WSL 不影響選哪條，只決定 server 由誰起：有 WSL 時 agent 在那台 WSL 跑 `~/.claude/skills/windows-mcp/scripts/` 的腳本（靠 `powershell.exe` 操作 Windows）；沒有 WSL（或那台沒有 skillshare）時請使用者照[〈使用者在那台 PowerShell 貼〉](#使用者在那台-powershell-貼)貼。公開網址的開、驗、收都交給 `expose-port`，這裡只寫 server 那半和要給 `expose-port` 的輸入。
+有沒有 WSL 不影響選哪條，只決定 server 由誰起：有 WSL 時 agent 在那台 WSL 跑 `~/.claude/skills/windows-mcp/scripts/` 的腳本（靠 `powershell.exe` 操作 Windows；這個 WSL 要是從使用者桌面開的，ssh 進去的沒有互動桌面，server 起不來，見 reference.md）；沒有 WSL（或那台沒有 skillshare）時請使用者照[〈使用者在那台 PowerShell 貼〉](#使用者在那台-powershell-貼)貼。公開網址的開、驗、收都交給 `expose-port`，這裡只寫 server 那半和要給 `expose-port` 的輸入。
 
 ### 交 key 和交代 agent（每條都一樣）
 

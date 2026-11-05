@@ -62,7 +62,11 @@ esac
 FAKE_CURL = r"""#!/usr/bin/env bash
 state="$FAKE_STATE"
 printf 'curl' >> "$state/calls"; printf ' %q' "$@" >> "$state/calls"; echo >> "$state/calls"
-case "$*" in *dns-query*) echo '{"Answer":[{"type":5,"data":"x."},{"type":1,"data":"__IP__"}]}'; exit 0 ;; esac
+case "$*" in *dns-query*)
+  # FAKE_DNS_MISSES=N：前 N 次查詢還沒有紀錄（Funnel 剛開時公開 DNS 還查不到）
+  n=$(cat "$state/dns-count" 2>/dev/null || echo 0); echo $((n + 1)) > "$state/dns-count"
+  if [ "$n" -lt "${FAKE_DNS_MISSES:-0}" ]; then echo '{"Status":3}'; exit 0; fi
+  echo '{"Answer":[{"type":5,"data":"x."},{"type":1,"data":"__IP__"}]}'; exit 0 ;; esac
 header=""
 while [ $# -gt 0 ]; do
   if [ "$1" = -H ] && [ "${2:0:1}" = @ ]; then header=$(cat "${2:1}"); fi
@@ -207,6 +211,25 @@ class FunnelTest(FakeBinTest):
         proc = self.start(self.open_args())
         out, _ = proc.communicate(timeout=30)
         self.assertNotEqual(proc.returncode, 0)
+        self.assertNotIn("公開網址", out)
+        self.assertFalse(self.funnel_open())
+
+    def test_open_waits_until_public_dns_has_the_name(self):
+        self.env["FAKE_DNS_MISSES"] = "3"
+        proc = self.start(self.open_args())
+        out = self.read_until(proc, "公開網址")
+        self.assertIn("不帶驗證=401（要 401）", out)
+        self.assertIn(f"--resolve {HOST}:8443:{PUBLIC_IP}", self.calls())
+        proc.send_signal(signal.SIGTERM)
+        proc.communicate(timeout=15)
+        self.assertFalse(self.funnel_open())
+
+    def test_open_fails_and_closes_when_public_dns_never_has_the_name(self):
+        self.env["FAKE_DNS_MISSES"] = "999"
+        proc = self.start(self.open_args())
+        out, _ = proc.communicate(timeout=30)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("公開 DNS 一直查不到", out)
         self.assertNotIn("公開網址", out)
         self.assertFalse(self.funnel_open())
 

@@ -86,7 +86,9 @@ uv tool update-shell
 | quick tunnel 收掉時 `Stop-Process` 停得掉 server | 未實測 |
 | `auth --force` 換 key 後舊 key 被拒 | 未實測 |
 | SSE 經 quick tunnel | 未實測 |
-| Windows 原生 tailscale 開 Funnel（含從 WSL 叫） | 未實測 |
+| Windows 原生 tailscale 開 Funnel（含從 WSL 叫） | 未實測公網 401／200：2026-11-05 在 henry-laptop 試跑，server 從 ssh 起不來（沒有互動桌面），只測到開完公開 DNS 要過一陣子才查得到（腳本已改成等）、收完 `funnel status` 0 條但留 1 個 `tailscale.exe` |
+| server 從 ssh session 起 | 2026-11-05 實測起不來：`No active interactive desktop`，要在桌面開的終端機起 |
+| `auth --force` 每次寫入新 key | 2026-11-05 實測：config 的 key 雜湊每跑一次就不同 |
 | tailnet 內（ssh 轉發、tailscale serve） | 未實測 |
 
 server 本身的坑（`/mcp/` 307、log 在哪、`Host` 檢查、session 順序）見

@@ -14,6 +14,7 @@ import time
 from urllib.parse import urlsplit
 
 PROBE_TRIES = 10
+DNS_TRIES = 20
 
 
 def say(msg):
@@ -54,6 +55,22 @@ def public_ip(host):
     except (ValueError, AttributeError):
         answers = []
     return answers[-1] if answers else ""
+
+
+def wait_public_ip(host):
+    """等公開 DNS 查得到 host 的 IP，每隔 EXPOSE_PORT_PROBE_INTERVAL 秒重查，最多 DNS_TRIES 次；查不到回空字串。
+
+    Funnel 剛開時公開 DNS 可能還沒有那台 ts.net 名稱的紀錄（2026-11-05 在 henry-laptop 實測：
+    開完立刻查是查無此名，之後才查得到）。
+    """
+    interval = float(os.environ.get("EXPOSE_PORT_PROBE_INTERVAL", "3"))
+    for i in range(DNS_TRIES):
+        ip = public_ip(host)
+        if ip:
+            return ip
+        if i < DNS_TRIES - 1:
+            time.sleep(interval)
+    return ""
 
 
 def probe(url, ip, curl_args, header_file=None):

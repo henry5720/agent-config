@@ -12,6 +12,7 @@
 
 - **只能用 443、8443、10000**（[官方文件](https://tailscale.com/docs/features/tailscale-funnel)）。443 常被其他 `tailscale serve` 佔用，所以預設 8443。
 - **開不起來**：tailnet 要開 MagicDNS 和 HTTPS 憑證，policy 要有 `funnel` node attribute。細節看 remote-access 的 [Tailscale Funnel](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access.md#tailscale-funnel)。
+- **剛開時公開 DNS 查不到 ts.net 名稱**：2026-11-05 在 henry-laptop 實測，開 Funnel 後立刻查公開 DNS 是查無此名，之後才查得到。`expose-port-funnel open` 會每隔幾秒重查，最多約 60 秒；一直查不到就撤掉 Funnel、exit 1。
 - **在本機驗不到 Funnel**：在 tailnet 內的機器查 ts.net 名稱會拿到 tailnet IP，連線會逾時。要用公開 DNS 查到的 IP 加 `curl --resolve`，`expose-port-funnel open` 已經這樣做。手動驗（那台沒有腳本時）：
 
   ```bash
@@ -23,7 +24,7 @@
   ```
 
   完成條件跟腳本一樣：不帶驗證、帶驗證各回 app 給的碼。剛開的前幾秒可能還不通，隔幾秒重打。
-- **收掉後還在**：`tailscale funnel status` 還列著那個 port 時，`expose-port-funnel close --https <port>` 會再 `off` 一次。前景開的 Funnel 收到 SIGTERM 就撤，這在 Linux 由 share-shell 實測過（2026-10-02）；從 WSL 叫 Windows 的 tailscale（`TAILSCALE='powershell.exe …'`）時，停掉 WSL 這邊的行程會不會撤掉 Windows 那邊的 Funnel **未實測**，收完一定看 `剩 0 條`。
+- **收掉後還在**：`tailscale funnel status` 還列著那個 port 時，`expose-port-funnel close --https <port>` 會再 `off` 一次。前景開的 Funnel 收到 SIGTERM 就撤，這在 Linux 由 share-shell 實測過（2026-10-02）；從 WSL 叫 Windows 的 tailscale（`TAILSCALE='powershell.exe …'`）時，停掉 WSL 這邊的行程會不會撤掉 Windows 那邊的 Funnel **還沒完整實測**：2026-11-05 在 henry-laptop 那輪 server 沒起來、驗證前就收了，收完 `tailscale funnel status` 是 `No serve config`、腳本印 `剩 0 條`，但 Windows 上還留著 1 個 `tailscale.exe`（停掉 WSL 那邊的 `powershell.exe` 不會連帶停掉它，該 ssh session 結束後才消失）。收完一定看 `剩 0 條`，並在 Windows 跑 `(Get-Process tailscale -ErrorAction SilentlyContinue | Measure-Object).Count` 要 `0`。
 
 ## quick tunnel 專屬
 

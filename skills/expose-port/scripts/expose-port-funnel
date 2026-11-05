@@ -30,7 +30,7 @@ from pathlib import Path
 # 共用模組放在同目錄；skill 資料夾會 sync 到各 client，不留 __pycache__
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from expose_port_common import add_verify_args, public_ip, run, say, split_curl_args, verify  # noqa: E402
+from expose_port_common import add_verify_args, run, say, split_curl_args, verify, wait_public_ip  # noqa: E402
 
 FUNNEL_PORTS = (443, 8443, 10000)
 
@@ -122,9 +122,9 @@ def cmd_open(args):
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGHUP, stop)
     try:
-        ip = public_ip(host)
+        ip = wait_public_ip(host)
         if not ip:
-            say(f"公開 DNS 查不到 {host} 的 IP")
+            say(f"公開 DNS 一直查不到 {host} 的 IP")
             finish(1)
         if not verify(args, f"https://{host}:{args.https}", ip):
             say("驗證沒過，Funnel 已撤掉。看 expose-port 的 reference.md")
