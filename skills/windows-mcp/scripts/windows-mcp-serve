@@ -9,6 +9,7 @@ listening() { pwsh "(Get-NetTCPConnection -LocalPort $PORT -State Listen -ErrorA
 
 exe_win=$(pwsh '"$env:USERPROFILE\.local\bin\windows-mcp.exe"')
 [ -f "$(wslpath "$exe_win")" ] || { echo "沒裝 windows-mcp，照 SKILL.md「第一次安裝」裝好再跑" >&2; exit 1; }
+# server 跑著時換 key 不生效、舊 key 照樣能用（2026-11-05 henry-laptop 實測），所以先確認沒有 server 再換
 [ "$(listening)" = 0 ] || { echo "$PORT 已經有程式在聽，先跑 windows-mcp-stop" >&2; exit 1; }
 
 # 1. 防火牆要擋住區網直連 8000：server 綁 0.0.0.0，只靠 key 擋
@@ -23,7 +24,7 @@ pwsh "& '$exe_win' auth --transport streamable-http --host 0.0.0.0 --port $PORT 
 echo "啟動 server（最小化視窗，log 在那個視窗裡）…"
 pwsh "Start-Process -WindowStyle Minimized -FilePath '$exe_win' -ArgumentList 'serve','--host','0.0.0.0'"
 for _ in $(seq 1 30); do [ "$(listening)" = 0 ] || break; sleep 1; done
-[ "$(listening)" != 0 ] || { echo "server 30 秒內沒在 $PORT 起來。從 ssh 跑的話沒有互動桌面，server 會直接結束：要在那台桌面開的終端機跑（見 reference.md）" >&2; exit 1; }
+[ "$(listening)" != 0 ] || { echo "server 30 秒內沒在 $PORT 起來。從 ssh 跑的話沒有互動桌面，server 會直接結束：要在那台桌面開的終端機跑，或照 reference.md 用暫時的 Interactive scheduled task 起" >&2; exit 1; }
 
 # 4. key 複製到剪貼簿，給使用者交給對方 agent。printf 是 bash 內建，key 不會出現在 ps 看得到的參數裡
 key=$(auth_key) || { echo "config.toml 裡沒有 auth_key：換 key 沒成功" >&2; exit 1; }

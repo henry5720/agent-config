@@ -4,7 +4,8 @@
 set -euo pipefail
 . "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/windows-mcp-common.sh"
 
-# 1. 停 server
+# 1. 停 server。一定先停再換 key：server 跑著時 auth --force 只改 config.toml，
+#    跑著的 server 繼續收舊 key（2026-11-05 henry-laptop 實測舊 key 仍回 200）
 pwsh "Get-NetTCPConnection -LocalPort $PORT -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id \$_.OwningProcess -Force }"
 # 2. 換 key，設定改回 loopback
 pwsh "& \"\$env:USERPROFILE\.local\bin\windows-mcp.exe\" auth --transport streamable-http --host 127.0.0.1 --port $PORT --force *> \$null"

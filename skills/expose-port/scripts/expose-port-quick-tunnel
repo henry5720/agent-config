@@ -6,13 +6,18 @@
       -- <兩次驗證都帶的 curl 參數>
   expose-port-quick-tunnel verify --url https://<隨機>.trycloudflare.com --path /mcp \\
       --expect-without 401 --expect-with 200 --auth-header-cmd '…' -- <curl 參數>
-  expose-port-quick-tunnel close --port 8000
+  expose-port-quick-tunnel check-closed --url https://<隨機>.trycloudflare.com
+  expose-port-quick-tunnel close --port 8000 [--url https://<隨機>.trycloudflare.com]
 
 open 在這台跑 cloudflared，照 remote-access 的共通規則前景跑：驗證過了印出公開網址就停著，
-收到 Ctrl+C／SIGTERM 才停掉 cloudflared，並確認沒有 cloudflared 還在轉這個 port。
-驗證沒過也會停掉再結束。
-verify 給 cloudflared 跑在別台（使用者貼指令開的）時用：只從這邊驗那個網址，不開也不收。
+收到 Ctrl+C／SIGTERM 才收。驗證沒過也會收掉再結束。
+verify、check-closed 給 cloudflared 跑在別台（使用者貼指令開的）時用：只從這邊驗開著、驗收掉，不開也不收。
 close 停掉這台上轉這個 port 的 quick tunnel，給上一輪沒收乾淨時用，重跑也安全。
+
+收的完成條件：轉這個 port 的 cloudflared 剩 0 個，而且從公網打網址連不上（530，或公開 DNS 查不到）。
+close 沒給 --url 時不知道網址，只看前一項。CLOUDFLARED 叫的是 Windows 的 cloudflared
+（WSL 經 powershell.exe 或直接跑 .exe）時，停掉這邊的行程不會停掉 Windows 的 cloudflared.exe
+（2026-11-05 henry-laptop 實測），腳本會從 PowerShell 停掉它。
 
 --host-header 讓 cloudflared 改寫 Host（--http-host-header），app 綁 loopback 又檢查 Host 時給 localhost。
 
@@ -40,7 +45,9 @@ from pathlib import Path
 # 共用模組放在同目錄；skill 資料夾會 sync 到各 client，不留 __pycache__
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from expose_port_common import add_verify_args, run, say, split_curl_args, verify  # noqa: E402
+from expose_port_common import (  # noqa: E402
+    add_verify_args, cmd_check_closed, public_closed, run, say, split_curl_args, verify, windows_procs, windows_shell,
+)
 
 URL_RE = re.compile(r"https://[a-z0-9-]+\.trycloudflare\.com")
 
@@ -56,10 +63,39 @@ def tunnel_pids(port):
     return [int(p) for p in out.split()]
 
 
-def report_left(port):
+def stop_local(port):
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        for pid in tunnel_pids(port):
+            try:
+                os.kill(pid, sig)
+            except ProcessLookupError:
+                pass
+        for _ in range(50):
+            if not tunnel_pids(port):
+                return
+            time.sleep(0.2)
+
+
+def tunnels_left(port, stop=False):
+    """轉這個 port 的 cloudflared 數（這台的，加上 CLOUDFLARED 叫的 Windows 那邊的）；stop=True 先停掉再數。"""
+    if stop:
+        stop_local(port)
     left = len(tunnel_pids(port))
-    say(f"cloudflared → :{port} 剩 {left} 個（要 0）")
+    shell = windows_shell(cloudflared_cmd())
+    if shell:
+        win = windows_procs(shell, "cloudflared.exe", [rf"--url (http://)?(127\.0\.0\.1|localhost):{port}(\s|$)"], stop)
+        left = left + win if win >= 0 else -1
     return left
+
+
+def report_closed(port, url, stop=True):
+    """收的完成條件：cloudflared 剩 0 個，給了 url 時公網也要連不上。回傳收乾淨了沒。"""
+    left = tunnels_left(port, stop)
+    say(f"cloudflared → :{port} 剩 {left} 個（要 0）" if left >= 0 else f"數不出 cloudflared → :{port} 的行程（要 0）")
+    if not url:
+        say("沒給網址，沒從公網確認")
+        return left == 0
+    return public_closed(url.rstrip("/") + "/") and left == 0
 
 
 def stop_child(child):
@@ -111,13 +147,14 @@ def cmd_open(args):
             if tail:
                 say("cloudflared 最後幾行：\n" + "\n".join(tail))
         os.unlink(log_path)
-        left = report_left(args.port)
-        sys.exit(code if left == 0 else 1)
+        ok = report_closed(args.port, url)
+        sys.exit(code if ok else 1)
 
     # handler 只丟例外，收尾在主流程做：在 handler 裡 wait 子行程會跟被打斷的 child.wait() 搶鎖卡死
     def stop(*_):
         raise KeyboardInterrupt
 
+    url = ""
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGHUP, stop)
     try:
@@ -148,21 +185,7 @@ def cmd_verify(args):
 
 
 def cmd_close(args):
-    for pid in tunnel_pids(args.port):
-        try:
-            os.kill(pid, signal.SIGTERM)
-        except ProcessLookupError:
-            pass
-    for _ in range(50):
-        if not tunnel_pids(args.port):
-            break
-        time.sleep(0.2)
-    for pid in tunnel_pids(args.port):
-        try:
-            os.kill(pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-    sys.exit(0 if report_left(args.port) == 0 else 1)
+    sys.exit(0 if report_closed(args.port, args.url) else 1)
 
 
 def main(argv):
@@ -176,12 +199,15 @@ def main(argv):
     ve = sub.add_parser("verify")
     ve.add_argument("--url", required=True, help="cloudflared 印出的 https://<隨機>.trycloudflare.com")
     add_verify_args(ve)
+    cc = sub.add_parser("check-closed", help="cloudflared 跑在別台、收掉後，從這邊確認公網連不上")
+    cc.add_argument("--url", required=True, help="cloudflared 印出的 https://<隨機>.trycloudflare.com")
     cl = sub.add_parser("close")
     cl.add_argument("--port", type=int, required=True)
+    cl.add_argument("--url", help="開的時候印出的網址；給了就也從公網確認連不上")
     args = parser.parse_args(argv)
     args.curl_args = curl_args
     sys.stdout.reconfigure(line_buffering=True)
-    {"open": cmd_open, "verify": cmd_verify, "close": cmd_close}[args.cmd](args)
+    {"open": cmd_open, "verify": cmd_verify, "check-closed": cmd_check_closed, "close": cmd_close}[args.cmd](args)
 
 
 if __name__ == "__main__":

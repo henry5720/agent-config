@@ -1,4 +1,5 @@
-"""expose-port-funnel 與 expose-port-quick-tunnel 共用的部分：輸出、跑指令、參數、從公網驗證。
+"""expose-port-funnel 與 expose-port-quick-tunnel 共用的部分：輸出、跑指令、參數、從公網驗證開著或收掉、
+停 Windows 那邊的程式。
 
 不是可以直接跑的腳本。兩支腳本用 `Path(__file__).resolve().parent` 把這個目錄加進 sys.path 再 import，
 skillshare sync 成 symlink 時也找得到。
@@ -9,12 +10,16 @@ skillshare sync 成 symlink 時也找得到。
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import time
 from urllib.parse import urlsplit
 
 PROBE_TRIES = 10
 DNS_TRIES = 20
+# 從公網打收掉的網址會看到的碼：Funnel 連不上是 000，quick tunnel 是 Cloudflare 回 530（2026-11-05 henry-laptop 實測）
+CLOSED_CODES = ("000", "530")
+WINDOWS_SHELLS = ("powershell.exe", "pwsh.exe", "powershell", "pwsh")
 
 
 def say(msg):
@@ -115,3 +120,62 @@ def verify(args, base_url, ip=""):
         os.unlink(header_file)
     say(f"公網驗證：不帶驗證={without}（要 {args.expect_without}），帶驗證={with_auth}（要 {args.expect_with}）")
     return without == args.expect_without and with_auth == args.expect_with
+
+
+def public_state(url):
+    """從公網打一次 url（不帶驗證）：回 (收掉了沒, 看到什麼)。公開 DNS 查不到也算收掉。"""
+    host = urlsplit(url).hostname
+    ip = public_ip(host)
+    if not ip:
+        return True, "公開 DNS 查不到"
+    code = probe(url, ip, [])
+    return code in CLOSED_CODES, code
+
+
+def public_closed(url):
+    """收的完成條件之一：從公網打 url 要連不上。剛停掉時可能還通一下，每隔幾秒重打，最多 PROBE_TRIES 次。
+
+    不能只看 `tailscale funnel status`：前景開的 Funnel 不會列成 serve config，status 印
+    `No serve config` 時公網照樣回 401（2026-11-05 henry-laptop 實測）。
+    """
+    interval = float(os.environ.get("EXPOSE_PORT_PROBE_INTERVAL", "3"))
+    for i in range(PROBE_TRIES):
+        closed, seen = public_state(url)
+        if closed:
+            break
+        if i < PROBE_TRIES - 1:
+            time.sleep(interval)
+    say(f"公網 {url}：{seen}（要連不上：{'、'.join(CLOSED_CODES)} 或公開 DNS 查不到）")
+    return closed
+
+
+def windows_shell(cmd):
+    """cmd 是叫 Windows 程式的指令（WSL 經 powershell.exe、或直接跑 .exe）時，回能跑 PowerShell 的那支；不是回 None。
+
+    WSL 停掉自己這邊的行程，不會停掉它叫起來的 Windows 程式（2026-11-05 henry-laptop 實測 tailscale.exe、
+    cloudflared.exe 都還在），收的時候要另外從 PowerShell 停。
+    """
+    name = os.path.basename(cmd[0]).lower()
+    if name in WINDOWS_SHELLS:
+        return cmd[0]
+    if name.endswith(".exe"):
+        return "powershell.exe"
+    return None
+
+
+def windows_procs(shell, exe, patterns, stop=False):
+    """Windows 上名稱是 exe、命令列符合全部 patterns（.NET regex）的行程數；stop=True 先停掉再數。數不出來回 -1。"""
+    conds = " -and ".join(f"$_.CommandLine -match '{pat}'" for pat in patterns)
+    query = f"Get-CimInstance Win32_Process -Filter \"Name='{exe}'\" | Where-Object {{ {conds} }}"
+    if stop:
+        run([shell, "-NoProfile", "-Command", f"{query} | ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force }}"])
+    out = run([shell, "-NoProfile", "-Command", f"@({query}).Count"]).stdout.strip()
+    try:
+        return int(out.splitlines()[-1])
+    except (ValueError, IndexError):
+        return -1
+
+
+def cmd_check_closed(args):
+    """check-closed：開在別台的網址收掉後，從這邊確認公網連不上。"""
+    sys.exit(0 if public_closed(args.url.rstrip("/") + "/") else 1)

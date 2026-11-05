@@ -1,9 +1,11 @@
 """expose-port 的 Funnel 與 quick tunnel 腳本：開、公網驗證、收。
 
 tailscale、cloudflared、curl、sudo 都換成 PATH 上的假指令（見 FAKE_*），不會真的開公開網址或連外。
-假 tailscale 用一個檔案代表「Funnel 開著」：前景的 `funnel --https=N <target>` 在跑時檔案在，
-被收掉（SIGTERM）或 `funnel --https=N off` 後檔案消失。假 cloudflared 同理（cloudflared-running）。
-假 curl 帶了正確 header 回 200，否則 401。
+假 tailscale 用檔案代表「Funnel 開著」：前景的 `funnel --https=N <target>` 在跑時 fg-funnel-N 在，
+被收掉（SIGTERM）後消失；`--bg` 留下的設定是 bg-funnel-N，`funnel --https=N off` 才會消失。
+假 cloudflared 同理（cloudflared-running）。
+假 curl 打公開網址：有東西開著時帶了正確 header 回 200、否則 401；沒開時 Funnel 回 000、quick tunnel 回 530。
+假 powershell.exe 模擬從 WSL 叫 Windows 的程式：它開的 tailscale／cloudflared 在 powershell.exe 被停掉後還在跑。
 """
 import os
 import select
@@ -38,22 +40,24 @@ case "$1 $2" in
   "status --json") echo '{"Self":{"DNSName":"__HOST__."}}' ;;
   "debug prefs") echo "{\"OperatorUser\":\"${FAKE_OPERATOR:-$USER}\"}" ;;
   "funnel status")
-    found=0
-    for f in "$state"/funnel-*; do
+    # FAKE_STATUS_HIDES_FG=1：前景 Funnel 不列成 serve config（2026-11-05 henry-laptop 的 Windows tailscale 就是這樣）
+    listed=0 hidden=0
+    for f in "$state"/bg-funnel-* "$state"/fg-funnel-*; do
       [ -e "$f" ] || continue
-      found=1
-      p=${f##*/funnel-}
+      case "$f" in */fg-funnel-*) [ -n "$FAKE_STATUS_HIDES_FG" ] && { hidden=1; continue; } ;; esac
+      listed=1
+      p=${f##*-funnel-}
       echo "# Funnel on:"
       echo "https://__HOST__:$p (Funnel on)"
       echo "|-- / proxy $(cat "$f")"
     done
-    [ "$found" = 1 ] || echo "No serve config"
+    if [ "$listed" = 0 ]; then [ "$hidden" = 1 ] && echo "# Funnel on:"; echo "No serve config"; fi
     ;;
   funnel\ --https=*)
     port=${2#--https=}
-    if [ "$3" = off ]; then rm -f "$state/funnel-$port"; exit 0; fi
-    echo "$3" > "$state/funnel-$port"
-    trap 'rm -f "$state/funnel-$port"; exit 0' TERM INT
+    if [ "$3" = off ]; then rm -f "$state/bg-funnel-$port"; exit 0; fi
+    echo "$3" > "$state/fg-funnel-$port"
+    trap 'rm -f "$state/fg-funnel-$port"; exit 0' TERM INT
     while :; do sleep 0.1; done
     ;;
 esac
@@ -67,12 +71,17 @@ case "$*" in *dns-query*)
   n=$(cat "$state/dns-count" 2>/dev/null || echo 0); echo $((n + 1)) > "$state/dns-count"
   if [ "$n" -lt "${FAKE_DNS_MISSES:-0}" ]; then echo '{"Status":3}'; exit 0; fi
   echo '{"Answer":[{"type":5,"data":"x."},{"type":1,"data":"__IP__"}]}'; exit 0 ;; esac
-header=""
+header="" all="$*"
 while [ $# -gt 0 ]; do
   if [ "$1" = -H ] && [ "${2:0:1}" = @ ]; then header=$(cat "${2:1}"); fi
   shift
 done
 if [ -n "$FAKE_CURL_DOWN" ]; then printf 000; exit 7; fi
+# 公開網址有沒有東西在接：remote-up 代表別台開著
+case "$all" in
+  *__QUICK_HOST__*) [ -e "$state/cloudflared-running" ] || [ -e "$state/remote-up" ] || { printf 530; exit 0; } ;;
+  *) compgen -G "$state/*-funnel-*" >/dev/null || [ -e "$state/remote-up" ] || { printf 000; exit 7; } ;;
+esac
 if [ "$header" = "Authorization: Bearer __KEY__" ]; then printf 200; else printf 401; fi
 """
 
@@ -89,7 +98,38 @@ while :; do sleep 0.1; done
 """.replace("__QUICK_HOST__", QUICK_HOST)
 
 FAKE_TAILSCALE = FAKE_TAILSCALE.replace("__HOST__", HOST)
-FAKE_CURL = FAKE_CURL.replace("__IP__", PUBLIC_IP).replace("__KEY__", KEY)
+FAKE_CURL = FAKE_CURL.replace("__IP__", PUBLIC_IP).replace("__KEY__", KEY).replace("__QUICK_HOST__", QUICK_HOST)
+
+# 從 WSL 叫 Windows 程式（TAILSCALE='powershell.exe -NoProfile -Command tailscale'、
+# CLOUDFLARED='powershell.exe -NoProfile -Command cloudflared'）：開出來的 tailscale.exe／cloudflared.exe
+# 自己一個 session，powershell.exe 被停掉它還在（2026-11-05 henry-laptop 實測）。
+# 腳本用 Get-CimInstance … | Stop-Process 停、用 @(…).Count 數，這裡只認這兩種。
+FAKE_WIN_POWERSHELL = r"""#!/usr/bin/env bash
+state="$FAKE_STATE"
+shift 2  # -NoProfile -Command
+echo "powershell $*" >> "$state/calls"
+name=$(printf '%s' "$*" | grep -oP "Name='\K[a-z]+" | head -1)
+case "$*" in
+  *Stop-Process*)
+    pid=$(cat "$state/win-$name.pid" 2>/dev/null) || exit 0
+    kill "$pid" 2>/dev/null
+    while kill -0 "$pid" 2>/dev/null; do sleep 0.05; done
+    rm -f "$state/win-$name.pid" ;;
+  *.Count*)
+    pid=$(cat "$state/win-$name.pid" 2>/dev/null)
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then echo 1; else echo 0; fi ;;
+  "tailscale funnel --https="*" off"|"tailscale funnel status"*|"tailscale status"*|"tailscale debug"*)
+    exec "$@" ;;
+  tailscale\ *|cloudflared\ *)
+    # 換個檔名跑：Windows 的行程在 WSL 用 pgrep 看不到，腳本只能從 PowerShell 停
+    cp "$(command -v "$1")" "$state/$1.winbin"
+    prog=$1; shift
+    setsid "$state/$prog.winbin" "$@" </dev/null &
+    set -- "$prog"
+    echo $! > "$state/win-$1.pid"
+    while :; do sleep 0.1; done ;;
+esac
+"""
 
 FAKE_SUDO = r"""#!/usr/bin/env bash
 echo "sudo $*" >> "$FAKE_STATE/calls"
@@ -124,7 +164,23 @@ class FakeBinTest(unittest.TestCase):
         return path.read_text() if path.exists() else ""
 
     def funnel_open(self, port=8443):
-        return (self.state / f"funnel-{port}").exists()
+        return any((self.state / f"{kind}-funnel-{port}").exists() for kind in ("fg", "bg"))
+
+    def use_windows(self, var, prog):
+        """把 var 設成經假 powershell.exe 叫 Windows 的 prog；測完收掉它留下的程式。"""
+        ps = self.bin / "powershell.exe"
+        ps.write_text(FAKE_WIN_POWERSHELL)
+        ps.chmod(0o755)
+        self.env[var] = f"{ps} -NoProfile -Command {prog}"
+        self.addCleanup(self.kill_windows, prog)
+
+    def kill_windows(self, prog):
+        pid_file = self.state / f"win-{prog}.pid"
+        if pid_file.exists():
+            try:
+                os.kill(int(pid_file.read_text()), signal.SIGKILL)
+            except ProcessLookupError:
+                pass
 
     def open_args(self, *extra, header_cmd=None):
         return [
@@ -189,7 +245,7 @@ class FunnelTest(FakeBinTest):
         rest, _ = proc.communicate(timeout=15)
         self.assertEqual(proc.returncode, 0, out + rest)
         self.assertFalse(self.funnel_open())
-        self.assertIn("Funnel :8443 剩 0 條", rest)
+        self.assertIn("Funnel :8443 已收乾淨", rest)
 
     def test_auth_header_stays_out_of_curl_argv(self):
         proc = self.start(self.open_args())
@@ -234,14 +290,14 @@ class FunnelTest(FakeBinTest):
         self.assertFalse(self.funnel_open())
 
     def test_open_refuses_when_that_funnel_port_is_taken(self):
-        (self.state / "funnel-8443").write_text("http://127.0.0.1:3000")
+        (self.state / "bg-funnel-8443").write_text("http://127.0.0.1:3000")
         proc = self.start(self.open_args())
         out, _ = proc.communicate(timeout=15)
         self.assertNotEqual(proc.returncode, 0)
         self.assertIn("8443", out)
         self.assertNotIn("funnel --https=8443 http", self.calls())
         # 別人的 Funnel 不能被收掉
-        self.assertEqual((self.state / "funnel-8443").read_text(), "http://127.0.0.1:3000")
+        self.assertEqual((self.state / "bg-funnel-8443").read_text(), "http://127.0.0.1:3000")
 
     def test_open_rejects_ports_funnel_cannot_listen_on(self):
         args = self.open_args()
@@ -279,14 +335,14 @@ class FunnelTest(FakeBinTest):
     # ======================================================================
 
     def test_close_turns_off_leftover_funnel(self):
-        (self.state / "funnel-8443").write_text("http://127.0.0.1:8000")
+        (self.state / "bg-funnel-8443").write_text("http://127.0.0.1:8000")
         result = subprocess.run(
             [sys.executable, str(SCRIPT), "close", "--https", "8443"],
             env=self.env, capture_output=True, text=True, timeout=15,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertFalse(self.funnel_open())
-        self.assertIn("Funnel :8443 剩 0 條", result.stdout)
+        self.assertIn("Funnel :8443 已收乾淨", result.stdout)
 
     def test_close_is_safe_to_rerun(self):
         result = subprocess.run(
@@ -294,7 +350,78 @@ class FunnelTest(FakeBinTest):
             env=self.env, capture_output=True, text=True, timeout=15,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("Funnel :8443 剩 0 條", result.stdout)
+        self.assertIn("Funnel :8443 已收乾淨", result.stdout)
+
+    def test_close_fails_when_public_url_still_answers_though_status_shows_nothing(self):
+        # 前景 Funnel 不列在 status（# Funnel on: 後接 No serve config），但行程還在、公網還回 401
+        self.env["FAKE_STATUS_HIDES_FG"] = "1"
+        (self.state / "fg-funnel-8443").write_text("http://127.0.0.1:8000")
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), "close", "--https", "8443"],
+            env=self.env, capture_output=True, text=True, timeout=30,
+        )
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertNotIn("已收乾淨", result.stdout)
+        self.assertIn("401", result.stdout)
+
+    def test_sigterm_stops_windows_tailscale_left_behind_by_powershell(self):
+        # 從 WSL 叫 Windows 的 tailscale：停掉 powershell.exe 不會停掉 tailscale.exe，腳本要自己停
+        self.use_windows("TAILSCALE", "tailscale")
+        self.env["FAKE_STATUS_HIDES_FG"] = "1"
+        proc = self.start(self.open_args())
+        out = self.read_until(proc, "公開網址")
+        proc.send_signal(signal.SIGTERM)
+        rest, _ = proc.communicate(timeout=30)
+        self.assertEqual(proc.returncode, 0, out + rest)
+        self.assertIn("Stop-Process", self.calls())
+        self.assertFalse(self.funnel_open())
+        self.assertIn("行程剩 0 個", rest)
+        self.assertIn("Funnel :8443 已收乾淨", rest)
+
+    def test_open_refuses_when_public_url_already_answers(self):
+        # status 看不到的前景 Funnel 佔著這個 port：從公網打得到就不開
+        self.env["FAKE_STATUS_HIDES_FG"] = "1"
+        (self.state / "fg-funnel-8443").write_text("http://127.0.0.1:3000")
+        proc = self.start(self.open_args())
+        out, _ = proc.communicate(timeout=15)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertNotIn("funnel --https=8443 http", self.calls())
+
+    # ======================================================================
+    # verify、check-closed：Funnel 開在別台（使用者貼指令開的），只從這邊驗
+    # ======================================================================
+
+    def funnel_verify_args(self, url=f"https://{HOST}:8443", header_cmd=None):
+        return [
+            sys.executable, str(SCRIPT), "verify", "--url", url, "--path", "/mcp",
+            "--expect-without", "401", "--expect-with", "200",
+            "--auth-header-cmd", header_cmd or self.header_cmd, "--", "-X", "POST",
+        ]
+
+    def test_verify_checks_a_funnel_opened_elsewhere(self):
+        (self.state / "remote-up").touch()
+        result = subprocess.run(self.funnel_verify_args(), env=self.env, capture_output=True, text=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("不帶驗證=401（要 401），帶驗證=200（要 200）", result.stdout)
+        self.assertIn(f"公開網址：https://{HOST}:8443/mcp", result.stdout)
+        self.assertIn(f"--resolve {HOST}:8443:{PUBLIC_IP}", self.calls())
+        self.assertNotIn("tailscale funnel", self.calls())
+
+    def test_verify_rejects_urls_that_are_not_funnel(self):
+        result = subprocess.run(self.funnel_verify_args(url=f"https://{QUICK_HOST}"),
+                                env=self.env, capture_output=True, text=True, timeout=15)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("curl", self.calls())
+
+    def test_check_closed_passes_only_when_public_url_is_unreachable(self):
+        args = [sys.executable, str(SCRIPT), "check-closed", "--url", f"https://{HOST}:8443"]
+        (self.state / "remote-up").touch()
+        still = subprocess.run(args, env=self.env, capture_output=True, text=True, timeout=30)
+        self.assertNotEqual(still.returncode, 0, still.stdout)
+        (self.state / "remote-up").unlink()
+        gone = subprocess.run(args, env=self.env, capture_output=True, text=True, timeout=30)
+        self.assertEqual(gone.returncode, 0, gone.stdout)
+        self.assertIn("000", gone.stdout)
 
 
 class QuickTunnelTest(FakeBinTest):
@@ -384,6 +511,7 @@ class QuickTunnelTest(FakeBinTest):
         ]
 
     def test_verify_passes_and_prints_endpoint(self):
+        (self.state / "remote-up").touch()
         result = subprocess.run(self.verify_args(), env=self.env, capture_output=True, text=True, timeout=15)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("不帶驗證=401（要 401），帶驗證=200（要 200）", result.stdout)
@@ -391,6 +519,7 @@ class QuickTunnelTest(FakeBinTest):
         self.assertNotIn("cloudflared", self.calls())
 
     def test_verify_fails_on_wrong_key(self):
+        (self.state / "remote-up").touch()
         result = subprocess.run(self.verify_args(header_cmd="echo 'Authorization: Bearer wrong'"),
                                 env=self.env, capture_output=True, text=True, timeout=15)
         self.assertNotEqual(result.returncode, 0)
@@ -401,6 +530,25 @@ class QuickTunnelTest(FakeBinTest):
                                 env=self.env, capture_output=True, text=True, timeout=15)
         self.assertNotEqual(result.returncode, 0)
         self.assertNotIn("curl", self.calls())
+
+    def test_sigterm_stops_windows_cloudflared_and_checks_public_url(self):
+        # 從 WSL 叫 Windows 的 cloudflared：停掉 powershell.exe 不會停掉 cloudflared.exe，腳本要自己停
+        self.use_windows("CLOUDFLARED", "cloudflared")
+        proc = self.start(self.quick_args())
+        out = self.read_until(proc, "公開網址")
+        proc.send_signal(signal.SIGTERM)
+        rest, _ = proc.communicate(timeout=30)
+        self.assertEqual(proc.returncode, 0, out + rest)
+        self.assertIn("Stop-Process", self.calls())
+        self.assertFalse(self.tunnel_running())
+        self.assertIn("cloudflared → :8000 剩 0 個（要 0）", rest)
+        self.assertIn("530", rest)
+
+    def test_check_closed_fails_while_quick_tunnel_still_answers(self):
+        (self.state / "remote-up").touch()
+        result = subprocess.run([sys.executable, str(QUICK_SCRIPT), "check-closed", "--url", f"https://{QUICK_HOST}"],
+                                env=self.env, capture_output=True, text=True, timeout=30)
+        self.assertNotEqual(result.returncode, 0, result.stdout)
 
     # ======================================================================
     # close：收掉留下來的 quick tunnel

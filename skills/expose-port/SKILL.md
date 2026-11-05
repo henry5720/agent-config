@@ -29,11 +29,13 @@ description: 把本機某個 port 開成 tailnet 外連得到的公開網址：�
 
 ## Funnel
 
-腳本：`~/.claude/skills/expose-port/scripts/expose-port-funnel`（`--help` 看參數）。它照[共通規則](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access.md#共通規則)前景跑：不加 `--bg`，停著直到收到 Ctrl+C／SIGTERM 才撤掉 Funnel，忘了收也不會像 `--bg` 那樣留下持久設定。
+腳本：`~/.claude/skills/expose-port/scripts/expose-port-funnel`（`--help` 看參數）。它照[共通規則](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access.md#共通規則)前景跑：不加 `--bg`，停著直到收到 Ctrl+C／SIGTERM 才撤掉 Funnel。
+
+**收乾淨的判準**（這支和下面手動的做法都一樣）：那個對外 port 的 tailscale CLI 行程剩 0 個，**而且**從公網打公開網址連不上（`000`，或公開 DNS 查不到）。`tailscale funnel status` 不算數：前景 Funnel 不會列成 serve config，印 `No serve config` 時公網照樣回 `401`（2026-11-05 在 henry-laptop 實測）。停掉叫 tailscale 的那一端（ssh、WSL 的 `powershell.exe`）也不會停掉 Windows 上的 `tailscale.exe`，口子會一直開著。
 
 1. **對好 `Host`**：Funnel 不能改寫 `Host`，轉進來的 `Host` 是公開網址。app 綁 loopback 又檢查 `Host` 時，請 app 改綁 `0.0.0.0`，並確認防火牆沒放行那個 port 的 inbound（不然區網能直連）。
    完成條件：app 綁的位址接受公開網址當 `Host`。
-2. **挑對外 port**：只能用 `443`、`8443`、`10000`。先跑 `tailscale funnel status`，挑沒被用的；預設 `8443`。
+2. **挑對外 port**：只能用 `443`、`8443`、`10000`，預設 `8443`。`tailscale funnel status` 只看得到 `--bg` 留下的設定，看不到別人前景開著的；腳本開之前會再查那個 port 的 tailscale 行程和公網，有人在用就拒絕。
 3. **開**：背景跑（Claude Code 的 Bash `run_in_background`）：
 
    ```bash
@@ -45,8 +47,8 @@ description: 把本機某個 port 開成 tailnet 外連得到的公開網址：�
    tailscale 不在這台的 PATH 上、或要叫別台的（例如 WSL 叫 Windows 那邊的），用環境變數 `TAILSCALE` 給整條指令。沒設時腳本自己判斷要不要 sudo。
    完成條件：輸出出現 `公網驗證：不帶驗證=<碼>（要 <碼>），帶驗證=<碼>（要 <碼>）` 兩邊相符，接著 `公開網址：https://…`。驗證沒過時腳本已經撤掉 Funnel、exit 1；照 [reference.md](reference.md) 查原因。
 4. **交網址**：把 `公開網址` 那行交給 app skill 或使用者。驗證用的 key 由 app 自己的規則交。
-5. **收掉**：用完對背景那支送 SIGTERM（`TaskStop`、`kill -TERM <pid>`）。
-   完成條件：輸出最後是 `Funnel :<port> 剩 0 條（要 0）`，再由 app 停掉它的 server（app 的文件寫怎麼確認沒有程式在聽那個 port）。背景那支已經不在（session 斷過）時，跑 `~/.claude/skills/expose-port/scripts/expose-port-funnel close --https <對外 port>`，完成條件相同。
+5. **收掉**：用完對背景那支送 SIGTERM（`TaskStop`、`kill -TERM <pid>`）。它停掉 tailscale CLI（`TAILSCALE` 叫 Windows 的時候從 PowerShell 停 `tailscale.exe`），再從公網確認連不上。
+   完成條件：輸出有 `tailscale funnel :<port> 的行程剩 0 個（要 0）`、`公網 https://…：000`，最後是 `Funnel :<port> 已收乾淨`。印 `還沒收乾淨` 時照 [reference.md](reference.md)〈收掉後還在〉處理。接著由 app 停掉它的 server（app 的文件寫怎麼確認沒有程式在聽那個 port）。背景那支已經不在（session 斷過、被 SIGKILL）時，跑 `~/.claude/skills/expose-port/scripts/expose-port-funnel close --https <對外 port>`，完成條件相同。
 
 ### 那台沒有這支腳本
 
@@ -57,10 +59,22 @@ tailscale funnel --https=<對外 port> <app port>    # Linux 沒設 operator 要
 ```
 
 1. **開**：完成條件：使用者說貼了、視窗停著沒有回到提示字元（印出網址或要你開權限的 admin console 連結都算開著；後者先請使用者開好權限再貼一次）。
-2. **驗**：照 [reference.md](reference.md)〈在本機驗不到 Funnel〉從你這邊打，網址是 `https://<那台的機器名>.<tailnet>.ts.net:<對外 port><路徑>`。
-   完成條件：不帶驗證、帶驗證各回 app 給的碼。沒過就照第 3 步收掉，再照 reference.md 查原因。
-3. **交網址、收掉**：交網址同上面第 4 步。用完請使用者在那個視窗按 Ctrl+C，再跑 `tailscale funnel status`。
-   完成條件：`tailscale funnel status` 的輸出沒有那個對外 port 的 `https://` 行（443 的那行網址不帶 port；只剩 `No serve config` 或別的 port 都算收乾淨）。再由 app 停掉它的 server。
+2. **驗**：從你這邊跑：
+
+   ```bash
+   ~/.claude/skills/expose-port/scripts/expose-port-funnel verify --url https://<那台的機器名>.<tailnet>.ts.net:<對外 port> --path <路徑> \
+     --expect-without <碼> --expect-with <碼> --auth-header-cmd '<印出 header 的指令>' -- <curl 參數>
+   ```
+
+   完成條件：輸出出現 `公網驗證：…` 兩邊相符，接著 `公開網址：https://…`。沒過就照第 3 步收掉，再照 reference.md 查原因。
+3. **交網址、收掉**：交網址同上面第 4 步。用完請使用者在那個視窗按 Ctrl+C，再貼下面這行（Windows PowerShell；Linux 用 `pgrep -fc 'tailscale funnel'`）：
+
+   ```powershell
+   Get-Process tailscale -ErrorAction SilentlyContinue | Stop-Process -Force; (Get-Process tailscale -ErrorAction SilentlyContinue | Measure-Object).Count
+   ```
+
+   `tailscale` 這個名字只對到 CLI 的 `tailscale.exe`，不會停掉 tailscale 本身（`tailscaled`、`tailscale-ipn`）。接著從你這邊跑 `expose-port-funnel check-closed --url https://<機器名>.<tailnet>.ts.net:<對外 port>`。
+   完成條件：使用者那行印 `0`，`check-closed` exit 0（印出 `000` 或公開 DNS 查不到）。再由 app 停掉它的 server。
 
 ## quick tunnel
 
@@ -68,7 +82,7 @@ tailscale funnel --https=<對外 port> <app port>    # Linux 沒設 operator 要
 
 開之前對一次 app 的需求和這四項限制（[Cloudflare 官方文件](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/)），app 撐不住就停下來回報使用者：
 
-- **不支援 SSE**：app 靠 SSE 推資料時可能會壞（例如 MCP streamable HTTP 的串流回應）。
+- **不支援 SSE**：app 靠 SSE 推資料時可能會壞。2026-11-05 在 henry-laptop 實測，單次請求用 SSE 回的（MCP `initialize`、`tools/list`）收得到；長時間開著的 SSE stream **未實測**。
 - **每條最多 200 個並行請求**，超過的回 `429`。
 - **網址每次都變**：每開一次是新網址，重開就要重交。
 - **官方只給測試、開發用**：用完就收，不長駐。
@@ -84,10 +98,10 @@ tailscale funnel --https=<對外 port> <app port>    # Linux 沒設 operator 要
        -- <兩次驗證都帶的 curl 參數>
      ```
 
-   - **那台沒有這支腳本**（例如別人的 Windows）：請使用者在那台 PowerShell 貼上，開著別關。沒裝 cloudflared 先跑 `winget install --exact --id Cloudflare.cloudflared`，再重開 PowerShell。
+   - **那台沒有這支腳本**（例如別人的 Windows）：請使用者在那台 PowerShell 貼上，開著別關。沒裝 cloudflared 先跑 `winget install --exact --id Cloudflare.cloudflared`。裝完當下的 PowerShell 找不到 `cloudflared`（PATH 要重開才更新），所以直接給完整路徑：
 
      ```powershell
-     cloudflared tunnel --url http://127.0.0.1:<app port> --http-host-header localhost   # app 不檢查 Host 就拿掉最後兩個字
+     & 'C:\Program Files (x86)\cloudflared\cloudflared.exe' tunnel --url http://127.0.0.1:<app port> --http-host-header localhost   # app 不檢查 Host 就拿掉最後兩個字
      ```
 
      請使用者把輸出裡 `https://<隨機>.trycloudflare.com` 那行給你，從這邊驗：
@@ -100,7 +114,14 @@ tailscale funnel --https=<對外 port> <app port>    # Linux 沒設 operator 要
    完成條件：輸出出現 `公網驗證：不帶驗證=<碼>（要 <碼>），帶驗證=<碼>（要 <碼>）` 兩邊相符，接著 `公開網址：https://…`。驗證沒過時 `open` 已經停掉 cloudflared、exit 1；`verify` 沒過就照第 4 步請使用者收掉。原因照 [reference.md](reference.md) 查。
 3. **交網址**：把 `公開網址` 那行交給 app skill 或使用者。
 4. **收掉**：
-   - **這台**：對背景那支送 SIGTERM。完成條件：輸出最後是 `cloudflared → :<port> 剩 0 個（要 0）`。背景那支已經不在時，跑 `expose-port-quick-tunnel close --port <app port>`，完成條件相同。
-   - **那台**：請使用者在 cloudflared 視窗按 Ctrl+C，再貼 `(Get-Process cloudflared -ErrorAction SilentlyContinue | Measure-Object).Count`。完成條件：印出 `0`。
+   收乾淨的判準：轉那個 port 的 cloudflared 剩 0 個，**而且**從公網打網址連不上（Cloudflare 回 `530`，或公開 DNS 查不到）。停掉叫 cloudflared 的那一端（ssh、WSL）不會停掉 Windows 上的 `cloudflared.exe`（2026-11-05 在 henry-laptop 實測），要另外停。
+   - **這台**：對背景那支送 SIGTERM。它停掉 cloudflared（`CLOUDFLARED` 叫 Windows 的時候也從 PowerShell 停 `cloudflared.exe`），再從公網確認。完成條件：輸出有 `cloudflared → :<port> 剩 0 個（要 0）` 和 `公網 https://…：530`（或公開 DNS 查不到），exit 0。背景那支已經不在時，跑 `expose-port-quick-tunnel close --port <app port> --url <公開網址>`，完成條件相同（沒有網址時不帶 `--url`，只確認行程數）。
+   - **那台**：請使用者在 cloudflared 視窗按 Ctrl+C，再貼下面這行；接著從你這邊跑 `expose-port-quick-tunnel check-closed --url <公開網址>`。
+
+     ```powershell
+     Get-Process cloudflared -ErrorAction SilentlyContinue | Stop-Process -Force; (Get-Process cloudflared -ErrorAction SilentlyContinue | Measure-Object).Count
+     ```
+
+     完成條件：印出 `0`（假設那台沒有別的 cloudflared），`check-closed` exit 0。
 
    接著由 app 停掉它的 server（app 的文件寫怎麼確認沒有程式在聽那個 port）。
