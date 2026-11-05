@@ -661,6 +661,25 @@ class SlackListTest(unittest.TestCase):
             path.write_text("outside", encoding="utf-8")
             self.assert_artifact_rejected(path, str(Path(self.tmp.name)))
 
+    def test_artifact_root_env_overrides_default_root(self):
+        os.environ[slack_list.ARTIFACT_ROOT_ENV] = self.tmp.name
+        path = self.artifact_path("shot.png", b"\x89PNG")
+        resolved, data = slack_list.artifact_file(str(path))
+        self.assertEqual(resolved, path.resolve())
+        self.assertEqual(data, b"\x89PNG")
+
+    def test_artifact_root_env_still_rejects_file_outside_it(self):
+        os.environ[slack_list.ARTIFACT_ROOT_ENV] = self.tmp.name
+        with tempfile.TemporaryDirectory() as outside:
+            path = Path(outside) / "outside.png"
+            path.write_bytes(b"\x89PNG")
+            with redirect_stderr(io.StringIO()) as errors, self.assertRaises(SystemExit):
+                slack_list.artifact_file(str(path))
+        self.assertIn(self.tmp.name, errors.getvalue())
+
+    def test_artifact_root_defaults_to_container_drafts(self):
+        self.assertEqual(slack_list.artifact_root(), Path("/home/node/drafts"))
+
     def test_artifact_rejects_symlink(self):
         target = self.artifact_path("target.html")
         link = Path(self.tmp.name) / "link.html"
@@ -957,6 +976,8 @@ class SlackListTest(unittest.TestCase):
         })
         env.start()
         self.addCleanup(env.stop)
+        # 本機可能設了 artifact 根目錄覆寫；測試一律從預設常數出發。
+        os.environ.pop(slack_list.ARTIFACT_ROOT_ENV, None)
 
     FULL_REPORT = (
         "# V01 庫存異常狀態顯示 — 驗收說明\n\n"
