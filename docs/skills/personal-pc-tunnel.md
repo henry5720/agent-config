@@ -1,5 +1,9 @@
 # personal-pc-tunnel
 
+你要 agent 在你看得到的瀏覽器裡做事（多分頁），開 **remote browser**：Windows 跑 `remote-browser`，
+做法見 dotfiles 的[〈你要用、讓 agent 控你的瀏覽器〉](https://github.com/henry5720/dotfiles/blob/main/docs/browser-via-ec2.md#你要用讓-agent-控你的瀏覽器)。
+下面講另外兩條。
+
 agent 在已配置主機（例如 company-ec2）上做事，一定要用**你日常的 Chrome**（passkey、硬體金鑰、裝置 SSO）時，
 它會照這個 skill 請你開一條 ssh 轉發、貼一個網址；網站擋機房 IP 時，它會請你開另一條轉發借你的對外 IP
 （見〈網站擋機房 IP〉）。agent 怎麼做寫在

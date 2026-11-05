@@ -19,8 +19,9 @@ performance trace、lighthouse、heap snapshot、minify 過的 code 下斷點。
 
 1. **驗證**：`curl -s --max-time 3 127.0.0.1:9222/json/version | grep User-Agent`
    - 看到 `HeadlessChrome` → 通了，跳到 3。
-   - 看到別的 User-Agent → 9222 被別的 Chrome 佔著（例如別人手動開的）。`ss -ltnp | grep 9222`
-     找出是誰，請使用者決定要不要關，不要自己殺。
+   - 看到別的 User-Agent（`/json/version` 帶 `"File-Path-Style": "windows"`）→ 那是使用者經 `ssh -R` 帶過來的
+     remote browser（`personal-pc-tunnel` skill）。MCP 直接接它就能查原因，跳到 3；查的是他看著的那支 Chrome，先跟他說一聲。
+   - 其他 → 9222 被別的程式佔著。`ss -ltnp | grep 9222` 找出是誰，請使用者決定要不要關，不要自己殺。
    - 沒回應 → 做 2。
 2. **開 Chrome**：沒有 `google-chrome` 就停下來回報，請使用者在 dotfiles 的選裝工具勾 `headless-chrome`
    （WSL 不提供這一項：WSL 上 chrome-devtools MCP 沒有 Chrome 可接，查原因改到有 `headless-chrome` 的機器做）。

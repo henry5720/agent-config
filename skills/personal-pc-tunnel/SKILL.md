@@ -1,17 +1,32 @@
 ---
 name: personal-pc-tunnel
-description: 要使用者在個人電腦開一條 ssh 轉發才做得到的瀏覽器工作：接上使用者日常的 Chrome（passkey、硬體金鑰、裝置 SSO），或借他那台的對外 IP。一定要使用者自己的瀏覽器、或網站擋機房 IP（headless 瀏覽器被擋、對方要驗證你不是機器人）時使用。
+description: 要使用者在個人電腦開一條 ssh 轉發才做得到的瀏覽器工作：控使用者的 remote browser（他要一邊看、多分頁）、接他日常的 Chrome（passkey、硬體金鑰、裝置 SSO），或借他那台的對外 IP。使用者說「remote browser 開好了」、要你在他的瀏覽器裡做事、一定要他日常的 Chrome、或網站擋機房 IP（headless 瀏覽器被擋、對方要驗證你不是機器人）時使用。
 ---
 
 # personal-pc-tunnel
 
 你在已配置主機（例如 company-ec2）上，瀏覽器預設用這台自己的 headless 瀏覽器（`playwright-cli open`，流程照 `verify-in-browser` skill）。這個 skill 只處理那條走不通、要借使用者個人電腦的情況，共同點是使用者要開一條 ssh 轉發，而且只綁 127.0.0.1：轉過來的東西都沒有驗證。
 
-這兩條都是 tailnet 內的 ssh 轉發，不開公網：使用者的個人電腦要連得到你這台的 ssh。他連不到（不在 tailnet、沒有 ssh key）就停下來回報，不要改開公開網址。其他開法給人看的全貌在 dotfiles 的 [remote-access](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access.md#tailnet-內)。
+這幾條都是 tailnet 內的 ssh 轉發，不開公網：使用者的個人電腦要連得到你這台的 ssh。他連不到（不在 tailnet、沒有 ssh key）就停下來回報，不要改開公開網址。其他開法給人看的全貌在 dotfiles 的 [remote-access](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access.md#tailnet-內)。
+
+## 控使用者的 remote browser
+
+使用者坐在個人電腦前、要你在他看得到的瀏覽器裡做事時用。remote browser 是他個人電腦上一支**獨立 profile** 的 Chrome，CDP port 經 `ssh -R` 帶到你這台的 127.0.0.1:9222：你用 `playwright-cli attach --cdp` 操作、可以開多個分頁，chrome-devtools MCP 也直接接得上（`mcp.yaml` 寫死 9222）。登入狀態留在那個 profile，要登入的網站請他在視窗裡自己登。
+
+跟下一節的日常 Chrome 是兩個入口、兩支 Chrome：日常 profile 從 Chrome 136 起開不了 debug port，只能靠插件交出一個分頁。只有網站一定要日常 profile 裡的東西（passkey、硬體金鑰、裝置 SSO）時才走下一節。
+
+1. **確認 9222 是他的 remote browser**：`curl -s --max-time 3 127.0.0.1:9222/json/version`。
+   - 沒回應 → 請使用者開：Windows 在 PowerShell 跑 `remote-browser`（dotfiles 部署的指令，開 Chrome 加轉發一起做）；其他系統自己開帶 `--remote-debugging-port=9222 --user-data-dir=<另一個資料夾>` 的 Chrome，再開 `ssh -N company-ec2-chrome`。等他說好再查一次。
+   - `User-Agent` 有 `HeadlessChrome` → 那是這台自己的 headless（`remote-chrome-headless` 還開著）。他的轉發會因此失敗；問他要不要先收掉 headless，不要自己殺。
+   完成條件：回應裡有 `webSocketDebuggerUrl`，`User-Agent` 不是 `HeadlessChrome`（Windows 的會帶 `"File-Path-Style": "windows"`）。
+2. **接上**：`playwright-cli -s=<S> attach --cdp=http://127.0.0.1:9222`，之後照常用 `playwright-cli -s=<S> <指令>`。要新分頁用 `tab-new <網址>`，別 `goto` 蓋掉他正在看的分頁。
+   完成條件：`playwright-cli -s=<S> tab-list` 列得出他開著的分頁。
+3. **收尾**：`playwright-cli -s=<S> detach`。Chrome 和分頁留給他繼續用；轉發由他按 Ctrl+C 關（Chrome 留著）。
+   完成條件：輸出 `Browser '<S>' detached`，並告訴使用者可以關轉發了。
 
 ## 接使用者日常的 Chrome
 
-只在**一定要使用者自己的瀏覽器**時用：passkey、硬體金鑰、裝置 SSO，也就是 headless 瀏覽器怎樣都登不進去的網站。使用者要看畫面、要替你登入，走 headless 瀏覽器 + `playwright-cli show`（`verify-in-browser` 的 hitl.md〈讓使用者看畫面、接手〉），不用打擾他的 Chrome。
+只在**一定要使用者日常的 profile** 時用：passkey、硬體金鑰、裝置 SSO，也就是 headless 瀏覽器和 remote browser 都登不進去的網站。使用者要看畫面、要替你登入，走 headless 瀏覽器 + `playwright-cli show`（`verify-in-browser` 的 hitl.md〈讓使用者看畫面、接手〉），不用打擾他的 Chrome。
 
 接上之後你只看得到使用者貼網址的那一個分頁，`goto` 會直接換掉那個分頁的內容，所以一定請他貼在**新分頁**。
 
