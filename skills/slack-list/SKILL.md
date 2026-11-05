@@ -331,6 +331,19 @@ channel。
 檢查上限。成功只在原 item 留言串附檔並發一則不含 `@` 的簡短訊息，不改狀態，也不寫 List
 的「檔案」欄。
 
+**local（沒有 `/home/node/drafts` 的主機）**：在呼叫的 process 環境設 `SLACK_LIST_ARTIFACT_ROOT`
+指向一個專用目錄，把要交付的檔案（例如驗收截圖）先複製進去再跑 `artifact`；根目錄限制、
+白名單、刪除來源、`cleanup` 都改以那個目錄為準。這個值只讀 process 環境，寫在
+`~/.config/slack-list/.env` 不會生效。不要把它指向 home 或 repo 這種大目錄 —— 交付成功會刪來源，
+`cleanup` 也會清掉裡面 24 小時以上的檔案。
+
+```bash
+mkdir -p ~/.local/share/slack-list/drafts && cp <截圖>.png ~/.local/share/slack-list/drafts/
+SLACK_LIST_ARTIFACT_ROOT=~/.local/share/slack-list/drafts \
+  ~/.claude/skills/slack-list/scripts/slack-list artifact Rec0B… \
+  --file ~/.local/share/slack-list/drafts/<截圖>.png --kind artifact --summary "<這張圖在證明什麼>"
+```
+
 不要把 artifact 交到 DM、一般 channel 或新開的 thread。若 runtime 沒有原 Slack item 的
 `record_id`/thread context，不能保證回到原 thread；先回報這項 deployment 限制，不要猜 channel。
 

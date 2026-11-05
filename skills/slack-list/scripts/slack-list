@@ -68,6 +68,9 @@ MARKDOWN_LIMIT = 12000
 # artifact 是給 backlog agent 交付 prototype／產物的窄入口，不是任意檔案上傳器。
 # 路徑與白名單集中在常數，測試可以換成 temporary directory。
 ARTIFACT_DRAFTS_ROOT = Path("/home/node/drafts")
+# local CLI 沒有 /home/node/drafts；用這個環境變數指一個專用目錄（同樣只收這底下的檔，
+# cleanup 也只清這底下）。只讀 process 環境、不讀 .env：artifact 在載入 .env 前就驗路徑。
+ARTIFACT_ROOT_ENV = "SLACK_LIST_ARTIFACT_ROOT"
 ARTIFACT_ALLOWED_EXTENSIONS = frozenset({
     ".html", ".md", ".css", ".js", ".json", ".png", ".zip",
 })
@@ -735,6 +738,12 @@ def upload_md(token, channel, thread_ts, path):
     return slot["file_id"]
 
 
+def artifact_root():
+    """artifact 允許的根目錄：環境變數優先，沒設就是 container 的 /home/node/drafts。"""
+    override = os.environ.get(ARTIFACT_ROOT_ENV, "").strip()
+    return Path(override).expanduser() if override else ARTIFACT_DRAFTS_ROOT
+
+
 def artifact_file(path):
     """驗證並從安全開啟的 fd 讀取 artifact，回傳 (路徑, bytes)。"""
     candidate = Path(path)
@@ -747,9 +756,9 @@ def artifact_file(path):
         die(f"無法 resolve artifact 路徑 {candidate}：{exc}")
 
     try:
-        resolved.relative_to(ARTIFACT_DRAFTS_ROOT.resolve())
+        resolved.relative_to(artifact_root().resolve())
     except ValueError:
-        die(f"artifact 檔案必須在 {ARTIFACT_DRAFTS_ROOT} 底下：{candidate}")
+        die(f"artifact 檔案必須在 {artifact_root()} 底下：{candidate}")
 
     suffix = resolved.suffix.lower()
     if suffix not in ARTIFACT_ALLOWED_EXTENSIONS:
@@ -761,7 +770,7 @@ def artifact_file(path):
     if not nofollow or not directory:
         die("系統缺少 artifact 安全讀取需要的 O_NOFOLLOW 或 O_DIRECTORY；已拒絕操作")
 
-    root = ARTIFACT_DRAFTS_ROOT.resolve()
+    root = artifact_root().resolve()
     relative = resolved.relative_to(root)
     if not relative.parts:
         die(f"artifact 必須是 regular file，不接受 directory 或其他檔案：{candidate}")
@@ -819,7 +828,7 @@ def delete_artifact(path):
         return False
     try:
         resolved = candidate.resolve()
-        root = ARTIFACT_DRAFTS_ROOT.resolve()
+        root = artifact_root().resolve()
         relative = resolved.relative_to(root)
     except (OSError, ValueError):
         return False
@@ -906,7 +915,7 @@ def _cleanup_directory(directory_fd, relative, cutoff, removed):
 
 def cleanup_artifacts(now=None):
     """刪除 root 內 mtime 已達 24 小時的 regular artifact，回傳相對路徑。"""
-    root_candidate = ARTIFACT_DRAFTS_ROOT
+    root_candidate = artifact_root()
     if root_candidate.is_symlink():
         return []
     try:
@@ -1627,10 +1636,10 @@ def cmd_artifact(argv):
     """把 prototype／artifact 交付到既有 item 留言串；不改狀態或檔案欄。"""
     ap = argparse.ArgumentParser(
         prog="slack-list artifact",
-        description="把 /home/node/drafts 下的 prototype 或 artifact 附到既有 item 留言串。")
+        description="把 artifact 根目錄（預設 /home/node/drafts，可用 SLACK_LIST_ARTIFACT_ROOT 改）下的 prototype 或 artifact 附到既有 item 留言串。")
     ap.add_argument("record_id", help="表上那一列的 ID（Rec… 開頭）")
     ap.add_argument("--file", required=True, metavar="PATH",
-                    help="/home/node/drafts 下的檔案；只接受白名單副檔名")
+                    help="artifact 根目錄下的檔案；只接受白名單副檔名")
     ap.add_argument("--kind", required=True, choices=("prototype", "artifact"),
                     help="交付物種類")
     ap.add_argument("--summary", required=True, help="給 PM 的簡短摘要")
@@ -1689,7 +1698,7 @@ def cmd_cleanup(argv):
     """供 container cron／entrypoint 呼叫，清掉 drafts 內已達保留期限的 artifact。"""
     ap = argparse.ArgumentParser(
         prog="slack-list cleanup",
-        description="刪除 /home/node/drafts 內超過 24 小時的 regular artifact；不追 symlink。")
+        description="刪除 artifact 根目錄（預設 /home/node/drafts）內超過 24 小時的 regular artifact；不追 symlink。")
     ap.parse_args(argv)
     removed = cleanup_artifacts()
     for path in removed:
