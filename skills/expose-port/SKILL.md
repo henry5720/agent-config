@@ -11,7 +11,7 @@ description: 把本機某個 port 開成 tailnet 外連得到的公開網址：�
 
 ## 選分支
 
-開出去的那台**跑得到登入使用者 tailnet 的 tailscale** → Funnel（下面）。那台不加進使用者的 tailnet（別人的機器、臨時借用）→ Cloudflare quick tunnel，這個分支還沒寫，停下來回報使用者。差異看 [比較表](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access.md#比較表)。
+開出去的那台**跑得到登入使用者 tailnet 的 tailscale** → [Funnel](#funnel)。那台不加進使用者的 tailnet（別人的機器、臨時借用）→ [quick tunnel](#quick-tunnel)。差異看 [比較表](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access.md#比較表)。
 
 ## 跟 app 要的輸入
 
@@ -57,3 +57,46 @@ tailscale funnel --https=<對外 port> <app port>    # Linux 沒設 operator 要
 ```
 
 公網驗證照 [reference.md](reference.md)〈在本機驗不到 Funnel〉從你這邊打。收掉時請使用者按 Ctrl+C，再跑 `tailscale funnel status` 確認沒有那個 port。
+
+## quick tunnel
+
+腳本：`~/.claude/skills/expose-port/scripts/expose-port-quick-tunnel`（`--help` 看參數）。cloudflared 給一個 `https://<隨機>.trycloudflare.com`，不用 Cloudflare 帳號，轉進 app 的 `127.0.0.1:<port>`。
+
+開之前對一次 app 的需求和這四項限制（[Cloudflare 官方文件](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/)），app 撐不住就停下來回報使用者：
+
+- **不支援 SSE**：app 靠 SSE 推資料時可能會壞（例如 MCP streamable HTTP 的串流回應）。
+- **每條最多 200 個並行請求**，超過的回 `429`。
+- **網址每次都變**：每開一次是新網址，重開就要重交。
+- **官方只給測試、開發用**：用完就收，不長駐。
+
+1. **對好 `Host`**：app 綁 loopback 又檢查 `Host` 時，帶 `--host-header localhost`（cloudflared 的 `--http-host-header`）。app 留在 loopback，不用放行防火牆 inbound。
+   完成條件：決定好帶不帶 `--host-header`、帶什麼值。
+2. **開**：看 cloudflared 跑在哪台。
+   - **這台**（`cloudflared --version` 有輸出）：背景跑（Claude Code 的 Bash `run_in_background`）：
+
+     ```bash
+     ~/.claude/skills/expose-port/scripts/expose-port-quick-tunnel open --port <app port> [--host-header localhost] --path <路徑> \
+       --expect-without <碼> --expect-with <碼> --auth-header-cmd '<印出 header 的指令>' \
+       -- <兩次驗證都帶的 curl 參數>
+     ```
+
+   - **那台沒有這支腳本**（例如別人的 Windows）：請使用者在那台 PowerShell 貼上，開著別關。沒裝 cloudflared 先跑 `winget install --exact --id Cloudflare.cloudflared`，再重開 PowerShell。
+
+     ```powershell
+     cloudflared tunnel --url http://127.0.0.1:<app port> --http-host-header localhost   # app 不檢查 Host 就拿掉最後兩個字
+     ```
+
+     請使用者把輸出裡 `https://<隨機>.trycloudflare.com` 那行給你，從這邊驗：
+
+     ```bash
+     ~/.claude/skills/expose-port/scripts/expose-port-quick-tunnel verify --url <那個網址> --path <路徑> \
+       --expect-without <碼> --expect-with <碼> --auth-header-cmd '<印出 header 的指令>' -- <curl 參數>
+     ```
+
+   完成條件：輸出出現 `公網驗證：不帶驗證=<碼>（要 <碼>），帶驗證=<碼>（要 <碼>）` 兩邊相符，接著 `公開網址：https://…`。驗證沒過時 `open` 已經停掉 cloudflared、exit 1；`verify` 沒過就照第 4 步請使用者收掉。原因照 [reference.md](reference.md) 查。
+3. **交網址**：把 `公開網址` 那行交給 app skill 或使用者。
+4. **收掉**：
+   - **這台**：對背景那支送 SIGTERM。完成條件：輸出最後是 `cloudflared → :<port> 剩 0 個（要 0）`。背景那支已經不在時，跑 `expose-port-quick-tunnel close --port <app port>`，完成條件相同。
+   - **那台**：請使用者在 cloudflared 視窗按 Ctrl+C，再貼 `(Get-Process cloudflared -ErrorAction SilentlyContinue | Measure-Object).Count`。完成條件：印出 `0`。
+
+   接著由 app 停掉它的 server（app 的文件寫怎麼確認沒有程式在聽那個 port）。

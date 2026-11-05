@@ -1,0 +1,251 @@
+#!/usr/bin/env python3
+"""用 Cloudflare quick tunnel 把本機 port 開到 tailnet 外：開、從公網驗證、收。
+
+  expose-port-quick-tunnel open --port 8000 --host-header localhost --path /mcp \\
+      --expect-without 401 --expect-with 200 --auth-header-cmd '<印出驗證 header 的指令>' \\
+      -- <兩次驗證都帶的 curl 參數>
+  expose-port-quick-tunnel verify --url https://<隨機>.trycloudflare.com --path /mcp \\
+      --expect-without 401 --expect-with 200 --auth-header-cmd '…' -- <curl 參數>
+  expose-port-quick-tunnel close --port 8000
+
+open 在這台跑 cloudflared，照 remote-access 的共通規則前景跑：驗證過了印出公開網址就停著，
+收到 Ctrl+C／SIGTERM 才停掉 cloudflared，並確認沒有 cloudflared 還在轉這個 port。
+驗證沒過也會停掉再結束。
+verify 給 cloudflared 跑在別台（使用者貼指令開的）時用：只從這邊驗那個網址，不開也不收。
+close 停掉這台上轉這個 port 的 quick tunnel，給上一輪沒收乾淨時用，重跑也安全。
+
+--host-header 讓 cloudflared 改寫 Host（--http-host-header），app 綁 loopback 又檢查 Host 時給 localhost。
+
+驗證的 header 由 --auth-header-cmd 印出，寫進只有自己讀得到的暫存檔再用 `curl -H @檔案` 帶，
+不會出現在 curl 的參數裡（ps 看得到參數）。
+
+環境變數：
+  CLOUDFLARED                  叫 cloudflared 的指令（照 shell 斷字），預設 cloudflared
+  EXPOSE_PORT_PROBE_INTERVAL   等網址生效時每次重試間隔秒數，預設 3
+  EXPOSE_PORT_URL_TIMEOUT      等 cloudflared 印出網址的秒數，預設 60
+"""
+import argparse
+import json
+import os
+import re
+import shlex
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+
+PROBE_TRIES = 10
+URL_RE = re.compile(r"https://[a-z0-9-]+\.trycloudflare\.com")
+
+
+def say(msg):
+    print(msg, flush=True)
+
+
+def run(cmd):
+    return subprocess.run(cmd, capture_output=True, text=True)
+
+
+def cloudflared_cmd():
+    return shlex.split(os.environ.get("CLOUDFLARED", "cloudflared"))
+
+
+def tunnel_pids(port):
+    """這台上把 127.0.0.1／localhost:<port> 開成 quick tunnel 的 cloudflared。"""
+    pattern = rf"cloudflared(\.exe)? tunnel .*--url (http://)?(127\.0\.0\.1|localhost):{port}( |$)"
+    out = run(["pgrep", "-f", pattern]).stdout
+    return [int(p) for p in out.split()]
+
+
+def report_left(port):
+    left = len(tunnel_pids(port))
+    say(f"cloudflared → :{port} 剩 {left} 個（要 0）")
+    return left
+
+
+def stop_child(child):
+    if child.poll() is None:
+        child.terminate()
+        try:
+            child.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            child.kill()
+            child.wait()
+
+
+def public_ip(host):
+    # 剛開的網址本機 DNS 可能已經快取成查無此名，改用公開 DNS 查到的 IP 打
+    out = run([
+        "curl", "-s", "-m", "10", f"https://cloudflare-dns.com/dns-query?name={host}&type=A",
+        "-H", "accept: application/dns-json",
+    ]).stdout
+    try:
+        answers = [a["data"] for a in json.loads(out).get("Answer", []) if a.get("type") == 1]
+    except (ValueError, AttributeError):
+        answers = []
+    return answers[-1] if answers else ""
+
+
+def probe(url, host, ip, curl_args, header_file=None):
+    cmd = ["curl", "-s", "-m", "30", "-o", "/dev/null", "-w", "%{http_code}"]
+    if ip:
+        cmd += ["--resolve", f"{host}:443:{ip}"]
+    cmd += [*curl_args, url]
+    if header_file:
+        cmd += ["-H", f"@{header_file}"]
+    return run(cmd).stdout.strip() or "000"
+
+
+def verify(args, base_url):
+    host = base_url.split("://", 1)[1].split("/")[0]
+    url = base_url.rstrip("/") + args.path
+    interval = float(os.environ.get("EXPOSE_PORT_PROBE_INTERVAL", "3"))
+    header = run(["bash", "-c", args.auth_header_cmd])
+    if header.returncode != 0 or not header.stdout.strip():
+        say("--auth-header-cmd 沒印出 header")
+        return False
+    fd, header_file = tempfile.mkstemp(prefix="expose-port-")
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(header.stdout.strip().splitlines()[0] + "\n")
+        # 網址剛印出來要幾秒才通，等到不帶驗證的回應符合預期
+        ip = ""
+        for i in range(PROBE_TRIES):
+            ip = ip or public_ip(host)
+            without = probe(url, host, ip, args.curl_args)
+            if without == args.expect_without:
+                break
+            if i < PROBE_TRIES - 1:
+                time.sleep(interval)
+        with_auth = probe(url, host, ip, args.curl_args, header_file)
+    finally:
+        os.unlink(header_file)
+    say(f"公網驗證：不帶驗證={without}（要 {args.expect_without}），帶驗證={with_auth}（要 {args.expect_with}）")
+    return without == args.expect_without and with_auth == args.expect_with
+
+
+def wait_for_url(child, log_path):
+    timeout = float(os.environ.get("EXPOSE_PORT_URL_TIMEOUT", "60"))
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        with open(log_path, errors="replace") as f:
+            m = URL_RE.search(f.read())
+        if m:
+            return m.group(0)
+        if child.poll() is not None:
+            return ""
+        time.sleep(0.2)
+    return ""
+
+
+def cmd_open(args):
+    cmd = cloudflared_cmd() + ["tunnel", "--url", f"http://127.0.0.1:{args.port}"]
+    if args.host_header:
+        cmd += ["--http-host-header", args.host_header]
+    log_fd, log_path = tempfile.mkstemp(prefix="expose-port-cloudflared-", suffix=".log")
+    say(f"開 quick tunnel → 127.0.0.1:{args.port}（前景，收到 Ctrl+C／SIGTERM 就收）…")
+    try:
+        child = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=log_fd, stderr=log_fd)
+    except FileNotFoundError:
+        os.close(log_fd)
+        os.unlink(log_path)
+        say("找不到 cloudflared：先裝（Windows：winget install --exact --id Cloudflare.cloudflared），或用 CLOUDFLARED 指定")
+        sys.exit(1)
+    os.close(log_fd)
+
+    def finish(code):
+        for sig in (signal.SIGTERM, signal.SIGHUP, signal.SIGINT):
+            signal.signal(sig, signal.SIG_IGN)
+        stop_child(child)
+        if code != 0:
+            with open(log_path, errors="replace") as f:
+                tail = f.read().splitlines()[-5:]
+            if tail:
+                say("cloudflared 最後幾行：\n" + "\n".join(tail))
+        os.unlink(log_path)
+        left = report_left(args.port)
+        sys.exit(code if left == 0 else 1)
+
+    # handler 只丟例外，收尾在主流程做：在 handler 裡 wait 子行程會跟被打斷的 child.wait() 搶鎖卡死
+    def stop(*_):
+        raise KeyboardInterrupt
+
+    signal.signal(signal.SIGTERM, stop)
+    signal.signal(signal.SIGHUP, stop)
+    try:
+        url = wait_for_url(child, log_path)
+        if not url:
+            say("cloudflared 沒印出 trycloudflare.com 網址")
+            finish(1)
+        if not verify(args, url):
+            say("驗證沒過，quick tunnel 已收掉。看 expose-port 的 reference.md")
+            finish(1)
+        say(f"公開網址：{url}{args.path}")
+        say("停著直到 Ctrl+C／SIGTERM，收到就收掉 quick tunnel")
+        child.wait()
+        say("cloudflared 自己結束了")
+        finish(1)
+    except KeyboardInterrupt:
+        finish(0)
+
+
+def cmd_verify(args):
+    if not URL_RE.fullmatch(args.url.rstrip("/")):
+        say("--url 要是 cloudflared 印出的 https://<隨機>.trycloudflare.com")
+        sys.exit(1)
+    ok = verify(args, args.url.rstrip("/"))
+    if ok:
+        say(f"公開網址：{args.url.rstrip('/')}{args.path}")
+    sys.exit(0 if ok else 1)
+
+
+def cmd_close(args):
+    for pid in tunnel_pids(args.port):
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+    for _ in range(50):
+        if not tunnel_pids(args.port):
+            break
+        time.sleep(0.2)
+    for pid in tunnel_pids(args.port):
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+    sys.exit(0 if report_left(args.port) == 0 else 1)
+
+
+def add_verify_args(p):
+    p.add_argument("--path", default="/", help="驗證時打的路徑")
+    p.add_argument("--expect-without", required=True, help="不帶驗證時要回的 HTTP 狀態碼")
+    p.add_argument("--expect-with", required=True, help="帶驗證時要回的 HTTP 狀態碼")
+    p.add_argument("--auth-header-cmd", required=True, help="印出一行驗證 header 的 shell 指令")
+
+
+def main(argv):
+    curl_args = []
+    if "--" in argv:
+        i = argv.index("--")
+        argv, curl_args = argv[:i], argv[i + 1:]
+    parser = argparse.ArgumentParser(prog="expose-port-quick-tunnel")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+    op = sub.add_parser("open")
+    op.add_argument("--port", type=int, required=True, help="本機 app 聽的 port")
+    op.add_argument("--host-header", help="cloudflared 轉進來時把 Host 改成這個（app 綁 loopback 時給 localhost）")
+    add_verify_args(op)
+    ve = sub.add_parser("verify")
+    ve.add_argument("--url", required=True, help="cloudflared 印出的 https://<隨機>.trycloudflare.com")
+    add_verify_args(ve)
+    cl = sub.add_parser("close")
+    cl.add_argument("--port", type=int, required=True)
+    args = parser.parse_args(argv)
+    args.curl_args = curl_args
+    sys.stdout.reconfigure(line_buffering=True)
+    {"open": cmd_open, "verify": cmd_verify, "close": cmd_close}[args.cmd](args)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
