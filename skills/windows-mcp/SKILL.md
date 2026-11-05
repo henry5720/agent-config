@@ -95,7 +95,7 @@ uv tool update-shell
 
 ### Funnel
 
-Funnel 不能改寫 `Host`，所以這條 server 綁 `0.0.0.0:8000`。2026-11-05 在 henry-laptop 實測過 Windows 原生 tailscale 開 Funnel：server 綁 `0.0.0.0`、用 Interactive scheduled task 在桌面 session 起，在 Windows 前景跑 `tailscale funnel --https=8443 8000`，公網不帶 key `401`、帶 key `200`。從 WSL 跑下面第 2 步整條**未實測**（那輪是直接在 Windows 跑 tailscale）。收的時候停掉呼叫端不會停掉 Windows 的 `tailscale.exe`，口子會一直開著；照 `expose-port` 收，看到 `已收乾淨` 才算收掉。
+Funnel 不能改寫 `Host`，所以這條 server 綁 `0.0.0.0:8000`。2026-11-05 在 henry-laptop 實測過 Windows 原生 tailscale 開 Funnel：server 綁 `0.0.0.0`、用 Interactive scheduled task 在桌面 session 起，在 Windows 前景開 Funnel（對外 8443 → 本機 8000），公網不帶 key `401`、帶 key `200`。從 WSL 跑下面第 2 步整條**未實測**（那輪是直接在 Windows 跑 tailscale）。收的時候停掉呼叫端不會停掉 Windows 的 `tailscale.exe`，口子會一直開著；照 `expose-port` 收，看到 `已收乾淨` 才算收掉。
 
 **那台沒有 WSL** 時下面的腳本用不了：server 照[〈使用者在那台 PowerShell 貼〉](#使用者在那台-powershell-貼)起（`<綁的位址>` 填 `0.0.0.0`），公開網址照 `expose-port` 的 Funnel 分支〈那台沒有這支腳本〉請使用者在那台 PowerShell 開，驗證用的 header 照 [quick tunnel](#quick-tunnel) 表裡的 `--auth-header-cmd`。收掉時先照 `expose-port` 收公開網址，再照上面那節收 server。下面 1–4 是有 WSL 的做法。
 
