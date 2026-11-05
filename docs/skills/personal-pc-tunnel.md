@@ -5,8 +5,11 @@ agent 在已配置主機（例如 company-ec2）上做事，一定要用**你日
 （見〈網站擋機房 IP〉）。agent 怎麼做寫在
 [`skills/personal-pc-tunnel/SKILL.md`](../../skills/personal-pc-tunnel/SKILL.md)，這份只寫你要做的事。
 只是要看 agent 的畫面或替它登入，不走這條：見 [verify-in-browser](verify-in-browser.md)。
-三種情況放在一起的教學（`ssh -N`／`-L`／`-R` 怎麼讀、連不上怎麼查）見 dotfiles 的
-[看 agent 的瀏覽器](https://github.com/henry5720/dotfiles/blob/main/docs/browser-via-ec2.md)。
+`ssh -N`／`-L`／`-R` 怎麼讀見 dotfiles remote-access 的
+[〈ssh 轉發怎麼讀〉](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access.md#ssh-轉發怎麼讀)，
+連不上見[〈ssh 轉發連不上〉](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access.md#ssh-轉發連不上)。
+這兩條都是 tailnet 內的 ssh 轉發，你的個人電腦要連得到已配置主機的 ssh；其他開法（例如對方不在 tailnet）見 dotfiles 的
+[remote-access](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access.md#判準)。
 
 ## 你要做的
 

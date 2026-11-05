@@ -1,16 +1,16 @@
 ---
 name: windows-mcp
-description: 把一台 Windows 桌面的 Windows-MCP 經 Tailscale Funnel 或 Cloudflare quick tunnel 開給別台的 agent 操作（截圖、點擊、打字），用完收掉並換 key。別台的 agent 要操作某台 Windows 的 GUI app，或說測完要收掉時使用。
+description: 把一台 Windows 桌面的 Windows-MCP 開給別台的 agent 操作（截圖、點擊、打字）：起 server、換 key、交 key，用完收掉並換 key。別台的 agent 要操作某台 Windows 的 GUI app，或說測完要收掉時使用。
 ---
 
 # windows-mcp
 
-Windows-MCP 要跑在 Windows 的使用者 session 裡，才操作得到眼前這個桌面。
+Windows-MCP 要跑在 Windows 使用者登入的桌面 session 裡，才操作得到眼前這個桌面。HTTP server 一律從桌面 session 起：使用者在那台桌面開終端機（PowerShell 或 WSL）跑，或經使用者核准、用暫時的 Interactive scheduled task 起，用完刪掉（做法在 [reference.md](reference.md)〈從 ssh 起的 server 一啟動就結束〉）。從 ssh 起的沒有桌面，server 一啟動就結束。
 
 - **同一台的 agent**（WSL 裡的 Claude Code、Codex）：不用這個 skill，直接用 skillshare `mcp.yaml` 裡的 `windows-mcp` server（stdio，client 用時才帶起來）。
-- **別台的 agent**（tailnet 內的也算）：照下面「別台的 agent」把 server 經 HTTPS 入口開到外面，連 `/mcp`，帶 Bearer key，用完收掉並換 key。
+- **別台的 agent**：照下面「別台的 agent」起 HTTP server、換 key，讓對方連 `/mcp`、帶 Bearer key，用完收掉並換 key。對方在使用者的 tailnet 內就直接連，不叫 `expose-port`；在 tailnet 外才交給 `expose-port` skill 開公開網址。
 
-連不上、出現 400／403／逾時，或要改用其他對外方式時，看 [reference.md](reference.md)。
+server 本身的坑（400、307、session）看 [reference.md](reference.md)；經過 Funnel、quick tunnel 的坑看 `expose-port` 的 reference.md。給人看的版本（要在那台貼什麼、怎麼收）在 agent-config 的 `docs/skills/windows-mcp.md`。
 
 ## 第一次安裝
 
@@ -24,82 +24,120 @@ uv tool install --python 3.14 windows-mcp
 uv tool update-shell
 ```
 
-要走 quick tunnel 的話，在第一次重開 PowerShell 之前多裝 cloudflared：
-
-```powershell
-winget install --exact --id Cloudflare.cloudflared
-```
-
-完成條件：重開的 PowerShell 跑 `windows-mcp --help` 有輸出；走 quick tunnel 的再加 `cloudflared --version` 有輸出。
+完成條件：重開的 PowerShell 跑 `windows-mcp --help` 有輸出。
 
 只用需要時才開的方式。`windows-mcp install` 會建登入時自動啟動的 scheduled task，這裡用不到。
 
 ## 別台的 agent
 
-### 選對外方式
+### 連線要求
 
-兩種並列，看那台 Windows 的條件選：
+- endpoint 是 `/mcp`，不帶結尾斜線；每個請求都要帶 `Authorization: Bearer <key>`，不帶回 `401`。
+- server 綁 loopback（`127.0.0.1`）時只接受 `localhost`、`127.0.0.1`、`[::1]` 當 `Host`，其他回 `400`；綁 `0.0.0.0` 時不檢查。
+- MCP streamable HTTP 用 SSE 回應（`initialize`、`tools/list` 回 `text/event-stream`）。單次請求的 SSE 回應經 quick tunnel 收得到（2026-11-05 實測）；長時間開著的 SSE stream 未實測，走 quick tunnel 時某個操作卡住或斷線先懷疑它。
 
-|  | Funnel | quick tunnel |
-|---|---|---|
-| 那台要有 | WSL，且登入 Tailscale | cloudflared，不用帳號 |
-| 怎麼開 | WSL 跑 funnel-open／funnel-close 腳本 | 沒有腳本，指令請使用者貼進那台 PowerShell |
-| server 綁 | `0.0.0.0:8000` | `127.0.0.1:8000`，不用開防火牆 inbound |
-| 網址 | 腳本印出 | 每次開都不同，要重新交給 agent |
+### 選連法
 
-只符合一邊的條件就走那邊；兩邊都符合時兩者皆可。
+照 [remote-access 的判準](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access.md#判準)，先看對方 agent 在哪：
 
-### 交 key 和交代 agent（兩種都一樣）
+- **對方 agent 在使用者的 tailnet 內** → [tailnet 內](#tailnet-內)：ssh 轉發或 tailscale serve，不開公網、不叫 `expose-port`。
+- **在 tailnet 外，那台 Windows 加進使用者的 tailnet**（WSL 裡的 tailscale、Windows 原生 tailscale 都算）→ [Funnel](#funnel)。
+- **在 tailnet 外，那台不加進使用者的 tailnet**（別人的機器、臨時借用）→ [quick tunnel](#quick-tunnel)。
+
+有沒有 WSL 不影響選哪條，只決定 server 由誰起：有 WSL 時 agent 在那台 WSL 跑 `~/.claude/skills/windows-mcp/scripts/` 的腳本（靠 `powershell.exe` 操作 Windows；這個 WSL 要是從使用者桌面開的）；沒有 WSL（或那台沒有 skillshare）時請使用者照[〈使用者在那台 PowerShell 貼〉](#使用者在那台-powershell-貼)貼。公開網址的開、驗、收都交給 `expose-port`，這裡只寫 server 那半和要給 `expose-port` 的輸入。
+
+### 交 key 和交代 agent（每條都一樣）
 
 - **交 key**：key 會先複製到那台的剪貼簿。請使用者交給對方 agent，最好設成它的環境變數 `WINDOWS_MCP_AUTH_KEY`。agent 自己讀 key、或把 key 傳到別的服務，都要先取得使用者明說同意。用聊天訊息交的話，用完一定要收掉並換 key。
-- **交代 agent**：endpoint 用 `/mcp`，不帶結尾斜線；先跑 `tools/list` 和 `Screenshot`。`PowerShell`、`Registry`、`FileSystem` 寫入，要使用者同意才用。
+- **交代 agent**：endpoint 是各條給的網址（結尾 `/mcp`）；先跑 `tools/list` 和 `Screenshot`。`PowerShell`、`Registry`、`FileSystem` 寫入，要使用者同意才用。
+
+### 使用者在那台 PowerShell 貼
+
+那台沒有 WSL 或沒有 skillshare 時，server 由使用者起、收。`<綁的位址>` 照各條：要讓代理改寫 `Host` 或走 ssh 轉發時 `127.0.0.1`；Funnel、tailscale serve 不能改寫 `Host`，用 `0.0.0.0`。
+
+- **起 server、換 key**：先確認 8000 沒有程式在聽（`(Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | Measure-Object).Count` 是 `0`；不是就先照下面〈收掉〉收）。server 跑著時 `auth --force` 換的 key 不生效，舊 key 照樣能用（2026-11-05 在 henry-laptop 實測舊 key 仍回 `200`），所以一定是沒有 server 時換 key、再起。`auth --force` 換一把新 key，最後一行把 key 複製到剪貼簿、不會印出來。取 key 都用最後一行；`config.toml` 開在畫面上時 key 會被 `Screenshot` 拍進去，真的用記事本開過就立刻關掉。綁 `0.0.0.0` 時，先請使用者確認防火牆沒放行 windows-mcp 的 inbound（不然區網能直連 8000，只剩 key 擋）。
+
+  ```powershell
+  windows-mcp auth --transport streamable-http --host <綁的位址> --port 8000 --force
+  Start-Process -WindowStyle Minimized windows-mcp -ArgumentList 'serve','--host','<綁的位址>'
+  (Select-String "$HOME\.windows-mcp\config.toml" -Pattern 'auth_key\s*=\s*"([^"]+)"').Matches.Groups[1].Value | Set-Clipboard
+  ```
+
+  完成條件：使用者說貼完了，並照上面交 key。
+- **收掉**：第一行停掉聽 8000 的程式（server 的最小化視窗會跟著關），第二行換 key、設定改回 loopback，第三行確認。順序不能反：server 跑著時換 key，舊 key 照樣能用；server 停了，交出去的那把就沒有 server 收，下次起的 server 用新 key。
+
+  ```powershell
+  Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+  windows-mcp auth --transport streamable-http --host 127.0.0.1 --port 8000 --force
+  (Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | Measure-Object).Count
+  ```
+
+  完成條件：最後一行印出 `0`。2026-11-05 在 henry-laptop 實測第一行停得掉真的在跑的 server，聽 8000 的數變 `0`。用新 key 重起的 server 拒絕舊 key（要 `401`）**未實測**。
+
+### tailnet 內
+
+對方 agent 直接連那台，照 remote-access 的 [tailnet 內](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access.md#tailnet-內)。這條**未實測**。
+
+1. **挑做法、起 server**：
+   - **ssh 轉發**（預設；對方那台 ssh 得到一個接得到那台 Windows `127.0.0.1:8000` 的端點，例如 Windows 的 OpenSSH、或 mirrored networking 的 WSL）：server 綁 loopback，`Host` 是 `127.0.0.1`，過得了檢查，也不用放行防火牆。server 照[〈使用者在那台 PowerShell 貼〉](#使用者在那台-powershell-貼)起，`<綁的位址>` 填 `127.0.0.1`。
+   - **tailscale serve**（ssh 不到那台時）：serve 跟 Funnel 一樣不改寫 `Host`，server 要綁 `0.0.0.0`。有 WSL 跑 `windows-mcp-serve`；沒有就照上面那節貼，`<綁的位址>` 填 `0.0.0.0`。
+
+   直接連 `<tailnet IP>:8000` 要另外在防火牆放行 inbound，不走這種。
+   完成條件：server 起好，key 在使用者手上。
+2. **接上**：
+   - ssh 轉發：在對方 agent 那台背景跑 `ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:8000:127.0.0.1:8000 <那台>`。網址是 `http://127.0.0.1:8000/mcp`。
+   - tailscale serve：在那台 Windows 前景跑 `tailscale serve --https=8443 8000`（不加 `--bg`；有 WSL 時用 `powershell.exe -NoProfile -Command tailscale serve --https=8443 8000` 背景跑）。網址是 `https://<機器>.<tailnet>.ts.net:8443/mcp`。8443 被佔就換 `10000`。
+
+   完成條件：從對方那台打網址，不帶 key 回 `401`，帶 key 的 POST `initialize`（[Funnel](#funnel) 第 2 步 `--` 後面那串）回 `200`。
+3. 照上面交 key、交代 agent。
+4. **收掉**：先停掉第 2 步那支（ssh 轉發或 tailscale serve），再收 server：有 WSL 跑 `windows-mcp-stop`，沒有照上面那節貼。
+   完成條件：tailscale serve 那條在那台跑 `tailscale serve status` 沒有 8443；server 收尾的完成條件照各自那段。
 
 ### Funnel
 
-1. **開**：在那台 Windows 的 WSL 跑 `~/.claude/skills/windows-mcp/scripts/windows-mcp-funnel-open`。它會換新 key、在 0.0.0.0:8000 起 server、開 Funnel :8443，再從公開 IP 驗證，最後印出 endpoint，並把 key 複製到 Windows 剪貼簿。
-   完成條件：印出 `不帶 key=401` `帶 key=200` 和 endpoint。驗證沒過就跑 funnel-close，再看 reference.md。
-2. 照上面交 key、交代 agent。
-3. **收掉**：用完跑 `~/.claude/skills/windows-mcp/scripts/windows-mcp-funnel-close`：關 Funnel、停 server、換掉 key，交出去的那把就作廢了。
-   完成條件：印出 `還在聽 8000 的程式：0，Funnel :8443 剩 0 條` 和 `已收掉`。
+Funnel 不能改寫 `Host`，所以這條 server 綁 `0.0.0.0:8000`。2026-11-05 在 henry-laptop 實測過 Windows 原生 tailscale 開 Funnel：server 綁 `0.0.0.0`、用 Interactive scheduled task 在桌面 session 起，在 Windows 前景開 Funnel（對外 8443 → 本機 8000），公網不帶 key `401`、帶 key `200`。從 WSL 跑下面第 2 步整條**未實測**（那輪是直接在 Windows 跑 tailscale）。收的時候停掉呼叫端不會停掉 Windows 的 `tailscale.exe`，口子會一直開著；照 `expose-port` 收，看到 `已收乾淨` 才算收掉。
+
+**那台沒有 WSL** 時下面的腳本用不了：server 照[〈使用者在那台 PowerShell 貼〉](#使用者在那台-powershell-貼)起（`<綁的位址>` 填 `0.0.0.0`），公開網址照 `expose-port` 的 Funnel 分支〈那台沒有這支腳本〉請使用者在那台 PowerShell 開，驗證用的 header 照 [quick tunnel](#quick-tunnel) 表裡的 `--auth-header-cmd`。收掉時先照 `expose-port` 收公開網址，再照上面那節收 server。下面 1–4 是有 WSL 的做法。
+
+1. **起 server、換 key**：跑 `windows-mcp-serve`。它先確認防火牆沒放行 windows-mcp 的 inbound（區網直連 8000 只靠防火牆擋），換新 key，在 `0.0.0.0:8000` 起 server，再把 key 複製到 Windows 剪貼簿。
+   完成條件：印出 `server 在 0.0.0.0:8000，key 已複製到 Windows 剪貼簿`。
+2. **開到 tailnet 外**：照 `expose-port` 的 Funnel 分支開，輸入如下。`TAILSCALE` 讓它叫 Windows 那邊的 tailscale。
+
+   ```bash
+   TAILSCALE='powershell.exe -NoProfile -Command tailscale' \
+   ~/.claude/skills/expose-port/scripts/expose-port-funnel open --port 8000 --https 8443 --path /mcp \
+     --expect-without 401 --expect-with 200 \
+     --auth-header-cmd ~/.claude/skills/windows-mcp/scripts/windows-mcp-auth-header \
+     -- -X POST -H 'Accept: application/json, text/event-stream' -H 'Content-Type: application/json' \
+     -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"probe","version":"0"}}}'
+   ```
+
+   完成條件：`expose-port` 印出 `公開網址`。驗證沒過時 `expose-port` 已經撤掉 Funnel；跑 `windows-mcp-stop` 收掉 server，再看 [reference.md](reference.md) 和 `expose-port` 的 reference.md。
+3. 照上面交 key、交代 agent，網址是 `公開網址`。
+4. **收掉**：先照 `expose-port` 收掉公開網址，再跑 `windows-mcp-stop`：停 server、換掉 key，交出去的那把就作廢了。
+   完成條件：`expose-port` 印出 `Funnel :8443 已收乾淨`，`windows-mcp-stop` 印出 `還在聽 8000 的程式：0` 和 `已收掉，key 已換新`。
 
 ### quick tunnel
 
-由 cloudflared 開一個 `trycloudflare.com` 的 HTTPS 網址，轉進留在 loopback 的 server。
+server 留在 loopback，`Host` 由 quick tunnel 改寫成 `localhost`，不用放行防火牆 inbound。那台通常沒有 skillshare。
 
-1. **開**：請使用者在那台 PowerShell 依序貼上。`auth --force` 會換一把新 key。
+1. **起 server、換 key**：照[〈使用者在那台 PowerShell 貼〉](#使用者在那台-powershell-貼)起，`<綁的位址>` 填 `127.0.0.1`。
+   完成條件：同那節。
+2. **開到 tailnet 外**：照 `expose-port` 的 quick tunnel 分支開（那台沒有腳本，照「那台沒有這支腳本」那條請使用者貼），輸入：
 
-   ```powershell
-   windows-mcp auth --transport streamable-http --host 127.0.0.1 --port 8000 --force
-   Start-Process -WindowStyle Minimized windows-mcp -ArgumentList 'serve'
-   cloudflared tunnel --url http://127.0.0.1:8000 --http-host-header localhost
-   ```
+   | 輸入 | 值 |
+   |---|---|
+   | 本機 port | `8000` |
+   | `--host-header` | `localhost` |
+   | `--path` | `/mcp` |
+   | 不帶／帶驗證 | `401`／`200` |
+   | `--auth-header-cmd` | `printf 'Authorization: Bearer %s\n' "$WINDOWS_MCP_AUTH_KEY"`（key 設在環境變數，不印出來） |
+   | curl 參數 | 跟 Funnel 第 2 步 `--` 後面那串一樣（POST `initialize`） |
 
-   cloudflared 會佔住這個視窗，輸出裡有一行 `https://<隨機名稱>.trycloudflare.com`。endpoint 是這個網址加 `/mcp`。
-   完成條件：使用者把 cloudflared 印出的網址給你。
-2. **取 key**：請使用者另開一個 PowerShell 貼上下面這行，key 會複製到剪貼簿、不會印出來，再照上面交 key、交代 agent。取 key 都用這行；`config.toml` 開在畫面上時 key 會被 `Screenshot` 拍進去，所以真的用記事本開過就立刻關掉。
-
-   ```powershell
-   (Select-String "$HOME\.windows-mcp\config.toml" -Pattern 'auth_key\s*=\s*"([^"]+)"').Matches.Groups[1].Value | Set-Clipboard
-   ```
-
-3. **驗證**：從 agent 這邊 POST endpoint 兩次，一次不帶 key、一次帶 `Authorization: Bearer <key>`。
-
-   ```bash
-   curl -s -m 30 -o /dev/null -w '%{http_code}' -X POST "<endpoint>" \
-     -H 'Accept: application/json, text/event-stream' -H 'Content-Type: application/json' \
-     -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"probe","version":"0"}}}'
-   # 帶 key 那次加 -H "Authorization: Bearer $WINDOWS_MCP_AUTH_KEY"
-   ```
-
-   完成條件：不帶 key 回 `401`、帶 key 回 `200`（2026-11-05 實測過兩條）。之後要手動打 `tools/list` 等方法，先看 reference.md 的 session 那條。驗證沒過就照第 4 步收掉，再看 reference.md。
-4. **收掉**：請使用者在 cloudflared 視窗按 Ctrl+C，關掉 windows-mcp 的最小化視窗（找不到就用下面第一行停掉聽 8000 的程式），最後用第二行換 key，交出去的那把就作廢了。這兩行還沒實測過，跑完照完成條件確認。
-
-   ```powershell
-   Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
-   windows-mcp auth --transport streamable-http --host 127.0.0.1 --port 8000 --force
-   ```
-
-   完成條件：`(Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | Measure-Object).Count` 印出 `0`，cloudflared 視窗已結束，且 key 已換。
+   完成條件：`expose-port` 印出 `公開網址`。2026-11-05 在 henry-laptop 實測過這條（cloudflared 2026.10.7，server 綁 `127.0.0.1`）：不帶 key `401`；帶 key 時 `initialize` `200`（`text/event-stream`，回 `Mcp-Session-Id`）、`notifications/initialized` `202`、`tools/list` `200`（SSE，21 個 tool）、`Snapshot` `200`。長時間開著的 SSE stream 未實測。手動打 `tools/list` 前先看 reference.md 的 session 那條。
+3. 照上面交代 agent，網址是 `公開網址`。
+4. **收掉**：先照 `expose-port` 收掉公開網址，再照[〈使用者在那台 PowerShell 貼〉](#使用者在那台-powershell-貼)收 server。
+   完成條件：`expose-port` 的收尾判準都成立（cloudflared `0` 個、公網 `530` 或查不到），加上那節的完成條件。停掉呼叫端不會停掉那台的 `cloudflared.exe`（2026-11-05 實測），一定要照 `expose-port` 確認。
 
 ## 操作時
 

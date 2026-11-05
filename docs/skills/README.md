@@ -154,5 +154,6 @@ done
 | [verify-in-browser](verify-in-browser.md) | 選瀏覽器工具（playwright-cli、Claude in Chrome、Codex）、裝 ffmpeg 轉影片、升級 playwright-cli 後跟上官方 skill |
 | [slack-list](slack-list.md) | 建 Slack app、填 `.env`、排錯 |
 | [daily-worklog](daily-worklog.md) | 兩種用法：裝成 skill，或整份貼給其他 agent |
+| [windows-mcp](windows-mcp.md) | 讓別台的 agent 操作某台 Windows：在那台貼什麼起 server、交 key、開公開網址，用完怎麼收 |
 
 其他 skill 只要叫 agent 照做，看它的 `SKILL.md` 就好。
