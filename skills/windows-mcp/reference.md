@@ -1,6 +1,6 @@
 # windows-mcp reference
 
-出問題、或要改用 Funnel 以外的對外方式時才讀。坑照原因分層：先看 server 本身，再看經過代理的，最後看各方式專屬的。
+出問題、或要改用 SKILL.md 那兩條以外的對外方式時才讀。坑照原因分層：先看 server 本身，再看經過代理的，最後看各方式專屬的（quick tunnel 沒有專屬的坑）。
 
 ## 對外入口要滿足的條件
 
@@ -11,11 +11,11 @@
 
 | 方式 | server 綁哪裡 | 狀態 |
 |------|--------------|------|
-| Tailscale Funnel | `0.0.0.0` | 預設，有 funnel-open / funnel-close 腳本 |
-| Cloudflare quick tunnel | 可以留在 `127.0.0.1` | 未實測，這台還沒裝 cloudflared |
+| Tailscale Funnel | `0.0.0.0` | 步驟在 SKILL.md，有 funnel-open / funnel-close 腳本 |
+| Cloudflare quick tunnel | 可以留在 `127.0.0.1` | 步驟在 SKILL.md。2026-11-05 實測過：不帶 key 401；帶 key 時 `initialize`、`tools/list`、`Snapshot` 都 200 |
 | 防火牆 inbound 直連 | `0.0.0.0` | 未實測 |
 
-不用 Funnel 時，照上面的條件和下面對應那層的坑自己組指令。
+用表上第三種方式時，照上面的條件和下面對應那層的坑自己組指令。
 
 ## server 本身（所有 HTTP 模式都會遇到）
 
@@ -23,6 +23,7 @@
 - **log 在 server 的最小化視窗**：手動 `serve` 不寫檔；`~\.windows-mcp\server.log` 只有 scheduled task 會寫。
 - **`serve` 沒帶 `--transport` 時**，會照 `config.toml` 的 transport 起 server。`auth` 會把它寫成 HTTP，所以 stdio 一定要明寫 `--transport stdio`。
 - **綁 loopback 時會檢查 `Host` header**：只接受 `localhost`、`127.0.0.1`、`[::1]`。這版沒有可以加 allowed hosts 的選項（`windows_mcp/__main__.py` 的 DNS rebinding 段），綁 `0.0.0.0` 時不檢查。其他值一律回 400，訊息是 Invalid host header。
+- **要先建 session**：streamable HTTP 直接打 `tools/list` 不會成功。順序是 POST `initialize` → 從回應 header 取 `Mcp-Session-Id` → 送 `notifications/initialized` → 之後每個請求都帶 `Mcp-Session-Id` header。MCP client 會自己做，手動用 curl 打才要照這個順序。
 - **`Snapshot` 有時讀不到視窗**（回 `No windows found`），截圖仍然正常。讀不到就靠截圖加座標點擊。
 
 ## 經過本機代理或 tunnel（Funnel、quick tunnel）
@@ -35,11 +36,6 @@
 
 - **只能用 443、8443、10000**：443 常被其他 `tailscale serve` 佔用，所以腳本用 8443。
 - **在本機驗不到 Funnel**：本機查 ts.net 名稱會拿到 tailnet IP，連線會逾時。要用公開 DNS 查到的 IP 加 `curl --resolve`，funnel-open 已經這樣做。
-
-## Cloudflare quick tunnel 專屬（未實測）
-
-- `cloudflared tunnel --url http://127.0.0.1:8000 --http-host-header localhost`，server 可以留在 loopback。
-- 不用帳號，但每次網址都會變，要重新交給對方。
 
 ## 防火牆直連專屬（未實測）
 
