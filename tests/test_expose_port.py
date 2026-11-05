@@ -20,6 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "skills" / "expose-port" / "scripts" / "expose-port-funnel"
 QUICK_SCRIPT = ROOT / "skills" / "expose-port" / "scripts" / "expose-port-quick-tunnel"
 AUTH_HEADER_SCRIPT = ROOT / "skills" / "windows-mcp" / "scripts" / "windows-mcp-auth-header"
+SERVE_SCRIPT = ROOT / "skills" / "windows-mcp" / "scripts" / "windows-mcp-serve"
 
 HOST = "box.tail123.ts.net"
 QUICK_HOST = "quiet-fox-123.trycloudflare.com"
@@ -427,6 +428,51 @@ class WindowsMcpAuthHeaderTest(unittest.TestCase):
             result = subprocess.run(["bash", str(AUTH_HEADER_SCRIPT)], env=env, capture_output=True, text=True, timeout=15)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, f"Authorization: Bearer {KEY}\n")
+
+
+# 只認 windows-mcp-serve 會送的幾種 PowerShell 指令；server 起來後 listening 檔案在
+FAKE_POWERSHELL = r"""#!/usr/bin/env bash
+cmd="$3"
+case "$cmd" in
+  '$env:USERPROFILE') printf 'C:\\Users\\me\r\n' ;;
+  *windows-mcp.exe\") printf 'C:\\Users\\me\\.local\\bin\\windows-mcp.exe\r\n' ;;
+  *Measure-Object\).Count*) [ -e "$FAKE_STATE/listening" ] && echo 1 || echo 0 ;;
+  *Start-Process*) touch "$FAKE_STATE/listening" ;;
+esac
+"""
+
+
+class WindowsMcpServeTest(unittest.TestCase):
+    """windows-mcp-serve：起 server 後把 key 放進 Windows 剪貼簿，不印出來。"""
+
+    def test_copies_key_to_clipboard_without_printing_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            home = tmp / "winhome"
+            (home / ".windows-mcp").mkdir(parents=True)
+            (home / ".windows-mcp" / "config.toml").write_text(
+                f'transport = "streamable-http"\nauth_key = "{KEY}"\n'
+            )
+            (home / ".local" / "bin").mkdir(parents=True)
+            (home / ".local" / "bin" / "windows-mcp.exe").write_text("")
+            state = tmp / "state"
+            state.mkdir()
+            bin_dir = tmp / "bin"
+            bin_dir.mkdir()
+            (bin_dir / "powershell.exe").write_text(FAKE_POWERSHELL)
+            (bin_dir / "wslpath").write_text(
+                f'#!/usr/bin/env bash\ncase "$1" in *windows-mcp.exe) echo {home}/.local/bin/windows-mcp.exe ;; *) echo {home} ;; esac\n'
+            )
+            (bin_dir / "clip.exe").write_text(f'#!/usr/bin/env bash\ncat > {state}/clip\n')
+            for p in bin_dir.iterdir():
+                p.chmod(0o755)
+            env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "FAKE_STATE": str(state)}
+            result = subprocess.run(["bash", str(SERVE_SCRIPT)], env=env, capture_output=True, text=True, timeout=30)
+            clip = (state / "clip").read_text() if (state / "clip").exists() else ""
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(clip, KEY)
+        self.assertNotIn(KEY, result.stdout + result.stderr)
+        self.assertIn("key 已複製到 Windows 剪貼簿", result.stdout)
 
 
 if __name__ == "__main__":

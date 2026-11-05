@@ -3,18 +3,11 @@
 # 開到 tailnet 外交給 expose-port（Funnel 不能改寫 Host，server 才綁 0.0.0.0，見 windows-mcp 的 reference.md）。
 # 在桌機 WSL 跑：要靠 powershell.exe 操作 Windows 那邊。key 不印出來。
 set -euo pipefail
+. "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/windows-mcp-common.sh"
 
-PORT=8000
-
-# PowerShell 查無結果也會回 exit 1，成敗一律看最後的檢查
-pwsh() { powershell.exe -NoProfile -Command "$1" </dev/null | tr -d '\r' || true; }
 listening() { pwsh "(Get-NetTCPConnection -LocalPort $PORT -State Listen -ErrorAction SilentlyContinue | Measure-Object).Count"; }
 
-command -v powershell.exe >/dev/null || { echo "找不到 powershell.exe：要在桌機 WSL 跑" >&2; exit 1; }
-
-win_home=$(wslpath "$(pwsh '$env:USERPROFILE')")
 exe_win=$(pwsh '"$env:USERPROFILE\.local\bin\windows-mcp.exe"')
-config="$win_home/.windows-mcp/config.toml"
 [ -f "$(wslpath "$exe_win")" ] || { echo "沒裝 windows-mcp，照 SKILL.md「第一次安裝」裝好再跑" >&2; exit 1; }
 [ "$(listening)" = 0 ] || { echo "$PORT 已經有程式在聽，先跑 windows-mcp-stop" >&2; exit 1; }
 
@@ -32,6 +25,7 @@ pwsh "Start-Process -WindowStyle Minimized -FilePath '$exe_win' -ArgumentList 's
 for _ in $(seq 1 30); do [ "$(listening)" = 0 ] || break; sleep 1; done
 [ "$(listening)" != 0 ] || { echo "server 30 秒內沒在 $PORT 起來" >&2; exit 1; }
 
-# 4. key 複製到剪貼簿，給使用者交給對方 agent
-pwsh "([regex]::Match((Get-Content '$(wslpath -w "$config")' -Raw), 'auth_key\s*=\s*\"([^\"]+)\"').Groups[1].Value) | Set-Clipboard"
+# 4. key 複製到剪貼簿，給使用者交給對方 agent。printf 是 bash 內建，key 不會出現在 ps 看得到的參數裡
+key=$(auth_key) || { echo "config.toml 裡沒有 auth_key：換 key 沒成功" >&2; exit 1; }
+printf %s "$key" | clip.exe
 echo "server 在 0.0.0.0:$PORT，key 已複製到 Windows 剪貼簿（沒有印出來）"

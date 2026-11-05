@@ -11,12 +11,12 @@ open 照 remote-access 的共通規則前景跑：Funnel 不加 --bg，驗證過
 驗證沒過也會撤掉再結束。close 給上一輪沒收乾淨時用，重跑也安全。
 
 驗證的 header 由 --auth-header-cmd 印出，寫進只有自己讀得到的暫存檔再用 `curl -H @檔案` 帶，
-不會出現在 curl 的參數裡（ps 看得到參數）。
+不會出現在 curl 的參數裡（ps 看得到參數）。驗證、輸出這些跟 quick tunnel 共用的在 expose_port_common.py。
 
 環境變數：
   TAILSCALE                    叫 tailscale 的指令（照 shell 斷字）。沒設時用 tailscale，
                                這個使用者不是 tailscale operator 就加 sudo
-  EXPOSE_PORT_PROBE_INTERVAL   等 Funnel 生效時每次重試間隔秒數，預設 3
+  EXPOSE_PORT_PROBE_INTERVAL   等 Funnel 生效時每次重試間隔秒數，預設 3（測試設 0）
 """
 import argparse
 import json
@@ -25,15 +25,14 @@ import shlex
 import signal
 import subprocess
 import sys
-import tempfile
-import time
+from pathlib import Path
+
+# 共用模組放在同目錄；skill 資料夾會 sync 到各 client，不留 __pycache__
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from expose_port_common import add_verify_args, public_ip, run, say, split_curl_args, verify  # noqa: E402
 
 FUNNEL_PORTS = (443, 8443, 10000)
-PROBE_TRIES = 10
-
-
-def say(msg):
-    print(msg, flush=True)
 
 
 def die(msg):
@@ -53,10 +52,6 @@ def tailscale_cmd():
     except ValueError:
         operator = ""
     return ["tailscale"] if operator == os.environ.get("USER") else ["sudo", "tailscale"]
-
-
-def run(cmd):
-    return subprocess.run(cmd, capture_output=True, text=True)
 
 
 def serve_entries(ts):
@@ -100,52 +95,6 @@ def dns_name(ts):
         return ""
 
 
-def public_ip(host):
-    # 本機查 ts.net 名稱會拿到 tailnet IP，連線會逾時；改用公開 DNS 的 IP 走 Funnel
-    out = run([
-        "curl", "-s", "-m", "10", f"https://cloudflare-dns.com/dns-query?name={host}&type=A",
-        "-H", "accept: application/dns-json",
-    ]).stdout
-    try:
-        answers = [a["data"] for a in json.loads(out).get("Answer", []) if a.get("type") == 1]
-    except (ValueError, AttributeError):
-        answers = []
-    return answers[-1] if answers else ""
-
-
-def probe(url, host, https, ip, curl_args, header_file=None):
-    cmd = ["curl", "-s", "-m", "30", "-o", "/dev/null", "-w", "%{http_code}",
-           "--resolve", f"{host}:{https}:{ip}", *curl_args, url]
-    if header_file:
-        cmd += ["-H", f"@{header_file}"]
-    return run(cmd).stdout.strip() or "000"
-
-
-def verify(args, host, ip):
-    url = f"https://{host}:{args.https}{args.path}"
-    interval = float(os.environ.get("EXPOSE_PORT_PROBE_INTERVAL", "3"))
-    header = run(["bash", "-c", args.auth_header_cmd])
-    if header.returncode != 0 or not header.stdout.strip():
-        say("--auth-header-cmd 沒印出 header")
-        return False
-    fd, header_file = tempfile.mkstemp(prefix="expose-port-")
-    try:
-        with os.fdopen(fd, "w") as f:
-            f.write(header.stdout.strip().splitlines()[0] + "\n")
-        # Funnel 剛開要幾秒才通，等到不帶驗證的回應符合預期
-        for i in range(PROBE_TRIES):
-            without = probe(url, host, args.https, ip, args.curl_args)
-            if without == args.expect_without:
-                break
-            if i < PROBE_TRIES - 1:
-                time.sleep(interval)
-        with_auth = probe(url, host, args.https, ip, args.curl_args, header_file)
-    finally:
-        os.unlink(header_file)
-    say(f"公網驗證：不帶驗證={without}（要 {args.expect_without}），帶驗證={with_auth}（要 {args.expect_with}）")
-    return without == args.expect_without and with_auth == args.expect_with
-
-
 def cmd_open(args):
     ts = tailscale_cmd()
     host = dns_name(ts)
@@ -177,7 +126,7 @@ def cmd_open(args):
         if not ip:
             say(f"公開 DNS 查不到 {host} 的 IP")
             finish(1)
-        if not verify(args, host, ip):
+        if not verify(args, f"https://{host}:{args.https}", ip):
             say("驗證沒過，Funnel 已撤掉。看 expose-port 的 reference.md")
             finish(1)
         say(f"公開網址：https://{host}:{args.https}{args.path}")
@@ -202,19 +151,13 @@ def funnel_port(value):
 
 
 def main(argv):
-    curl_args = []
-    if "--" in argv:
-        i = argv.index("--")
-        argv, curl_args = argv[:i], argv[i + 1:]
+    argv, curl_args = split_curl_args(argv)
     parser = argparse.ArgumentParser(prog="expose-port-funnel")
     sub = parser.add_subparsers(dest="cmd", required=True)
     op = sub.add_parser("open")
     op.add_argument("--port", type=int, required=True, help="本機 app 聽的 port")
     op.add_argument("--https", type=funnel_port, default=8443, help="對外 port：443、8443、10000")
-    op.add_argument("--path", default="/", help="驗證時打的路徑")
-    op.add_argument("--expect-without", required=True, help="不帶驗證時要回的 HTTP 狀態碼")
-    op.add_argument("--expect-with", required=True, help="帶驗證時要回的 HTTP 狀態碼")
-    op.add_argument("--auth-header-cmd", required=True, help="印出一行驗證 header 的 shell 指令")
+    add_verify_args(op)
     cl = sub.add_parser("close")
     cl.add_argument("--https", type=funnel_port, default=8443)
     args = parser.parse_args(argv)

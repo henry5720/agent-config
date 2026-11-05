@@ -2,9 +2,7 @@
 # 印出 Windows-MCP 的驗證 header（Authorization: Bearer <key>），給 expose-port 的 --auth-header-cmd 用。
 # 在桌機 WSL 跑；key 從 Windows 的 ~/.windows-mcp/config.toml 讀，只往 stdout 印這一行。
 set -euo pipefail
+. "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/windows-mcp-common.sh"
 
-command -v powershell.exe >/dev/null || { echo "找不到 powershell.exe：要在桌機 WSL 跑" >&2; exit 1; }
-win_home=$(wslpath "$(powershell.exe -NoProfile -Command '$env:USERPROFILE' </dev/null | tr -d '\r')")
-key=$(grep -oP 'auth_key\s*=\s*"\K[^"]+' "$win_home/.windows-mcp/config.toml") \
-  || { echo "config.toml 裡沒有 auth_key：先跑 windows-mcp-serve" >&2; exit 1; }
+key=$(auth_key) || { echo "config.toml 裡沒有 auth_key：先跑 windows-mcp-serve" >&2; exit 1; }
 echo "Authorization: Bearer $key"

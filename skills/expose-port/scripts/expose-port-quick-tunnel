@@ -17,15 +17,16 @@ close 停掉這台上轉這個 port 的 quick tunnel，給上一輪沒收乾淨�
 --host-header 讓 cloudflared 改寫 Host（--http-host-header），app 綁 loopback 又檢查 Host 時給 localhost。
 
 驗證的 header 由 --auth-header-cmd 印出，寫進只有自己讀得到的暫存檔再用 `curl -H @檔案` 帶，
-不會出現在 curl 的參數裡（ps 看得到參數）。
+不會出現在 curl 的參數裡（ps 看得到參數）。驗證、輸出這些跟 Funnel 共用的在 expose_port_common.py。
 
-環境變數：
-  CLOUDFLARED                  叫 cloudflared 的指令（照 shell 斷字），預設 cloudflared
-  EXPOSE_PORT_PROBE_INTERVAL   等網址生效時每次重試間隔秒數，預設 3
-  EXPOSE_PORT_URL_TIMEOUT      等 cloudflared 印出網址的秒數，預設 60
+環境變數（平常不用設）：
+  CLOUDFLARED                  叫 cloudflared 的指令（照 shell 斷字），預設 cloudflared。
+                               cloudflared 不在 PATH 上時給完整路徑；測試用它換成假指令
+  EXPOSE_PORT_PROBE_INTERVAL   等網址生效時每次重試間隔秒數，預設 3（測試設 0）
+  EXPOSE_PORT_URL_TIMEOUT      等 cloudflared 印出網址的秒數，預設 60。
+                               網路慢、cloudflared 要更久才拿到網址時加大；測試設小，不用等滿 60 秒
 """
 import argparse
-import json
 import os
 import re
 import shlex
@@ -34,17 +35,14 @@ import subprocess
 import sys
 import tempfile
 import time
+from pathlib import Path
 
-PROBE_TRIES = 10
+# 共用模組放在同目錄；skill 資料夾會 sync 到各 client，不留 __pycache__
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from expose_port_common import add_verify_args, run, say, split_curl_args, verify  # noqa: E402
+
 URL_RE = re.compile(r"https://[a-z0-9-]+\.trycloudflare\.com")
-
-
-def say(msg):
-    print(msg, flush=True)
-
-
-def run(cmd):
-    return subprocess.run(cmd, capture_output=True, text=True)
 
 
 def cloudflared_cmd():
@@ -72,57 +70,6 @@ def stop_child(child):
         except subprocess.TimeoutExpired:
             child.kill()
             child.wait()
-
-
-def public_ip(host):
-    # 剛開的網址本機 DNS 可能已經快取成查無此名，改用公開 DNS 查到的 IP 打
-    out = run([
-        "curl", "-s", "-m", "10", f"https://cloudflare-dns.com/dns-query?name={host}&type=A",
-        "-H", "accept: application/dns-json",
-    ]).stdout
-    try:
-        answers = [a["data"] for a in json.loads(out).get("Answer", []) if a.get("type") == 1]
-    except (ValueError, AttributeError):
-        answers = []
-    return answers[-1] if answers else ""
-
-
-def probe(url, host, ip, curl_args, header_file=None):
-    cmd = ["curl", "-s", "-m", "30", "-o", "/dev/null", "-w", "%{http_code}"]
-    if ip:
-        cmd += ["--resolve", f"{host}:443:{ip}"]
-    cmd += [*curl_args, url]
-    if header_file:
-        cmd += ["-H", f"@{header_file}"]
-    return run(cmd).stdout.strip() or "000"
-
-
-def verify(args, base_url):
-    host = base_url.split("://", 1)[1].split("/")[0]
-    url = base_url.rstrip("/") + args.path
-    interval = float(os.environ.get("EXPOSE_PORT_PROBE_INTERVAL", "3"))
-    header = run(["bash", "-c", args.auth_header_cmd])
-    if header.returncode != 0 or not header.stdout.strip():
-        say("--auth-header-cmd 沒印出 header")
-        return False
-    fd, header_file = tempfile.mkstemp(prefix="expose-port-")
-    try:
-        with os.fdopen(fd, "w") as f:
-            f.write(header.stdout.strip().splitlines()[0] + "\n")
-        # 網址剛印出來要幾秒才通，等到不帶驗證的回應符合預期
-        ip = ""
-        for i in range(PROBE_TRIES):
-            ip = ip or public_ip(host)
-            without = probe(url, host, ip, args.curl_args)
-            if without == args.expect_without:
-                break
-            if i < PROBE_TRIES - 1:
-                time.sleep(interval)
-        with_auth = probe(url, host, ip, args.curl_args, header_file)
-    finally:
-        os.unlink(header_file)
-    say(f"公網驗證：不帶驗證={without}（要 {args.expect_without}），帶驗證={with_auth}（要 {args.expect_with}）")
-    return without == args.expect_without and with_auth == args.expect_with
 
 
 def wait_for_url(child, log_path):
@@ -218,18 +165,8 @@ def cmd_close(args):
     sys.exit(0 if report_left(args.port) == 0 else 1)
 
 
-def add_verify_args(p):
-    p.add_argument("--path", default="/", help="驗證時打的路徑")
-    p.add_argument("--expect-without", required=True, help="不帶驗證時要回的 HTTP 狀態碼")
-    p.add_argument("--expect-with", required=True, help="帶驗證時要回的 HTTP 狀態碼")
-    p.add_argument("--auth-header-cmd", required=True, help="印出一行驗證 header 的 shell 指令")
-
-
 def main(argv):
-    curl_args = []
-    if "--" in argv:
-        i = argv.index("--")
-        argv, curl_args = argv[:i], argv[i + 1:]
+    argv, curl_args = split_curl_args(argv)
     parser = argparse.ArgumentParser(prog="expose-port-quick-tunnel")
     sub = parser.add_subparsers(dest="cmd", required=True)
     op = sub.add_parser("open")

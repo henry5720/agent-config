@@ -1,7 +1,7 @@
 # windows-mcp
 
 別台的 agent 要操作某台 Windows 的 GUI app（截圖、點擊、打字）時，它會照這個 skill 請你在那台
-起 Windows-MCP 的 server、交 key，再把 server 開成一個公開網址給它連。agent 怎麼做寫在
+起 Windows-MCP 的 server、交 key，再讓它連進來：在你的 tailnet 內就直接連，在外面才開成公開網址。agent 怎麼做寫在
 [`skills/windows-mcp/SKILL.md`](../../skills/windows-mcp/SKILL.md)，這份只寫你要在那台做的事。
 同一台的 agent（那台 WSL 裡的 Claude Code、Codex）不走這條，直接用 `mcp.yaml` 的 `windows-mcp`。
 
@@ -10,10 +10,16 @@
 照 dotfiles 的 [remote-access 判準](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access.md#判準)：
 
 ```
-那台 Windows 跑得到登入你 tailnet 的 tailscale，而且有 WSL？
-├─ 是 → Funnel：agent 在那台 WSL 跑腳本，你只要交 key
-└─ 否（別人的機器、臨時借用）→ quick tunnel：你在那台 PowerShell 貼幾行
+對方 agent 在你的 tailnet 內？
+├─ 是 → tailnet 內：ssh 轉發或 tailscale serve，不開公網
+└─ 否 → 那台 Windows 加進你的 tailnet？（WSL 裡的、Windows 原生的 tailscale 都算）
+        ├─ 是 → Funnel
+        └─ 否（別人的機器、臨時借用）→ quick tunnel：你在那台 PowerShell 貼幾行
 ```
+
+有沒有 WSL 不影響走哪條，只影響誰動手：那台有 WSL 時 agent 在 WSL 跑腳本起 server，你只要交 key；
+沒有 WSL 時你在那台 PowerShell 貼——起 server、收掉跟下面 quick tunnel 那兩段一樣，只是 Funnel、
+tailscale serve 要把第一、二行的 `127.0.0.1` 換成 `0.0.0.0`（agent 會講），再貼 agent 給你的那行開網址的指令。
 
 兩種差在哪（網址固不固定、SSE、並行上限）見 [比較表](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access.md#比較表)。
 Windows-MCP 回應可能用 SSE，quick tunnel 不支援 SSE：走 quick tunnel 時某個操作卡住或斷線，先懷疑這個。
@@ -62,12 +68,15 @@ uv tool update-shell
 
    最後兩行都印 `0` 才算收乾淨（第二個 `0` 假設你沒有開別的 cloudflared）。
 
-## Funnel：你要做的
+## Funnel、tailnet 內：你要做的
 
-agent 在那台 WSL 跑腳本起 server、開 Funnel、驗證，key 會複製到那台的剪貼簿。你只要：
+那台有 WSL 時，agent 在那台 WSL 跑腳本起 server、開網址、驗證，key 會複製到那台的剪貼簿。你只要：
 
 1. 把剪貼簿的 key 交給對方 agent（同上）。
-2. 用完跟 agent 說收掉。它會撤掉 Funnel、停 server、換 key。
+2. 用完跟 agent 說收掉。它會撤掉網址、停 server、換 key。
+
+沒有 WSL 時照上面〈開哪一種〉最後那段自己貼。tailnet 內走 ssh 轉發時，server 留在 `127.0.0.1`，
+由對方 agent 那台開 ssh 轉發，不用開任何網址。
 
 ## 測過什麼
 
@@ -77,7 +86,8 @@ agent 在那台 WSL 跑腳本起 server、開 Funnel、驗證，key 會複製到
 | quick tunnel 收掉時 `Stop-Process` 停得掉 server | 未實測 |
 | `auth --force` 換 key 後舊 key 被拒 | 未實測 |
 | SSE 經 quick tunnel | 未實測 |
-| Windows 原生 tailscale 開 Funnel | 未實測 |
+| Windows 原生 tailscale 開 Funnel（含從 WSL 叫） | 未實測 |
+| tailnet 內（ssh 轉發、tailscale serve） | 未實測 |
 
 server 本身的坑（`/mcp/` 307、log 在哪、`Host` 檢查、session 順序）見
 [`skills/windows-mcp/reference.md`](../../skills/windows-mcp/reference.md)。

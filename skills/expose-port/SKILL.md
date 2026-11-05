@@ -50,13 +50,17 @@ description: 把本機某個 port 開成 tailnet 外連得到的公開網址：�
 
 ### 那台沒有這支腳本
 
-開出去的那台沒有 skillshare 時，請使用者在那台開一個終端機貼上，開著別關：
+開出去的那台沒有 skillshare（或沒有 WSL 的 Windows）時，第 1、2 步照上面做，第 3 步改成請使用者在那台開一個終端機（Windows 用 PowerShell）貼上，開著別關：
 
 ```bash
 tailscale funnel --https=<對外 port> <app port>    # Linux 沒設 operator 要加 sudo；不加 --bg
 ```
 
-公網驗證照 [reference.md](reference.md)〈在本機驗不到 Funnel〉從你這邊打。收掉時請使用者按 Ctrl+C，再跑 `tailscale funnel status` 確認沒有那個 port。
+1. **開**：完成條件：使用者說貼了、視窗停著沒有回到提示字元（印出網址或要你開權限的 admin console 連結都算開著；後者先請使用者開好權限再貼一次）。
+2. **驗**：照 [reference.md](reference.md)〈在本機驗不到 Funnel〉從你這邊打，網址是 `https://<那台的機器名>.<tailnet>.ts.net:<對外 port><路徑>`。
+   完成條件：不帶驗證、帶驗證各回 app 給的碼。沒過就照第 3 步收掉，再照 reference.md 查原因。
+3. **交網址、收掉**：交網址同上面第 4 步。用完請使用者在那個視窗按 Ctrl+C，再跑 `tailscale funnel status`。
+   完成條件：`tailscale funnel status` 的輸出沒有那個對外 port 的 `https://` 行（443 的那行網址不帶 port；只剩 `No serve config` 或別的 port 都算收乾淨）。再由 app 停掉它的 server。
 
 ## quick tunnel
 
