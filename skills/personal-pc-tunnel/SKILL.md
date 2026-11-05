@@ -7,6 +7,8 @@ description: 要使用者在個人電腦開一條 ssh 轉發才做得到的瀏�
 
 你在已配置主機（例如 company-ec2）上，瀏覽器預設用這台自己的 headless 瀏覽器（`playwright-cli open`，流程照 `verify-in-browser` skill）。這個 skill 只處理那條走不通、要借使用者個人電腦的情況，共同點是使用者要開一條 ssh 轉發，而且只綁 127.0.0.1：轉過來的東西都沒有驗證。
 
+這兩條都是 tailnet 內的 ssh 轉發，不開公網：使用者的個人電腦要連得到你這台的 ssh。他連不到（不在 tailnet、沒有 ssh key）就停下來回報，不要改開公開網址。其他開法給人看的全貌在 dotfiles 的 [remote-access](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access.md#tailnet-內)。
+
 ## 接使用者日常的 Chrome
 
 只在**一定要使用者自己的瀏覽器**時用：passkey、硬體金鑰、裝置 SSO，也就是 headless 瀏覽器怎樣都登不進去的網站。使用者要看畫面、要替你登入，走 headless 瀏覽器 + `playwright-cli show`（`verify-in-browser` 的 hitl.md〈讓使用者看畫面、接手〉），不用打擾他的 Chrome。

@@ -11,6 +11,8 @@ performance trace、lighthouse、heap snapshot、minify 過的 code 下斷點。
 
 操作、驗收不用這個 skill：用 `playwright-cli open`（自己開瀏覽器、不佔 9222），流程照 `verify-in-browser` skill。
 
+9222 只綁 127.0.0.1、沒有驗證，不開給別台。使用者要從別台連，只走 tailnet 內的 `ssh -L` 轉發，不開公網；做法見 dotfiles 的 [remote-access](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access.md#tailnet-內)。
+
 背景、排錯、設定放在哪：[reference.md](reference.md)。
 
 ## 步驟
