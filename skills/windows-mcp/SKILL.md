@@ -1,6 +1,6 @@
 ---
 name: windows-mcp
-description: 把一台 Windows 桌面的 Windows-MCP 經 Tailscale Funnel 或 Cloudflare quick tunnel 開給別台的 agent 操作（截圖、點擊、打字），用完收掉並換 key。別台的 agent 要操作某台 Windows 的 GUI app，或說測完要收掉時使用。
+description: 把一台 Windows 桌面的 Windows-MCP 開給別台的 agent 操作（截圖、點擊、打字）：起 server、換 key、交 key，用完收掉並換 key。別台的 agent 要操作某台 Windows 的 GUI app，或說測完要收掉時使用。
 ---
 
 # windows-mcp
@@ -8,9 +8,9 @@ description: 把一台 Windows 桌面的 Windows-MCP 經 Tailscale Funnel 或 Cl
 Windows-MCP 要跑在 Windows 的使用者 session 裡，才操作得到眼前這個桌面。
 
 - **同一台的 agent**（WSL 裡的 Claude Code、Codex）：不用這個 skill，直接用 skillshare `mcp.yaml` 裡的 `windows-mcp` server（stdio，client 用時才帶起來）。
-- **別台的 agent**（tailnet 內的也算）：照下面「別台的 agent」把 server 經 HTTPS 入口開到外面，連 `/mcp`，帶 Bearer key，用完收掉並換 key。
+- **別台的 agent**（tailnet 內的也算）：照下面「別台的 agent」起 HTTP server、換 key，開到外面交給 `expose-port` skill；對方連 `/mcp`，帶 Bearer key，用完收掉並換 key。
 
-連不上、出現 400／403／逾時，或要改用其他對外方式時，看 [reference.md](reference.md)。
+server 本身的坑（400、307、session）看 [reference.md](reference.md)；經過 Funnel 或代理的坑看 `expose-port` 的 reference.md。
 
 ## 第一次安裝
 
@@ -38,16 +38,7 @@ winget install --exact --id Cloudflare.cloudflared
 
 ### 選對外方式
 
-兩種並列，看那台 Windows 的條件選：
-
-|  | Funnel | quick tunnel |
-|---|---|---|
-| 那台要有 | WSL，且登入 Tailscale | cloudflared，不用帳號 |
-| 怎麼開 | WSL 跑 funnel-open／funnel-close 腳本 | 沒有腳本，指令請使用者貼進那台 PowerShell |
-| server 綁 | `0.0.0.0:8000` | `127.0.0.1:8000`，不用開防火牆 inbound |
-| 網址 | 腳本印出 | 每次開都不同，要重新交給 agent |
-
-只符合一邊的條件就走那邊；兩邊都符合時兩者皆可。
+照 [remote-access 的判準](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access.md#判準)：那台 Windows 跑得到登入使用者 tailnet 的 tailscale → Funnel；不加進使用者的 tailnet → quick tunnel。Funnel 這邊的腳本要在那台的 WSL 跑（靠 `powershell.exe` 操作 Windows），沒有 WSL 時停下來回報使用者。
 
 ### 交 key 和交代 agent（兩種都一樣）
 
@@ -56,11 +47,25 @@ winget install --exact --id Cloudflare.cloudflared
 
 ### Funnel
 
-1. **開**：在那台 Windows 的 WSL 跑 `~/.claude/skills/windows-mcp/scripts/windows-mcp-funnel-open`。它會換新 key、在 0.0.0.0:8000 起 server、開 Funnel :8443，再從公開 IP 驗證，最後印出 endpoint，並把 key 複製到 Windows 剪貼簿。
-   完成條件：印出 `不帶 key=401` `帶 key=200` 和 endpoint。驗證沒過就跑 funnel-close，再看 reference.md。
-2. 照上面交 key、交代 agent。
-3. **收掉**：用完跑 `~/.claude/skills/windows-mcp/scripts/windows-mcp-funnel-close`：關 Funnel、停 server、換掉 key，交出去的那把就作廢了。
-   完成條件：印出 `還在聽 8000 的程式：0，Funnel :8443 剩 0 條` 和 `已收掉`。
+Funnel 不能改寫 `Host`，而 server 綁 loopback 時只接受 `localhost`，所以這條 server 綁 `0.0.0.0:8000`。腳本都在 `~/.claude/skills/windows-mcp/scripts/`，在那台的 WSL 跑。
+
+1. **起 server、換 key**：跑 `windows-mcp-serve`。它先確認防火牆沒放行 windows-mcp 的 inbound（區網直連 8000 只靠防火牆擋），換新 key，在 `0.0.0.0:8000` 起 server，再把 key 複製到 Windows 剪貼簿。
+   完成條件：印出 `server 在 0.0.0.0:8000，key 已複製到 Windows 剪貼簿`。
+2. **開到 tailnet 外**：照 `expose-port` skill 的 Funnel 分支開，輸入如下。`TAILSCALE` 讓它叫 Windows 那邊的 tailscale。
+
+   ```bash
+   TAILSCALE='powershell.exe -NoProfile -Command tailscale' \
+   ~/.claude/skills/expose-port/scripts/expose-port-funnel open --port 8000 --https 8443 --path /mcp \
+     --expect-without 401 --expect-with 200 \
+     --auth-header-cmd ~/.claude/skills/windows-mcp/scripts/windows-mcp-auth-header \
+     -- -X POST -H 'Accept: application/json, text/event-stream' -H 'Content-Type: application/json' \
+     -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"probe","version":"0"}}}'
+   ```
+
+   完成條件：`expose-port` 印出 `公開網址`，endpoint 就是那個網址（結尾 `/mcp`）。驗證沒過時 `expose-port` 已經撤掉 Funnel；跑 `windows-mcp-stop` 收掉 server，再看兩份 reference.md。
+3. 照上面交 key、交代 agent。
+4. **收掉**：先照 `expose-port` 收掉 Funnel，再跑 `windows-mcp-stop`：停 server、換掉 key，交出去的那把就作廢了。
+   完成條件：`expose-port` 印出 `Funnel :8443 剩 0 條`，`windows-mcp-stop` 印出 `還在聽 8000 的程式：0` 和 `已收掉，key 已換新`。
 
 ### quick tunnel
 

@@ -1,0 +1,227 @@
+#!/usr/bin/env python3
+"""用 Tailscale Funnel 把本機 port 開到 tailnet 外：開、從公網驗證、收。
+
+  expose-port-funnel open --port 8000 --https 8443 --path /mcp \\
+      --expect-without 401 --expect-with 200 --auth-header-cmd '<印出驗證 header 的指令>' \\
+      -- <兩次驗證都帶的 curl 參數>
+  expose-port-funnel close --https 8443
+
+open 照 remote-access 的共通規則前景跑：Funnel 不加 --bg，驗證過了印出公開網址就停著，
+收到 Ctrl+C／SIGTERM 才撤掉 Funnel，並確認 `tailscale funnel status` 裡沒有這個 port。
+驗證沒過也會撤掉再結束。close 給上一輪沒收乾淨時用，重跑也安全。
+
+驗證的 header 由 --auth-header-cmd 印出，寫進只有自己讀得到的暫存檔再用 `curl -H @檔案` 帶，
+不會出現在 curl 的參數裡（ps 看得到參數）。
+
+環境變數：
+  TAILSCALE                    叫 tailscale 的指令（照 shell 斷字）。沒設時用 tailscale，
+                               這個使用者不是 tailscale operator 就加 sudo
+  EXPOSE_PORT_PROBE_INTERVAL   等 Funnel 生效時每次重試間隔秒數，預設 3
+"""
+import argparse
+import json
+import os
+import shlex
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+
+FUNNEL_PORTS = (443, 8443, 10000)
+PROBE_TRIES = 10
+
+
+def say(msg):
+    print(msg, flush=True)
+
+
+def die(msg):
+    say(msg)
+    sys.exit(1)
+
+
+def tailscale_cmd():
+    if os.environ.get("TAILSCALE"):
+        return shlex.split(os.environ["TAILSCALE"])
+    if os.geteuid() == 0:
+        return ["tailscale"]
+    # 改 serve／funnel 設定要 sudo，除非這個使用者是 operator（tailscale set --operator=$USER）
+    prefs = run(["tailscale", "debug", "prefs"])
+    try:
+        operator = json.loads(prefs.stdout).get("OperatorUser", "")
+    except ValueError:
+        operator = ""
+    return ["tailscale"] if operator == os.environ.get("USER") else ["sudo", "tailscale"]
+
+
+def run(cmd):
+    return subprocess.run(cmd, capture_output=True, text=True)
+
+
+def serve_entries(ts):
+    """`tailscale funnel status` 列出的每個對外 port：[(port, 是不是 Funnel)]。443 的網址不帶 port。"""
+    entries = []
+    status = run(ts + ["funnel", "status"]).stdout.replace("\r", "")
+    for line in status.splitlines():
+        if not line.startswith("https://"):
+            continue
+        hostport = line.split()[0][len("https://"):].split("/")[0]
+        port = int(hostport.rsplit(":", 1)[1]) if ":" in hostport else 443
+        entries.append((port, "Funnel on" in line))
+    return entries
+
+
+def funnel_count(ts, https):
+    return sum(1 for port, funnel in serve_entries(ts) if port == https and funnel)
+
+
+def close_funnel(ts, https, child=None):
+    """撤掉 Funnel，回傳還剩幾條。先停前景那支；還在的話再 off 一次。"""
+    if child is not None and child.poll() is None:
+        child.terminate()
+        try:
+            child.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            child.kill()
+            child.wait()
+    if funnel_count(ts, https):
+        run(ts + ["funnel", f"--https={https}", "off"])
+    left = funnel_count(ts, https)
+    say(f"Funnel :{https} 剩 {left} 條（要 0）")
+    return left
+
+
+def dns_name(ts):
+    out = run(ts + ["status", "--json"]).stdout
+    try:
+        return json.loads(out)["Self"]["DNSName"].rstrip(".")
+    except (ValueError, KeyError, TypeError):
+        return ""
+
+
+def public_ip(host):
+    # 本機查 ts.net 名稱會拿到 tailnet IP，連線會逾時；改用公開 DNS 的 IP 走 Funnel
+    out = run([
+        "curl", "-s", "-m", "10", f"https://cloudflare-dns.com/dns-query?name={host}&type=A",
+        "-H", "accept: application/dns-json",
+    ]).stdout
+    try:
+        answers = [a["data"] for a in json.loads(out).get("Answer", []) if a.get("type") == 1]
+    except (ValueError, AttributeError):
+        answers = []
+    return answers[-1] if answers else ""
+
+
+def probe(url, host, https, ip, curl_args, header_file=None):
+    cmd = ["curl", "-s", "-m", "30", "-o", "/dev/null", "-w", "%{http_code}",
+           "--resolve", f"{host}:{https}:{ip}", *curl_args, url]
+    if header_file:
+        cmd += ["-H", f"@{header_file}"]
+    return run(cmd).stdout.strip() or "000"
+
+
+def verify(args, host, ip):
+    url = f"https://{host}:{args.https}{args.path}"
+    interval = float(os.environ.get("EXPOSE_PORT_PROBE_INTERVAL", "3"))
+    header = run(["bash", "-c", args.auth_header_cmd])
+    if header.returncode != 0 or not header.stdout.strip():
+        say("--auth-header-cmd 沒印出 header")
+        return False
+    fd, header_file = tempfile.mkstemp(prefix="expose-port-")
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(header.stdout.strip().splitlines()[0] + "\n")
+        # Funnel 剛開要幾秒才通，等到不帶驗證的回應符合預期
+        for i in range(PROBE_TRIES):
+            without = probe(url, host, args.https, ip, args.curl_args)
+            if without == args.expect_without:
+                break
+            if i < PROBE_TRIES - 1:
+                time.sleep(interval)
+        with_auth = probe(url, host, args.https, ip, args.curl_args, header_file)
+    finally:
+        os.unlink(header_file)
+    say(f"公網驗證：不帶驗證={without}（要 {args.expect_without}），帶驗證={with_auth}（要 {args.expect_with}）")
+    return without == args.expect_without and with_auth == args.expect_with
+
+
+def cmd_open(args):
+    ts = tailscale_cmd()
+    host = dns_name(ts)
+    if not host:
+        die("tailscale 沒登入，或叫不到 tailscale（tailscale status 看看）")
+    if any(port == args.https for port, _ in serve_entries(ts)):
+        die(f"Funnel／serve :{args.https} 已經開著（別的程式在用，或上一輪沒收）。換一個 port，或確認沒人用後跑 close --https {args.https}")
+
+    say(f"開 Funnel :{args.https} → 127.0.0.1:{args.port}（前景，收到 Ctrl+C／SIGTERM 就撤）…")
+    child = subprocess.Popen(
+        ts + ["funnel", f"--https={args.https}", f"http://127.0.0.1:{args.port}"],
+        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+
+    def finish(code):
+        for sig in (signal.SIGTERM, signal.SIGHUP, signal.SIGINT):
+            signal.signal(sig, signal.SIG_IGN)
+        left = close_funnel(ts, args.https, child)
+        sys.exit(code if left == 0 else 1)
+
+    # handler 只丟例外，收尾在主流程做：在 handler 裡 wait 子行程會跟被打斷的 child.wait() 搶鎖卡死
+    def stop(*_):
+        raise KeyboardInterrupt
+
+    signal.signal(signal.SIGTERM, stop)
+    signal.signal(signal.SIGHUP, stop)
+    try:
+        ip = public_ip(host)
+        if not ip:
+            say(f"公開 DNS 查不到 {host} 的 IP")
+            finish(1)
+        if not verify(args, host, ip):
+            say("驗證沒過，Funnel 已撤掉。看 expose-port 的 reference.md")
+            finish(1)
+        say(f"公開網址：https://{host}:{args.https}{args.path}")
+        say("停著直到 Ctrl+C／SIGTERM，收到就撤掉 Funnel")
+        child.wait()
+        say("Funnel 自己結束了")
+        finish(1)
+    except KeyboardInterrupt:
+        finish(0)
+
+
+def cmd_close(args):
+    ts = tailscale_cmd()
+    sys.exit(0 if close_funnel(ts, args.https) == 0 else 1)
+
+
+def funnel_port(value):
+    port = int(value)
+    if port not in FUNNEL_PORTS:
+        raise argparse.ArgumentTypeError("Funnel 只能用 443、8443、10000")
+    return port
+
+
+def main(argv):
+    curl_args = []
+    if "--" in argv:
+        i = argv.index("--")
+        argv, curl_args = argv[:i], argv[i + 1:]
+    parser = argparse.ArgumentParser(prog="expose-port-funnel")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+    op = sub.add_parser("open")
+    op.add_argument("--port", type=int, required=True, help="本機 app 聽的 port")
+    op.add_argument("--https", type=funnel_port, default=8443, help="對外 port：443、8443、10000")
+    op.add_argument("--path", default="/", help="驗證時打的路徑")
+    op.add_argument("--expect-without", required=True, help="不帶驗證時要回的 HTTP 狀態碼")
+    op.add_argument("--expect-with", required=True, help="帶驗證時要回的 HTTP 狀態碼")
+    op.add_argument("--auth-header-cmd", required=True, help="印出一行驗證 header 的 shell 指令")
+    cl = sub.add_parser("close")
+    cl.add_argument("--https", type=funnel_port, default=8443)
+    args = parser.parse_args(argv)
+    args.curl_args = curl_args
+    sys.stdout.reconfigure(line_buffering=True)
+    {"open": cmd_open, "close": cmd_close}[args.cmd](args)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
