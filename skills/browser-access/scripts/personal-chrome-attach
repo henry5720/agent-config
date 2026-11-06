@@ -9,7 +9,8 @@
 #
 # 用法:personal-chrome-attach [-s=<session>] [--timeout=<秒>] [--tunnel]
 #   -s          playwright-cli 的 session 名(預設 personal-chrome),接上後用 playwright-cli -s=<session> 操作
-#   --timeout   等人連進來的秒數(預設 300),時間到就收掉 attach 和轉發/tunnel、exit 1
+#   --timeout   等人連進來的秒數(預設 300;--tunnel 預設 600,人第一次要裝 cloudflared 和插件),
+#               時間到就收掉 attach 和轉發/tunnel、exit 1
 #   --tunnel    走 cloudflared tcp quick tunnel,不靠 ssh;要有 cloudflared。不帶 token,人在插件畫面按允許
 # 環境變數 PLAYWRIGHT_MCP_EXTENSION_TOKEN(--tunnel 時不用):有設就帶進網址,人貼網址就接上;沒設人要在
 #   插件畫面選分頁。有 token 的網址不印出來(agent 的輸出會進對話和檔案):人經 ssh -L 開
@@ -30,7 +31,7 @@ fi
 
 PORT=9555
 SESSION=personal-chrome
-TIMEOUT=300
+TIMEOUT=''
 TUNNEL=''
 CLOUDFLARED_DOWNLOADS=https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/downloads/
 for arg in "$@"; do
@@ -42,7 +43,10 @@ for arg in "$@"; do
     *) echo "不認得的參數:$arg(見 --help)" >&2; exit 2 ;;
   esac
 done
-case "$TIMEOUT" in '' | *[!0-9]*) echo "--timeout 要是秒數:$TIMEOUT" >&2; exit 2 ;; esac
+case "$TIMEOUT" in
+  '') if [ -n "$TUNNEL" ]; then TIMEOUT=600; else TIMEOUT=300; fi ;;
+  *[!0-9]*) echo "--timeout 要是秒數:$TIMEOUT" >&2; exit 2 ;;
+esac
 
 for required_command in playwright-cli node python3; do
   if ! command -v "$required_command" >/dev/null 2>&1; then
@@ -188,7 +192,12 @@ tunnel 開好了。connect 網址就是鑰匙,只交給使用者本人。把下�
   1. 安裝 cloudflared(第一次才要),依 OS 從官方下載頁選:$CLOUDFLARED_DOWNLOADS
   2. 開一個新的終端機貼這行,開著別關:
      cloudflared access tcp --hostname $hostname --url 127.0.0.1:$PORT
-  3. 在裝了 Playwright Extension 的 Chrome 開新分頁,網址列貼上這個 connect 網址,在插件畫面選分頁、按允許:
+  3. 開一支裝了 Playwright Extension 的 Chrome。建議用獨立 profile:跟你平常的 Chrome 分開,agent 碰不到你的登入;
+     第一次開是空的,要到 Chrome 線上應用程式商店裝 Playwright Extension。依 OS 貼這行開它(之後每次用同一行):
+       Windows(PowerShell):& "C:\Program Files\Google\Chrome\Application\chrome.exe" --user-data-dir="\$env:LOCALAPPDATA\chrome-agent" --no-first-run
+       macOS:open -na "Google Chrome" --args --user-data-dir="\$HOME/.local/state/chrome-agent" --no-first-run
+       Linux:google-chrome --user-data-dir="\$HOME/.local/state/chrome-agent" --no-first-run &
+     在這支 Chrome 開新分頁,網址列貼上這個 connect 網址,在插件畫面選分頁、按允許:
      $url
 等使用者接上(最多 $TIMEOUT 秒)…
 EOF

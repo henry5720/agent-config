@@ -162,6 +162,21 @@ class TunnelTest(unittest.TestCase):
         out = self.read_until(proc, READY)
         self.assertIn(f"cloudflared access tcp --hostname {QUICK_HOST} --url 127.0.0.1:9555", out)
 
+    def test_tunnel_waits_600_seconds_by_default(self):
+        proc = self.start()
+        out = self.read_until(proc, READY)
+        self.assertIn("600 秒內做完", out)
+
+    def test_suggests_separate_profile_with_command_per_os(self):
+        proc = self.start()
+        out = self.read_until(proc, READY)
+        self.assertIn("獨立 profile", out)
+        for line in ('--user-data-dir="$env:LOCALAPPDATA\\chrome-agent"',
+                     'open -na "Google Chrome" --args --user-data-dir="$HOME/.local/state/chrome-agent"',
+                     'google-chrome --user-data-dir="$HOME/.local/state/chrome-agent"'):
+            self.assertIn(line, out)
+        self.assertLess(out.index("獨立 profile"), out.index("chrome-extension://"))
+
     def test_tunnel_points_at_the_relay_over_tcp(self):
         proc = self.start()
         self.read_until(proc, READY)
