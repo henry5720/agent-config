@@ -164,13 +164,15 @@ print(relay.hostname, relay.port, p._replace(query=u.urlencode(q)).geturl())
 if [ -n "$TUNNEL" ]; then
   # 4a. --tunnel:cloudflared tcp quick tunnel → relay。人那台的 `cloudflared access tcp` 在他的 127.0.0.1:9555 聽,
   #     插件連過來時 Host 本來就是 loopback,relay 不擋,不用 --http-host-header。
-  #     網址印在 cloudflared 的 log;PERSONAL_CHROME_ATTACH_TUNNEL_WAIT 是等它印出網址的秒數(預設 60)。
+  #     網址印在 cloudflared 的 log;失敗時 log 會出現 API 的 https://api.trycloudflare.com/tunnel,那不是 tunnel,排除。
+  #     PERSONAL_CHROME_ATTACH_TUNNEL_WAIT 是等它印出網址的秒數(預設 60)。
   cloudflared tunnel --url "tcp://$relay_host:$relay_port" >"$state/cloudflared.log" 2>&1 &
   tunnel_pid=$!
   hostname=''
   wait_until=$((SECONDS + ${PERSONAL_CHROME_ATTACH_TUNNEL_WAIT:-60}))
   while [ "$SECONDS" -lt "$wait_until" ]; do
-    hostname=$({ grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' "$state/cloudflared.log" || true; } | head -n1)
+    hostname=$({ grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' "$state/cloudflared.log" || true; } \
+      | { grep -v '^https://api\.' || true; } | head -n1)
     hostname=${hostname#https://}
     [ -n "$hostname" ] && break
     running "$tunnel_pid" || break

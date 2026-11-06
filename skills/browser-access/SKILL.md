@@ -26,7 +26,7 @@ description: 接瀏覽器：自己的 headless、使用者的獨立 profile（92
 
 tailnet 內只在獨立 profile 也登不進去時用；tailnet 外一律加 `--tunnel`。背景跑 `scripts/personal-chrome-attach -s=<S> [--tunnel]`（`~/.local/bin/personal-chrome-attach` 是同一支，要 `playwright-cli` ≥ 0.1.23，`--tunnel` 另要 `cloudflared`），它停在前景直到 session 結束；`--timeout=<秒>` 改等待時間（預設 300）。
 
-- 印出「tunnel 開好了」（`--tunnel`）→ 把它列的三步原樣交給使用者：裝 cloudflared、新終端機貼 `cloudflared access tcp --hostname … --url 127.0.0.1:9555` 並開著、新分頁貼 connect 網址並在插件畫面按允許。connect 網址就是鑰匙，只交給使用者本人。
+- 印出「tunnel 開好了」（`--tunnel`）→ 把它印出的步驟原樣轉交使用者。connect 網址就是鑰匙，只交給使用者本人。
 - 印出 `chrome-extension://…connect.html?…`（tailnet 內，沒設 token）→ 原樣交給使用者，請他貼進日常 Chrome 的**新分頁**，再在插件畫面選這個分頁、按允許。
 - 印出「connect 網址含 token,不印在這裡」（tailnet 內，有設 token）→ 轉述它列的兩步：新分頁開 `http://127.0.0.1:9555/connect`、按「複製」、貼進同一個分頁。那一頁只給使用者的瀏覽器開，你只轉述步驟。
 - 逾時、attach 失敗、cloudflared 起不來 → 它已經收乾淨（`--tunnel` 印「cloudflared 剩 0 個」）、exit 1。問使用者卡在哪一步再重跑（網址每次不同）。

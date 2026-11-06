@@ -54,6 +54,11 @@ state="$FAKE_STATE"
 echo "cloudflared $*" >> "$state/calls"
 echo $$ > "$state/cloudflared.pid"
 if [ -n "${FAKE_CF_FAIL:-}" ]; then echo "ERR failed to request quick Tunnel: 429 Too Many Requests" >&2; exit 1; fi
+if [ -n "${FAKE_CF_API_ERR:-}" ]; then
+  echo "INF Requesting new quick Tunnel on trycloudflare.com..." >&2
+  echo 'ERR failed to request quick Tunnel: Post "https://api.trycloudflare.com/tunnel": dial tcp: i/o timeout' >&2
+  sleep 0.5; exit 1
+fi
 trap 'exit 0' TERM INT
 echo "INF Requesting new quick Tunnel on trycloudflare.com..." >&2
 echo "INF |  https://__QUICK_HOST__  |" >&2
@@ -234,6 +239,16 @@ class TunnelTest(unittest.TestCase):
         rc, rest = self.finish(proc)
         self.assertEqual(rc, 1, rest)
         self.assertIn("429 Too Many Requests", rest)
+        self.assertNotIn("chrome-extension://", rest)
+        self.assert_all_closed()
+
+    def test_cloudflare_api_url_in_error_log_is_not_taken_as_hostname(self):
+        self.env["FAKE_CF_API_ERR"] = "1"
+        proc = self.start()
+        rc, rest = self.finish(proc)
+        self.assertEqual(rc, 1, rest)
+        self.assertIn("i/o timeout", rest)
+        self.assertNotIn("cloudflared access tcp", rest)
         self.assertNotIn("chrome-extension://", rest)
         self.assert_all_closed()
 
