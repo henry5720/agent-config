@@ -1,18 +1,23 @@
 #!/usr/bin/env bash
-# 讓這台的 playwright-cli 接上人在個人電腦上日常的 Chrome:跑 `playwright-cli attach --extension=chrome`,
-# 把 relay 轉到固定的 127.0.0.1:9555,給人一個貼進 Chrome 的 connect 網址。
-# 人的個人電腦要先開 `ssh -L 127.0.0.1:9555:127.0.0.1:9555 <這台>`,Chrome 裝好 Playwright Extension。
+# 讓這台的 playwright-cli 經 Playwright Extension 接上人在個人電腦上的 Chrome:跑
+# `playwright-cli attach --extension=chrome`,給人一個貼進 Chrome 的 connect 網址(mcpRelayUrl 改成 127.0.0.1:9555)。
+# 人那台要有東西把他的 127.0.0.1:9555 接到這台的 relay,兩種:
+#   預設(tailnet 內):這支在這台開 127.0.0.1:9555 轉發,人開 `ssh -L 127.0.0.1:9555:127.0.0.1:9555 <這台>`。
+#   --tunnel(tailnet 外):這支開一條 cloudflared tcp quick tunnel 指向 relay,印出人要打的
+#     `cloudflared access tcp --hostname <x>.trycloudflare.com --url 127.0.0.1:9555`。connect 網址就是鑰匙,只交給本人。
 # 怎麼用見同一個 skill 的 SKILL.md。
 #
-# 用法:personal-chrome-attach [-s=<session>] [--timeout=<秒>]
+# 用法:personal-chrome-attach [-s=<session>] [--timeout=<秒>] [--tunnel]
 #   -s          playwright-cli 的 session 名(預設 personal-chrome),接上後用 playwright-cli -s=<session> 操作
-#   --timeout   等人連進來的秒數(預設 300),時間到就收掉 attach 和轉發、exit 1
-# 環境變數 PLAYWRIGHT_MCP_EXTENSION_TOKEN:有設就帶進網址,人貼網址就接上;沒設人要在 extension 畫面選分頁。
-#   有 token 的網址不印出來(agent 的輸出會進對話和檔案):人經 ssh -L 開 http://127.0.0.1:9555/connect 拿。
-#   沒 token 的網址照常印出,這一頁也拿得到。
+#   --timeout   等人連進來的秒數(預設 300),時間到就收掉 attach 和轉發/tunnel、exit 1
+#   --tunnel    走 cloudflared tcp quick tunnel,不靠 ssh;要有 cloudflared。不帶 token,人在插件畫面按允許
+# 環境變數 PLAYWRIGHT_MCP_EXTENSION_TOKEN(--tunnel 時不用):有設就帶進網址,人貼網址就接上;沒設人要在
+#   插件畫面選分頁。有 token 的網址不印出來(agent 的輸出會進對話和檔案):人經 ssh -L 開
+#   http://127.0.0.1:9555/connect 拿。沒 token 的網址照常印出,這一頁也拿得到。
 #
 # 停在前景直到 detach:接上之後 agent 用 playwright-cli 操作,用完 `playwright-cli -s=<session> detach`,
-# 這支看到 session 結束就收掉轉發、exit 0。
+# 這支看到 session 結束就收掉轉發/tunnel、exit 0。逾時、attach 失敗、cloudflared 起不來或中途結束 exit 1;
+# 被 SIGINT/SIGTERM/SIGHUP 中斷 exit 130。不管哪種結束,cloudflared 都收掉。
 
 set -euo pipefail
 
@@ -26,11 +31,14 @@ fi
 PORT=9555
 SESSION=personal-chrome
 TIMEOUT=300
+TUNNEL=''
+CLOUDFLARED_DOWNLOADS=https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/downloads/
 for arg in "$@"; do
   case "$arg" in
     -s=*) SESSION=${arg#-s=} ;;
     --timeout=*) TIMEOUT=${arg#--timeout=} ;;
-    -h | --help) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --tunnel) TUNNEL=1 ;;
+    -h | --help) sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "不認得的參數:$arg(見 --help)" >&2; exit 2 ;;
   esac
 done
@@ -42,6 +50,10 @@ for required_command in playwright-cli node python3; do
     exit 1
   fi
 done
+if [ -n "$TUNNEL" ] && ! command -v cloudflared >/dev/null 2>&1; then
+  echo "找不到 cloudflared:--tunnel 要它。依 OS 從官方下載頁裝:$CLOUDFLARED_DOWNLOADS" >&2
+  exit 1
+fi
 
 # 誰在聽 port $1:印 pid 和指令列。只看 /proc,不靠 ss／lsof(不一定有裝)。沒人在聽 return 1。
 port_owner() {
@@ -61,7 +73,8 @@ port_owner() {
 }
 
 # 1. 9555 被佔就失敗:多半是另一個 session 的 personal-chrome-attach 還開著,兩個搶同一個 relay 會互相蓋掉。
-if owner=$(port_owner "$PORT"); then
+#    --tunnel 不在這台聽 9555(9555 在人那台),不用查。
+if [ -z "$TUNNEL" ] && owner=$(port_owner "$PORT"); then
   echo "127.0.0.1:$PORT 已經有人在聽,不能再開一個 relay。佔著的是:" >&2
   printf '%s\n' "$owner" >&2
   echo "是另一個 personal-chrome-attach 就先讓它 detach 或結束;不是就請使用者決定要不要關。" >&2
@@ -73,14 +86,37 @@ pipe=$state/url
 mkfifo "$pipe"
 exec 3<>"$pipe"  # 讀寫都開著:寫的那頭(0. 的 shim)不會因為還沒人讀而卡住
 
-attach_pid='' daemon_pid='' forward_pid='' connected=''
+attach_pid='' daemon_pid='' forward_pid='' tunnel_pid='' connected=''
+if [ -n "$TUNNEL" ]; then link=tunnel; else link="127.0.0.1:$PORT 的轉發"; fi
 
-# 收尾:不管怎麼結束都收掉轉發;還沒接上就連 attach 和它起的 daemon(relay 在裡面)一起收,不留著佔 port。
+# 行程 $1 還在跑(殭屍不算)。
+running() {
+  [ -n "$1" ] && [ -r "/proc/$1/status" ] && ! grep -q '^State:[[:space:]]*Z' "/proc/$1/status" 2>/dev/null
+}
+
+# 收掉 cloudflared:先 SIGTERM 等它自己收,5 秒還在就 SIGKILL。印剩幾個,判準跟 expose-port 一樣要 0。
+stop_tunnel() {
+  [ -n "$tunnel_pid" ] || return 0
+  local _
+  kill "$tunnel_pid" 2>/dev/null || true
+  for _ in $(seq 1 50); do running "$tunnel_pid" || break; sleep 0.1; done
+  if running "$tunnel_pid"; then kill -KILL "$tunnel_pid" 2>/dev/null || true; fi
+  wait "$tunnel_pid" 2>/dev/null || true
+  if running "$tunnel_pid"; then
+    echo "cloudflared(pid $tunnel_pid)剩 1 個,收不掉,要手動 kill。" >&2
+  else
+    echo "cloudflared 剩 0 個(要 0)。" >&2
+  fi
+  tunnel_pid=''
+}
+
+# 收尾:不管怎麼結束都收掉轉發和 tunnel;還沒接上就連 attach 和它起的 daemon(relay 在裡面)一起收,不留著佔 port。
 #    接上之後被中斷就先 detach,Chrome 和分頁留著。
 cleanup() {
   if [ -n "$connected" ] && [ -n "$daemon_pid" ] && [ -e "/proc/$daemon_pid" ]; then
     playwright-cli -s="$SESSION" detach >/dev/null 2>&1 || true
   fi
+  stop_tunnel
   local pid
   for pid in $forward_pid $attach_pid $daemon_pid; do
     kill "$pid" 2>/dev/null || true
@@ -99,6 +135,8 @@ child_of() {
 
 # 2. attach。PLAYWRIGHT_MCP_EXECUTABLE_PATH 換成這支自己(見 0.),connect 網址就從 pipe 回來,不會在這台開瀏覽器。
 #    playwright 自己的逾時只在有 token 時生效、預設 30 秒(人來不及貼),調到比 --timeout 長,逾時一律由這支管。
+#    --tunnel 不帶 token:token 屬於某一位使用者的插件,共用環境沒有對應的人,改由人在插件畫面按允許。
+if [ -n "$TUNNEL" ]; then unset PLAYWRIGHT_MCP_EXTENSION_TOKEN; fi
 PERSONAL_CHROME_ATTACH_URL_PIPE=$pipe \
 PLAYWRIGHT_MCP_EXECUTABLE_PATH=$(readlink -f "$0") \
 PWTEST_EXTENSION_CONNECT_TIMEOUT=$(( (TIMEOUT + 60) * 1000 )) \
@@ -123,18 +161,50 @@ q = [(k, relay._replace(netloc=f"127.0.0.1:{port}").geturl() if k == "mcpRelayUr
 print(relay.hostname, relay.port, p._replace(query=u.urlencode(q)).geturl())
 ' "$PORT")
 
-# 4. 轉發 127.0.0.1:9555 → relay。只聽 127.0.0.1:relay 沒有驗證,人那邊經 ssh -L 進來。
-#    例外:GET /connect 不轉給 relay,回一頁 connect 網址(含 token)給人複製。網址只經 ssh 到人的瀏覽器,
-#    不進這支的輸出。網址用環境變數交給 node(不放 argv,理由同 3.)。
-#    argv 帶這支的名字,方便用指令列找出是誰。
-PERSONAL_CHROME_ATTACH_CONNECT_URL=$url node -e '
+if [ -n "$TUNNEL" ]; then
+  # 4a. --tunnel:cloudflared tcp quick tunnel → relay。人那台的 `cloudflared access tcp` 在他的 127.0.0.1:9555 聽,
+  #     插件連過來時 Host 本來就是 loopback,relay 不擋,不用 --http-host-header。
+  #     網址印在 cloudflared 的 log;失敗時 log 會出現 API 的 https://api.trycloudflare.com/tunnel,那不是 tunnel,排除。
+  #     PERSONAL_CHROME_ATTACH_TUNNEL_WAIT 是等它印出網址的秒數(預設 60)。
+  cloudflared tunnel --url "tcp://$relay_host:$relay_port" >"$state/cloudflared.log" 2>&1 &
+  tunnel_pid=$!
+  hostname=''
+  wait_until=$((SECONDS + ${PERSONAL_CHROME_ATTACH_TUNNEL_WAIT:-60}))
+  while [ "$SECONDS" -lt "$wait_until" ]; do
+    hostname=$({ grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' "$state/cloudflared.log" || true; } \
+      | { grep -v '^https://api\.' || true; } | head -n1)
+    hostname=${hostname#https://}
+    [ -n "$hostname" ] && break
+    running "$tunnel_pid" || break
+    sleep 0.2
+  done
+  if [ -z "$hostname" ]; then
+    echo "cloudflared 沒開出 trycloudflare.com 網址。它最後幾行:" >&2
+    tail -n 5 "$state/cloudflared.log" >&2
+    exit 1
+  fi
+  cat <<EOF
+tunnel 開好了。connect 網址就是鑰匙,只交給使用者本人。把下面三步交給他,請他在 $TIMEOUT 秒內做完:
+  1. 安裝 cloudflared(第一次才要),依 OS 從官方下載頁選:$CLOUDFLARED_DOWNLOADS
+  2. 開一個新的終端機貼這行,開著別關:
+     cloudflared access tcp --hostname $hostname --url 127.0.0.1:$PORT
+  3. 在裝了 Playwright Extension 的 Chrome 開新分頁,網址列貼上這個 connect 網址,在插件畫面選分頁、按允許:
+     $url
+等使用者接上(最多 $TIMEOUT 秒)…
+EOF
+else
+  # 4b. 轉發 127.0.0.1:9555 → relay。只聽 127.0.0.1:relay 沒有驗證,人那邊經 ssh -L 進來。
+  #     例外:GET /connect 不轉給 relay,回一頁 connect 網址(含 token)給人複製。網址只經 ssh 到人的瀏覽器,
+  #     不進這支的輸出。網址用環境變數交給 node(不放 argv,理由同 3.)。
+  #     argv 帶這支的名字,方便用指令列找出是誰。
+  PERSONAL_CHROME_ATTACH_CONNECT_URL=$url node -e '
 const net = require("node:net");
 const [port, host, target] = process.argv.slice(1);  // node -e 沒有腳本路徑那一格
 const url = process.env.PERSONAL_CHROME_ATTACH_CONNECT_URL;
 delete process.env.PERSONAL_CHROME_ATTACH_CONNECT_URL;
 const esc = (s) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 const body = `<!doctype html><meta charset="utf-8"><title>personal-chrome-attach</title>
-<p>按「複製」,再把網址貼進<b>這個分頁</b>的網址列、按 Enter。agent 只看得到那個分頁,會直接改它的內容。</p>
+<p>按「複製」,再把網址貼進<b>這個分頁</b>的網址列、按 Enter。agent 會直接改這個分頁的內容,也能另開新分頁。</p>
 <p><input id="u" readonly size="100" value="${esc(url)}" onfocus="this.select()"> <button id="b">複製</button></p>
 <script>b.onclick = () => navigator.clipboard.writeText(u.value).then(() => { b.textContent = "已複製"; });</script>
 `;
@@ -154,51 +224,67 @@ net.createServer((c) => {
 }).on("error", (e) => { console.error(`轉發開不起來:${e.message}`); process.exit(1); })
   .listen(Number(port), "127.0.0.1");
 ' "$PORT" "$relay_host" "$relay_port" personal-chrome-attach-forward &
-forward_pid=$!
-for _ in $(seq 1 50); do
-  port_owner "$PORT" >/dev/null && break
-  [ -e "/proc/$forward_pid" ] || { echo "127.0.0.1:$PORT 的轉發開不起來。" >&2; exit 1; }
-  sleep 0.1
-done
+  forward_pid=$!
+  for _ in $(seq 1 50); do
+    port_owner "$PORT" >/dev/null && break
+    [ -e "/proc/$forward_pid" ] || { echo "127.0.0.1:$PORT 的轉發開不起來。" >&2; exit 1; }
+    sleep 0.1
+  done
 
-# 有 token 的網址不印:這支的輸出 agent 看得到,背景跑時還會存成檔案。
-if [ -n "${PLAYWRIGHT_MCP_EXTENSION_TOKEN:-}" ]; then
-  cat <<EOF
+  # 有 token 的網址不印:這支的輸出 agent 看得到,背景跑時還會存成檔案。
+  if [ -n "${PLAYWRIGHT_MCP_EXTENSION_TOKEN:-}" ]; then
+    cat <<EOF
 connect 網址含 token,不印在這裡。請使用者在 $TIMEOUT 秒內:
   1. 日常 Chrome 開新分頁,網址列輸入 http://127.0.0.1:$PORT/connect
-  2. 按「複製」,把網址貼進同一個分頁的網址列、按 Enter(agent 只看得到這個分頁,會直接改它的內容)
+  2. 按「複製」,把網址貼進同一個分頁的網址列、按 Enter(agent 會直接改這個分頁的內容,也能另開新分頁)
 不要自己去開那一頁,網址裡有 token。
 
 使用者那台要先開好:ssh -N -L 127.0.0.1:$PORT:127.0.0.1:$PORT <這台的 ssh host>
 EOF
-else
-  cat <<EOF
-connect 網址(請使用者在 $TIMEOUT 秒內貼進日常 Chrome 的「新分頁」網址列;agent 只看得到這個分頁,會直接改它的內容):
+  else
+    cat <<EOF
+connect 網址(請使用者在 $TIMEOUT 秒內貼進日常 Chrome 的「新分頁」網址列;agent 會直接改這個分頁的內容,也能另開新分頁):
 $url
 
 使用者那台要先開好:ssh -N -L 127.0.0.1:$PORT:127.0.0.1:$PORT <這台的 ssh host>
 沒設 PLAYWRIGHT_MCP_EXTENSION_TOKEN:使用者貼網址後還要在 extension 畫面選分頁、按允許。
 EOF
+  fi
 fi
 url=''
 
+# tunnel 斷了(cloudflared 自己結束)就沒辦法再連:印它最後幾行,return 1。
+tunnel_alive() {
+  [ -z "$TUNNEL" ] && return 0
+  running "$tunnel_pid" && return 0
+  echo "cloudflared 自己結束了,tunnel 斷了。它最後幾行:" >&2
+  tail -n 5 "$state/cloudflared.log" >&2
+  return 1
+}
+
 # 5. 等 attach 結束(接上或失敗),自己計時:沒 token 時 attach 沒人連進來會一直等。
 deadline=$((SECONDS + TIMEOUT))
-while [ -e "/proc/$attach_pid" ] && [ "$SECONDS" -lt "$deadline" ]; do sleep 1; done
+while [ -e "/proc/$attach_pid" ] && [ "$SECONDS" -lt "$deadline" ]; do
+  tunnel_alive || exit 1
+  sleep 1
+done
 if [ -e "/proc/$attach_pid" ]; then
-  echo "等了 $TIMEOUT 秒沒人連進來,收掉 attach 和 127.0.0.1:$PORT 的轉發。要再試就重跑(網址每次不同)。" >&2
+  echo "等了 $TIMEOUT 秒沒人連進來,收掉 attach 和 $link。要再試就重跑(網址每次不同)。" >&2
   exit 1
 fi
 if ! wait "$attach_pid"; then
   attach_pid=''
-  echo "attach 失敗(上面是 playwright-cli 的輸出),收掉 127.0.0.1:$PORT 的轉發。" >&2
+  echo "attach 失敗(上面是 playwright-cli 的輸出),收掉 $link。" >&2
   exit 1
 fi
 attach_pid=''
 connected=1
 
-# 6. 接上了。session 結束(detach 或 close)時 daemon 會結束,這時收掉轉發。
+# 6. 接上了。session 結束(detach 或 close)時 daemon 會結束,這時收掉轉發/tunnel。
 echo "已接上,session:$SESSION。用 playwright-cli -s=$SESSION <指令> 操作;用完 playwright-cli -s=$SESSION detach(Chrome 和分頁留著)。"
-while [ -n "$daemon_pid" ] && [ -e "/proc/$daemon_pid" ]; do sleep 1; done
+while [ -n "$daemon_pid" ] && [ -e "/proc/$daemon_pid" ]; do
+  tunnel_alive || exit 1
+  sleep 1
+done
 connected=''
-echo "session $SESSION 結束了,收掉 127.0.0.1:$PORT 的轉發。"
+echo "session $SESSION 結束了,收掉 $link。"
