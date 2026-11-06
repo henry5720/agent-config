@@ -95,6 +95,34 @@
               }
             ]
           },
+          "change": {
+            "type": "string",
+            "enum": [
+              "fixed",
+              "changed",
+              "kept",
+              "new"
+            ]
+          },
+          "before": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$"
+            }
+          },
+          "beforeReason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "evidence": {
             "type": "array",
             "items": {
@@ -110,6 +138,9 @@
           "status",
           "reason",
           "account",
+          "change",
+          "before",
+          "beforeReason",
           "evidence"
         ],
         "additionalProperties": false

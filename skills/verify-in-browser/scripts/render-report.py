@@ -5,7 +5,7 @@
 """驗證逐條判定 JSON，印出可直接發到 PR 的 Markdown。
 
 證據檔從 JSON 所在的資料夾讀取；在該資料夾執行，`--attach` 的相對路徑才對得上。
-圖片、影片以 `![檔名](./路徑)` 直接嵌在表格的證據欄，交給 `gh pr comment --attach` 上傳；其他證據在表格下方摺疊內嵌。
+圖片、影片以 `![檔名](./路徑)` 直接嵌在表格的改前／改後（或證據）欄，交給 `gh pr comment --attach` 上傳；其他證據在表格下方摺疊內嵌。
 附件超過單則 comment 上限時，依條件把表格拆成多則，`--part K` 印第 K 則。
 """
 import argparse
@@ -39,6 +39,13 @@ def validate(report):
             raise ValueError("passed 必須有證據，reason 為 null")
         if item["status"] in ("failed", "skipped") and not item["reason"]:
             raise ValueError("failed、skipped 必須寫 reason")
+        if item["change"] == "fixed":
+            if bool(item["before"]) == bool(item["beforeReason"]):
+                raise ValueError("fixed 必須有改前證據，拿不到就寫 beforeReason，兩者擇一")
+        elif item["beforeReason"] is not None:
+            raise ValueError("只有 fixed 可以寫 beforeReason")
+        if item["change"] in ("kept", "new") and item["before"]:
+            raise ValueError("kept、new 不放改前證據")
 
 
 def cell(value):
@@ -76,19 +83,40 @@ def is_media(name):
     return Path(name).suffix.lower() in MEDIA_SUFFIXES
 
 
-def evidence_cell(item):
-    """證據欄：圖片、影片直接以 `![檔名](./路徑)` 嵌在格子裡；文字證據只寫檔名，內容摺疊在表格下方。"""
+def files_of(item):
+    """該條所有證據檔（改前在前），去重保序。"""
+    return list(dict.fromkeys(item["before"] + item["evidence"]))
+
+
+def evidence_cell(names):
+    """證據格：圖片、影片直接以 `![檔名](./路徑)` 嵌在格子裡；文字證據只寫檔名，內容摺疊在表格下方。"""
     parts = []
-    for name in dict.fromkeys(item["evidence"]):
+    for name in dict.fromkeys(names):
         parts.append(f"![{cell(name)}](./{name})" if is_media(name) else f"{cell(name)}（見下方）")
     return " ".join(parts) or "—"
+
+
+BEFORE_PLACEHOLDER = {"kept": "不變", "new": "新增", "changed": "—"}
+
+
+def before_cell(item):
+    if item["before"]:
+        return evidence_cell(item["before"])
+    if item["change"] == "fixed":
+        return cell("只有改後：" + item["beforeReason"])
+    return BEFORE_PLACEHOLDER[item["change"]]
+
+
+def has_before_column(report):
+    """有任何一條是 fixed，或任何一條帶了改前證據，才顯示「改前」欄。"""
+    return any(item["change"] == "fixed" or item["before"] for item in report["criteria"])
 
 
 def split_rows(report):
     """依序把條件分到各則 comment：每則的不重複附件不超過 MAX_ATTACH_PER_COMMENT 個。"""
     parts = [([], [])]  # (該則的條件, 該則要 attach 的路徑)
     for item in report["criteria"]:
-        media = [f"./{name}" for name in dict.fromkeys(item["evidence"]) if is_media(name)]
+        media = [f"./{name}" for name in files_of(item) if is_media(name)]
         if len(media) > MAX_ATTACH_PER_COMMENT:
             raise ValueError(f"「{item['criterion']}」有 {len(media)} 個圖片／影片，超過單則上限 {MAX_ATTACH_PER_COMMENT}，請拆成多條條件")
         rows, attach = parts[-1]
@@ -102,16 +130,22 @@ def split_rows(report):
     return parts
 
 
-def render_table(items, base):
-    lines = ["| 條件 | 結果 | 帳號 | 看到什麼／原因 | 證據 |", "|---|---|---|---|---|"]
+def render_table(items, base, with_before):
+    if with_before:
+        lines = ["| 條件 | 結果 | 帳號 | 看到什麼／原因 | 改前 | 改後 |", "|---|---|---|---|---|---|"]
+    else:
+        lines = ["| 條件 | 結果 | 帳號 | 看到什麼／原因 | 證據 |", "|---|---|---|---|---|"]
     texts = []
     for item in items:
         observed = item["observed"]
         if item["reason"]:
             observed += "／" + item["reason"]
-        columns = [cell(item["criterion"]), cell(item["status"]), cell(item["account"] or "—"), cell(observed), evidence_cell(item)]
+        columns = [cell(item["criterion"]), cell(item["status"]), cell(item["account"] or "—"), cell(observed)]
+        if with_before:
+            columns.append(before_cell(item))
+        columns.append(evidence_cell(item["evidence"]))
         lines.append("| " + " | ".join(columns) + " |")
-        texts.extend(name for name in dict.fromkeys(item["evidence"]) if not is_media(name) and name not in texts)
+        texts.extend(name for name in files_of(item) if not is_media(name) and name not in texts)
     lines.append("")
     for name in texts:
         lines.extend(embed_text(name, base))
@@ -155,7 +189,7 @@ def render(report, base, part):
     if report["status"] == "unverifiable":
         lines.extend([f"驗不了：{report['unverifiableReason']}", ""])
     else:
-        lines.extend(render_table(items, base))
+        lines.extend(render_table(items, base, has_before_column(report)))
     if part == 1:
         lines.extend(render_footer(report))
     text = "\n".join(lines).rstrip() + "\n"

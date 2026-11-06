@@ -54,6 +54,22 @@ class BrowserVerificationTest(unittest.TestCase):
         inferred_too_many = copy.deepcopy(original)
         inferred_too_many["criteria"].append(copy.deepcopy(original["criteria"][0]))
         variants.append(inferred_too_many)
+        bugfix = json.loads((FIXTURES / "bugfix.json").read_text())
+        fixed_without_before = copy.deepcopy(bugfix)
+        fixed_without_before["criteria"][0]["before"] = []
+        variants.append(fixed_without_before)
+        fixed_with_both = copy.deepcopy(bugfix)
+        fixed_with_both["criteria"][0]["beforeReason"] = "拿不到"
+        variants.append(fixed_with_both)
+        kept_with_before = copy.deepcopy(bugfix)
+        kept_with_before["criteria"][2]["before"] = ["before-conflict.png"]
+        variants.append(kept_with_before)
+        changed_with_reason = copy.deepcopy(bugfix)
+        changed_with_reason["criteria"][3]["beforeReason"] = "沒拍"
+        variants.append(changed_with_reason)
+        before_outside = copy.deepcopy(bugfix)
+        before_outside["criteria"][0]["before"] = ["../auth.json"]
+        variants.append(before_outside)
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "report.json"
             for report in variants:

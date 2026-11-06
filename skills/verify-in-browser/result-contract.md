@@ -16,10 +16,15 @@
 
 `sha` 是實際驗的 commit。`evidenceDir` 是呼叫端可讀取的證據資料夾絕對路徑；runner 呼叫時填 runner 主機上的路徑，sandbox 掛載路徑不同時以呼叫端提供的對照為準。
 
-`evidence` 放相對 `evidenceDir` 的證據檔名，可用子目錄；每個證據檔都要出現在某條的 `evidence`（`unverifiable` 時在 `unverifiableReason`）。絕對路徑、`..`、登入狀態、snapshot、trace 不算證據。證據存成圖片、影片，或 UTF-8 文字檔（console、request、測試輸出）。`account` 是帳號變數前綴（例如 `E2E_ADMIN`），不登入填 `null`，不填帳密。`observed` 三種 status 都必填；記實際操作、引擎／環境、真實 API 或 mock、必要的改前對照或沒拿到的原因，讓人能判讀證據。
+`evidence` 放改後的證據檔名，`before` 放改前的，都相對 `evidenceDir`、可用子目錄；每個證據檔都要出現在某條的 `before` 或 `evidence`（`unverifiable` 時在 `unverifiableReason`）。絕對路徑、`..`、登入狀態、snapshot、trace 不算證據。證據存成圖片、影片，或 UTF-8 文字檔（console、request、測試輸出）。`account` 是帳號變數前綴（例如 `E2E_ADMIN`），不登入填 `null`，不填帳密。`observed` 三種 status 都必填；記實際操作、引擎／環境、真實 API 或 mock，有改前時也記改前在哪裡、看到什麼，讓人能判讀證據。
+
+`change` 照 [SKILL.md](SKILL.md)「改前對照」逐條填：
+- `fixed`：`before` 非空時 `beforeReason: null`；`before` 為空時 `beforeReason` 必填（拿不到改前的原因），兩者擇一。
+- `changed`：`before` 可空，`beforeReason: null`。
+- `kept`、`new`：`before: []`、`beforeReason: null`。
 
 `verifier.model` 寫實際判定 model，`same_model` 寫是否與實作相同，不知道時不可猜 true。`consoleErrors` 保留錯誤原文；`related` 對照 diff 分 yes／no／unknown，不確定就 unknown。`stagingRecords` 是 `<E>/state.json` 的筆數，沒有建立資料為 0。
 
 ## Render
 
-表格欄位固定為 `條件 | 結果 | 帳號 | 看到什麼／原因 | 證據`。failed／skipped 同時顯示 observed 與 reason；沒有帳號或證據用「—」。console error 的 yes／unknown 逐條列，no 只列數量。附上 model、staging 資料筆數與 inferred 註記。證據欄直接嵌入圖片、影片；文字證據摺疊在表格下方。runner 的 PR body 用同欄位與文字自行 render，不呼叫 script。
+有任何一條是 `fixed` 或帶了 `before` 時，表格欄位為 `條件 | 結果 | 帳號 | 看到什麼／原因 | 改前 | 改後`；改前格依 `change` 放 `before` 的證據，或「只有改後：<beforeReason>」、「—」（changed 沒拍）、「不變」（kept）、「新增」（new）。都沒有時省掉改前欄，表格為 `條件 | 結果 | 帳號 | 看到什麼／原因 | 證據`。failed／skipped 同時顯示 observed 與 reason；沒有帳號或證據用「—」。console error 的 yes／unknown 逐條列，no 只列數量。附上 model、staging 資料筆數與 inferred 註記。證據欄直接嵌入圖片、影片；文字證據摺疊在表格下方。runner 的 PR body 用同欄位與文字自行 render，不呼叫 script。

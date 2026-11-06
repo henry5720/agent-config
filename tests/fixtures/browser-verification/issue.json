@@ -15,6 +15,9 @@
       "status": "passed",
       "reason": null,
       "account": null,
+      "change": "new",
+      "before": [],
+      "beforeReason": null,
       "evidence": [
         "after.png"
       ]
