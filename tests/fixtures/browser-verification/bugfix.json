@@ -1,0 +1,69 @@
+{
+  "sha": "abc123",
+  "status": "verified",
+  "unverifiableReason": null,
+  "evidenceDir": "/tmp/verify-demo",
+  "verifier": {
+    "model": "claude-sonnet-4-6",
+    "same_model": true
+  },
+  "criteriaSource": "issue",
+  "criteria": [
+    {
+      "criterion": "移除唯一管理者：提示要保留一位管理者",
+      "observed": "改前（線上部署）鎖住視窗；改後顯示提示、名單可編輯",
+      "status": "passed",
+      "reason": null,
+      "account": "E2E_ADMIN",
+      "change": "fixed",
+      "before": [
+        "before-remove.png"
+      ],
+      "beforeReason": null,
+      "evidence": [
+        "after-remove.png"
+      ]
+    },
+    {
+      "criterion": "後端缺管理者 409：不鎖視窗",
+      "observed": "改後顯示管理者失效提示",
+      "status": "passed",
+      "reason": null,
+      "account": "E2E_ADMIN",
+      "change": "fixed",
+      "before": [],
+      "beforeReason": "base 部署關了這個模組",
+      "evidence": [
+        "after-409.png"
+      ]
+    },
+    {
+      "criterion": "版本衝突仍鎖視窗",
+      "observed": "與改前相同",
+      "status": "passed",
+      "reason": null,
+      "account": "E2E_ADMIN",
+      "change": "kept",
+      "before": [],
+      "beforeReason": null,
+      "evidence": [
+        "after-conflict.png"
+      ]
+    },
+    {
+      "criterion": "按鈕文案改成「儲存」",
+      "observed": "按鈕顯示「儲存」",
+      "status": "passed",
+      "reason": null,
+      "account": null,
+      "change": "changed",
+      "before": [],
+      "beforeReason": null,
+      "evidence": [
+        "after-button.png"
+      ]
+    }
+  ],
+  "consoleErrors": [],
+  "stagingRecords": 0
+}

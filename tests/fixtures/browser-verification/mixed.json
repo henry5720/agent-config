@@ -15,6 +15,9 @@
       "status": "passed",
       "reason": null,
       "account": "E2E_ADMIN",
+      "change": "new",
+      "before": [],
+      "beforeReason": null,
       "evidence": [
         "after-toast.png"
       ]
@@ -25,6 +28,9 @@
       "status": "failed",
       "reason": "對話框未關閉",
       "account": "E2E_ADMIN",
+      "change": "new",
+      "before": [],
+      "beforeReason": null,
       "evidence": [
         "after-cancel.png"
       ]
@@ -35,6 +41,9 @@
       "status": "skipped",
       "reason": "缺少 E2E_VIEWER_EMAIL、E2E_VIEWER_PASSWORD",
       "account": "E2E_VIEWER",
+      "change": "new",
+      "before": [],
+      "beforeReason": null,
       "evidence": []
     }
   ],

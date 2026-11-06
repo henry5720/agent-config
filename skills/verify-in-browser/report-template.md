@@ -2,7 +2,7 @@
 
 驗收結果是 [result.schema.json](result.schema.json) 規定的 JSON；給人看的 Markdown 由 `scripts/render-report.py` 產生。誰發布照 [hitl.md](hitl.md)「發布」；這份只管怎麼發。
 
-- 在證據資料夾執行，`evidence` 裡每個圖片、影片都附上：
+- 在證據資料夾執行，`before` 與 `evidence` 裡每個圖片、影片都附上：
   ```sh
   cd <E>
   python3 <render-report.py> result.json > report.md

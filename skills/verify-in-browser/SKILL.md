@@ -24,15 +24,16 @@ description: 瀏覽器驗收：照驗收條件逐條判定，留截圖證據。�
 
 **[引擎差異清單]**：iframe 嵌入、third-party cookie、SSO／跨網域登入、clipboard、原生 `date`／`file` input、檔案下載、使用者明說要看 Safari。這些是 Safari（WebKit）和 Chrome 已知行為不同的地方；不在清單上的改動只跑 Chromium，回報寫「僅 Chromium」。
 
-**改前對照**：依改動決定，合併後線上就變成改後，改前只留得住在 PR 上。
+**改前對照**：逐條決定，寫進該條的 `change`。合併後線上就變成改後，改前只留得住在 PR 上。
 
-| 改動 | 改前 |
-|---|---|
-| 修 bug | 必拍，證明 bug 重現過；照步驟 3 |
-| 改既有畫面 | PR body 用文字寫改前怎樣即可；順手拿得到就拍，拿不到不必寫原因 |
-| 新功能 | 不拍 |
+| `change` | 這條條件在 base 上 | 改前 |
+|---|---|---|
+| `fixed` | 不成立：bug 會在這條重現 | 必拍，照步驟 3 放進 `before`；拿不到就寫 `beforeReason` |
+| `changed` | 畫面不同但不算錯（文案、版面、顏色） | 順手拿得到就拍，拿不到留空 |
+| `kept` | 本來就成立，這次確認沒改壞 | 不拍，表格顯示「不變」 |
+| `new` | 沒有這個畫面或操作 | 不拍，表格顯示「新增」 |
 
-「修 bug」指 issue 有 `bug` label，或這次分支的 commit 是 `fix` 類型（`fix:`、`fix(<scope>):`）；判不出時照「改既有畫面」。使用者要求改前截圖時照「修 bug」辦。
+同一張修 bug 的 PR 常同時有 `fixed` 和 `kept`：被修的那幾條是 `fixed`，回歸防護的是 `kept`。判不出 `fixed` 還是 `changed` 時看 issue 是不是 bug（`bug` label，或分支 commit 是 `fix:`、`fix(<scope>):`）。使用者要求某條附改前時，那條照 `fixed` 辦。
 
 **截圖看不到的狀態**（hover、窄螢幕）各算一個斷言，各自留證據；沒驗就列進「未驗」。
 
@@ -51,18 +52,18 @@ description: 瀏覽器驗收：照驗收條件逐條判定，留截圖證據。�
 
 1. **起 dev server，開頁面，調成固定 viewport。** repo 有 playwright-cli 設定檔或要設語系時，照 [playwright-cli.md](playwright-cli.md)「步驟對應的指令」。
 2. **登入**（頁面要登入才看得到時），見下一節。每在 staging 建立一筆資料，立即 append 一筆到 `<E>/state.json` 的 JSON array：`{ "name": "資料名稱", "account": "帳號變數前綴", "created": "METHOD path", "undo": null }`。知道刪除方式就把 `undo` 填成 `METHOD path`，用不到或未知時填 JSON `null`；request 只記 method 與 path，不記 token、密碼、request body 或帶憑證的 query。記錄先落盤才繼續，crash 後仍可由人用 `test-api` 倒序清理。
-3. **改前對照（修 bug 或使用者要求時）。** 照順序取，拿到就停。截圖都存 `<E>/before-<狀態>.png`，另開一個瀏覽器 session，viewport、操作與改後相同。
+3. **改前對照（有 `fixed` 條件時，`changed` 順手拿）。** 照順序取，拿到就停。截圖都存 `<E>/before-<狀態>.png`，另開一個瀏覽器 session，每條的操作與它的改後相同，viewport 也相同；一張改前只能放進操作相同的那條 `before`。
    - **base 的線上部署**：該 repo 的 `AGENTS.md`／docs 寫了網址與查部署 commit 的方法，且下面三條都成立才用：部署 commit 與 merge-base 在這次改到的路徑上沒有差異（`git diff --name-only <merge-base> <部署 commit> -- <改到的路徑>` 輸出為空）；這張 PR 依賴的後端改動還沒部署；部署端開得到改到的頁面（模組開關、feature flag）。共用環境只截唯讀畫面。回報的環境表為改前另寫一列：網址、部署 commit、資料來源。
    - **本機 base**：`git worktree add <tmp>/before <merge-base>`，另一個 port 起 dev server。後端用 base 時期的版本：這張 PR 沒改後端契約就用改後那台；改了就用不含那些改動的舊版後端，回報註明資料來源。
-   - 都拿不到：回報寫「只有改後：<原因>」。
+   - 都拿不到：`fixed` 那幾條的 `beforeReason` 寫原因，表格會顯示「只有改後：<原因>」。
 4. **依級別操作並留證據。** 截圖存 `<E>/after-<狀態>.png`（L3 加引擎：`after-webkit-<狀態>.png`），截完查看圖片。斷言是先後順序或過程（暫存 → 儲存 → 重開一致、處理中無法關閉、按上一頁回到哪頁）時，登入完才開始錄 60 秒內的影片 `<E>/<流程>.webm`（GIF 也算影片）取代那串截圖。工具錄不了影就改連續截圖 `<E>/<流程>-01.png`、`-02.png`…，回報註明「無錄影：<工具>」。確認結構用 snapshot 或找文字。檢查 console error，分清這次改出來的和原本就有的。每張截圖記下資料來源：真實 API，或 mock／攔截。
 5. **收尾：** 關掉你開的每個瀏覽器 session；`git worktree remove <tmp>/before`；刪掉 `<E>` 裡所有 `auth*.json` 與 `.playwright-cli/`（多角色檔也要清）；保留證據、結果 JSON 與 `state.json`。dev server 是你起的就關掉。
 
 步驟 4 的完成條件：
 
 - 達到該級別的下限，證據已查看並留在 `<E>`。
-- 每個證據檔都對應一條條件，檔名寫進結果 JSON：寫在該條 criterion 的 `evidence`；`unverifiable` 時沒有 `evidence` 可放，寫進 `unverifiableReason`。
-- 需要改前對照卻沒有時，回報寫了原因；與驗證目的相關但沒走到的，列進「未驗」。
+- 每個證據檔都對應一條條件，檔名寫進結果 JSON：改前寫在該條的 `before`，改後寫在 `evidence`；`unverifiable` 時沒有條件可放，寫進 `unverifiableReason`。
+- 每條 `fixed` 都有 `before` 或 `beforeReason`；與驗證目的相關但沒走到的，列進「未驗」。
 
 ## 登入
 
