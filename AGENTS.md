@@ -14,8 +14,13 @@
   會蓋掉。要改就另存成自己的 skill。
 - **新增 skill 或 MCP 用 skillshare 指令，不要手寫 `.metadata.json`。** `install` 會記來源，
   `mcp add` 會寫 `mcp.yaml`。
-- **skill 資料夾裡不放 README。** skill 資料夾會被 sync 到各 client；給人看的寫
-  `docs/skills/<名字>.md`，只有人要自己動手（跑 script、設定、排錯）的 skill 才寫。
+- **指令只寫一份，skill 是索引。** 人和 agent 照同一份文件做：指令、怎麼確認成功、踩過的坑都寫在那份。
+  跟 dotfiles 部署的工具或連線有關的寫在 dotfiles 的 `docs/`（例如 `docs/remote-access/`），只跟這支 skill 有關、
+  人要自己動手（跑 script、設定、排錯）的寫 `docs/skills/<名字>.md`。SKILL.md 只寫什麼時候讀哪份、只有 agent 要守的限制，
+  再連過去（只隔一層）。通用概念連官方或高品質來源，不抄。
+- **script 只包脆弱的操作。** 會漏秘密、會忘記收、順序錯就壞的才寫成 `scripts/`；一兩行標準指令寫在文件裡，
+  讓人自己打、自己改參數。
+- **skill 資料夾裡不放 README。** skill 資料夾會被 sync 到各 client；給人看的照上面那條放。
   第三方 skill 帶來的 README 不動。
 - **不要加 OpenCode target。** OpenCode 會讀 `~/.claude/skills` 和 `~/.agents/skills`，加了會
   同一支出現三次。

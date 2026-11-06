@@ -9,8 +9,8 @@
 - 能錄影的：`playwright-cli`（錄 `.webm`）、Claude in Chrome（`claude --chrome`，錄 GIF）。
   - 使用者要看著操作或替你登入：照下面〈讓使用者看畫面、接手〉，瀏覽器還是 `playwright-cli` 自己開的那個。
   - Claude in Chrome 只在你跟使用者的 Chrome 在同一台時能用；它開的是使用者的 Chrome，可能本來就登入了。
-  - 一定要使用者自己的瀏覽器（passkey、硬體金鑰、裝置 SSO），你又不在他那台：照 `personal-pc-tunnel` skill 接他日常的 Chrome，操作還是 `playwright-cli -s=<S>`。
-  - 網站擋機房 IP（使用者那台正常、你這邊被擋）：照 `personal-pc-tunnel` skill 借他那台的對外 IP，瀏覽器還是 `playwright-cli` 自己開的那個。
+  - 一定要使用者自己的瀏覽器（passkey、硬體金鑰、裝置 SSO），你又不在他那台：照 `browser-access` skill 接他日常的 Chrome，操作還是 `playwright-cli -s=<S>`。
+  - 網站擋機房 IP（使用者那台正常、你這邊被擋）：照 `browser-access` skill 借他那台的對外 IP，瀏覽器還是 `playwright-cli` 自己開的那個。
 - 只能截圖的：Codex app 內建瀏覽器。
 
 都沒有就照 SKILL.md 回 `unverifiable`。L3 的 WebKit 一律用 `playwright-cli`。
@@ -41,6 +41,6 @@
 
 ## 卡住時換工具
 
-要查**為什麼**（慢、記憶體、minify 過的錯誤、斷點），照 `remote-chrome` skill 用 `remote-chrome-headless` 在這台開 9222，接 chrome-devtools MCP；沒有這支就用手上工具看得到的 console／network，查不出原因列進「未驗」。
+要查**為什麼**（慢、記憶體、minify 過的錯誤、斷點），照 `browser-access` skill 在這台開 headless Chrome 佔 9222，接 chrome-devtools MCP；開不了就用手上工具看得到的 console／network，查不出原因列進「未驗」。
 
 值得防回歸的流程，驗完提議寫成該 repo 的 Playwright e2e；要長期守住的視覺，提議 `toHaveScreenshot`。

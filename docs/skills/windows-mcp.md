@@ -7,7 +7,7 @@
 
 ## 開哪一種
 
-照 dotfiles 的 [remote-access 判準](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access.md#判準)：
+照 dotfiles 的 [remote-access 判準](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access/README.md#判準)：
 
 ```
 對方 agent 在你的 tailnet 內？
@@ -21,7 +21,7 @@
 沒有 WSL 時你在那台 PowerShell 貼——起 server、收掉跟下面 quick tunnel 那兩段一樣，只是 Funnel、
 tailscale serve 要把第一、二行的 `127.0.0.1` 換成 `0.0.0.0`（agent 會講），再貼 agent 給你的那行開網址的指令。
 
-兩種差在哪（網址固不固定、SSE、並行上限）見 [比較表](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access.md#比較表)。
+兩種差在哪（網址固不固定、SSE、並行上限）見 [比較表](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access/README.md#比較表)。
 Windows-MCP 回應可能用 SSE，quick tunnel 不支援 SSE：走 quick tunnel 時某個操作卡住或斷線，先懷疑這個。
 
 server 一定要在你登入的桌面起：你在那台桌面開 PowerShell（或 WSL）跑；agent 只連得到 ssh 時，
@@ -38,7 +38,7 @@ uv tool update-shell
 ```
 
 重開的 PowerShell 跑 `windows-mcp --help` 有輸出就好。走 quick tunnel 的再裝 cloudflared
-（[remote-access 的 Cloudflare quick tunnel](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access.md#cloudflare-quick-tunnel)）。
+（[remote-access 的 Cloudflare quick tunnel](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access/README.md#cloudflare-quick-tunnel)）。
 winget 裝完，當下的 PowerShell 找不到 `cloudflared`：重開 PowerShell，或用完整路徑
 `& 'C:\Program Files (x86)\cloudflared\cloudflared.exe'`。
 
