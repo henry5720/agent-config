@@ -31,6 +31,7 @@ script 在這份 SKILL.md 所在資料夾的 `scripts/personal-chrome-attach`，
 背景跑 `<那個資料夾>/scripts/personal-chrome-attach -s=<S> [--tunnel]`，它停在前景直到 session 結束；`--timeout=<秒>` 改等待時間（預設 300，`--tunnel` 預設 600）。`--tunnel` 印出的步驟裡已經建議使用者用獨立 profile、附各 OS 的開法；使用者選日常 profile 也照做。
 
 - 印出「tunnel 開好了」（`--tunnel`）→ 把它印出的步驟原樣轉交使用者。connect 網址就是鑰匙，只交給使用者本人。
+  轉交到聊天（Slack 等）時，步驟編號和說明照抄；每一條指令、每一個網址各放一個 code block，裡面只放那一行本身（OS 名稱寫在 code block 外面），使用者才複製得乾淨。
 - 印出 `chrome-extension://…connect.html?…`（tailnet 內，沒設 token）→ 原樣交給使用者，請他貼進日常 Chrome 的**新分頁**，再在插件畫面選這個分頁、按允許。
 - 印出「connect 網址含 token,不印在這裡」（tailnet 內，有設 token）→ 轉述它列的兩步：新分頁開 `http://127.0.0.1:9555/connect`、按「複製」、貼進同一個分頁。那一頁只給使用者的瀏覽器開，你只轉述步驟。
 - 逾時、attach 失敗、cloudflared 起不來 → 它已經收乾淨（`--tunnel` 印「cloudflared 剩 0 個」）、exit 1。問使用者卡在哪一步再重跑（網址每次不同）。

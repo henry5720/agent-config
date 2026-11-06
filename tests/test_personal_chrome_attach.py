@@ -177,6 +177,22 @@ class TunnelTest(unittest.TestCase):
             self.assertIn(line, out)
         self.assertLess(out.index("獨立 profile"), out.index("chrome-extension://"))
 
+    def test_each_command_sits_alone_on_its_line(self):
+        """標籤和指令同一行時，轉到 Slack 會一起被複製；每條指令自己一行、前面不帶 OS 標籤。"""
+        proc = self.start()
+        lines = [l.strip() for l in self.read_until(proc, READY).splitlines()]
+        for start in ('& "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"',
+                      'open -na "Google Chrome"', 'google-chrome --user-data-dir',
+                      f"cloudflared access tcp --hostname {QUICK_HOST}"):
+            self.assertTrue(any(l.startswith(start) for l in lines), f"沒有一行以 {start!r} 開頭")
+
+    def test_links_the_extension_in_the_web_store(self):
+        proc = self.start()
+        out = self.read_until(proc, READY)
+        store = "https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm"
+        self.assertIn(store, out)
+        self.assertLess(out.index(store), out.index("chrome-extension://"))
+
     def test_tunnel_points_at_the_relay_over_tcp(self):
         proc = self.start()
         self.read_until(proc, READY)

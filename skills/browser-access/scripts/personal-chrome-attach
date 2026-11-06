@@ -34,6 +34,7 @@ SESSION=personal-chrome
 TIMEOUT=''
 TUNNEL=''
 CLOUDFLARED_DOWNLOADS=https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/downloads/
+EXTENSION_STORE=https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm
 for arg in "$@"; do
   case "$arg" in
     -s=*) SESSION=${arg#-s=} ;;
@@ -188,17 +189,22 @@ if [ -n "$TUNNEL" ]; then
     exit 1
   fi
   cat <<EOF
-tunnel 開好了。connect 網址就是鑰匙,只交給使用者本人。把下面三步交給他,請他在 $TIMEOUT 秒內做完:
+tunnel 開好了。connect 網址就是鑰匙,只交給使用者本人。把下面四步交給他,請他在 $TIMEOUT 秒內做完:
   1. 安裝 cloudflared(第一次才要),依 OS 從官方下載頁選:$CLOUDFLARED_DOWNLOADS
   2. 開一個新的終端機貼這行,開著別關:
      cloudflared access tcp --hostname $hostname --url 127.0.0.1:$PORT
-  3. 開一支裝了 Playwright Extension 的 Chrome。建議用獨立 profile:跟你平常的 Chrome 分開,agent 碰不到你的登入;
-     第一次開是空的,要到 Chrome 線上應用程式商店裝 Playwright Extension。依 OS 貼這行開它(之後每次用同一行):
-       Windows(PowerShell):& "C:\Program Files\Google\Chrome\Application\chrome.exe" --user-data-dir="\$env:LOCALAPPDATA\chrome-agent" --no-first-run
-       macOS:open -na "Google Chrome" --args --user-data-dir="\$HOME/.local/state/chrome-agent" --no-first-run
-       Linux:google-chrome --user-data-dir="\$HOME/.local/state/chrome-agent" --no-first-run &
-     在這支 Chrome 開新分頁,網址列貼上這個 connect 網址,在插件畫面選分頁、按允許:
-     $url
+  3. 開一支裝了 Playwright Extension 的 Chrome。建議用獨立 profile:跟你平常的 Chrome 分開,agent 碰不到你的登入。
+     依 OS 貼對應那一行開它(之後每次用同一行):
+     Windows(PowerShell):
+       & "C:\Program Files\Google\Chrome\Application\chrome.exe" --user-data-dir="\$env:LOCALAPPDATA\chrome-agent" --no-first-run
+     macOS:
+       open -na "Google Chrome" --args --user-data-dir="\$HOME/.local/state/chrome-agent" --no-first-run
+     Linux:
+       google-chrome --user-data-dir="\$HOME/.local/state/chrome-agent" --no-first-run &
+     第一次開是空的,在這支 Chrome 開插件頁、按「加到 Chrome」:
+       $EXTENSION_STORE
+  4. 在這支 Chrome 開新分頁,網址列貼上這個 connect 網址,在插件畫面選分頁、按允許:
+       $url
 等使用者接上(最多 $TIMEOUT 秒)…
 EOF
 else
