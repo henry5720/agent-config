@@ -15,7 +15,7 @@ flowchart LR
 ```
 
 規則、skill、MCP、plugin 各歸誰管、檔案在哪，看 dotfiles 的
-[ai-agent-setup.md](https://github.com/henry5720/dotfiles/blob/main/docs/ai-agent-setup.md)；
+[ai-agent-setup.md](https://github.com/henry5720/dotfiles/blob/main/docs/ai-agent/ai-agent-setup.md)；
 新機器怎麼裝起來看 [new-machine-setup.md](https://github.com/henry5720/dotfiles/blob/main/docs/new-machine-setup.md)。
 這份只管「裝好之後怎麼用」。詞彙（source、target、local…）見 [GLOSSARY.md](GLOSSARY.md)。
 
