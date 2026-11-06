@@ -24,7 +24,11 @@ description: 接瀏覽器：自己的 headless、使用者的獨立 profile（92
 
 ## 接插件：`scripts/personal-chrome-attach`
 
-tailnet 內只在獨立 profile 也登不進去時用；tailnet 外一律加 `--tunnel`。背景跑 `scripts/personal-chrome-attach -s=<S> [--tunnel]`（`~/.local/bin/personal-chrome-attach` 是同一支，要 `playwright-cli` ≥ 0.1.23，`--tunnel` 另要 `cloudflared`），它停在前景直到 session 結束；`--timeout=<秒>` 改等待時間（預設 300）。
+tailnet 內只在獨立 profile 也登不進去時用；tailnet 外一律加 `--tunnel`。
+
+script 在這份 SKILL.md 所在資料夾的 `scripts/personal-chrome-attach`，用絕對路徑叫它：先 `ls` 確認你讀這份 SKILL.md 的那個資料夾底下有 `scripts/personal-chrome-attach`，再用 `<那個資料夾>/scripts/personal-chrome-attach` 跑，不要從目前工作目錄找。裝了 dotfiles 的機器另外有 `~/.local/bin/personal-chrome-attach`，是同一支。要 `playwright-cli` ≥ 0.1.23，`--tunnel` 另要 `cloudflared`；`command -v` 找得到就是裝好了，找不到才回報缺工具。
+
+背景跑 `<那個資料夾>/scripts/personal-chrome-attach -s=<S> [--tunnel]`，它停在前景直到 session 結束；`--timeout=<秒>` 改等待時間（預設 300）。
 
 - 印出「tunnel 開好了」（`--tunnel`）→ 把它印出的步驟原樣轉交使用者。connect 網址就是鑰匙，只交給使用者本人。
 - 印出 `chrome-extension://…connect.html?…`（tailnet 內，沒設 token）→ 原樣交給使用者，請他貼進日常 Chrome 的**新分頁**，再在插件畫面選這個分頁、按允許。
