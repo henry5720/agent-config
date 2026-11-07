@@ -34,7 +34,7 @@
 | 全域規則 | `instructions/agents-md/AGENTS.md`；skillshare extras 連到 `~/.claude/CLAUDE.md`、`~/.codex/AGENTS.md`、`~/.config/opencode/AGENTS.md`。要加連結改 dotfiles 的 `modify_config.yaml.tmpl`，不要用 `skillshare extras` 指令（下次 `chezmoi apply` 會蓋回去） |
 | skill | `skills/<名字>/`；補第三方 skill 沒寫的步驟也是另寫一支 |
 | MCP | `skillshare mcp add`，寫進 `mcp.yaml` |
-| hook | 自己寫的用 `skillshare hooks add`；工具自己裝的（herdr、codegraph、wakatime）不收，重裝時它們會再寫一次 |
+| hook | 自己寫的定義放 `hooks/<名字>.yaml`，用 `skillshare hooks add <名字> --file` 存進 `config.yaml` 再 sync（每台都要 add，步驟在 README）；工具自己裝的（herdr、codegraph、wakatime）不收，重裝時它們會再寫一次 |
 | plugin | `skillshare plugin add`，記在 `config.yaml` 的 `plugins:`（不進 repo，每台各自 add）。wakatime 的由 dotfiles apply 裝，不收 |
 | agent | `agents/<名字>.md`，`skillshare sync agents` 連到 `~/.claude/agents`（路徑由 dotfiles 的 `modify_config.yaml.tmpl` 釘）。Codex 的 subagent 是 TOML，要用時另走 extras 的 `codex-agents` extension |
 
@@ -42,9 +42,10 @@
 
 ```bash
 uv run --isolated --no-project --with-requirements tests/requirements.txt \
-  python3 -B -m unittest discover -s tests  # 動到自己寫的 skill 的 script 時
+  python3 -B -m unittest discover -s tests  # 動到自己寫的 skill 的 script、hooks/ 時
 skillshare sync --dry-run               # skill 會怎麼落到 target
 skillshare sync mcp -g --dry-run        # MCP 會怎麼寫進三個 client
+skillshare hooks sync -g --dry-run      # hook 會怎麼寫進 Claude Code、Codex
 ```
 
 驗完用 `skillshare push` 推（它會 commit 再 push）。其他機器 `skillshare pull && skillshare sync mcp -g`。
