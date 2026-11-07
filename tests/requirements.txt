@@ -1,2 +1,4 @@
 # 逐條判定 fixtures 使用的 JSON Schema draft-07 validator。
 jsonschema==4.19.2
+# tests/test_speak_hook.py 讀 hooks/*.yaml。
+PyYAML==6.0.2

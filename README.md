@@ -25,6 +25,7 @@ flowchart LR
 
 ```text
 mcp.yaml              三個 client 共用的 MCP server
+hooks/<名字>.yaml      自己寫的 hook（skillshare 的 hook entry），每台各自 add
 docs/                 給人看的文件
   mcp.md              MCP：三個 client 怎麼共用、舊條目怎麼清
   skills/README.md    skill：從哪來、裝給誰、怎麼關
@@ -64,6 +65,24 @@ skillshare mcp list
 skillshare mcp add <名字> --url <https://...>   # 或 -- <指令> <參數>；不加 --sync 只存進 mcp.yaml
 skillshare sync mcp -g                          # 寫進三個 client，只動自己寫的條目
 ```
+
+**hook**
+
+自己寫的 hook 定義放 `hooks/<名字>.yaml`。skillshare 把 hook 存在 `config.yaml`（不進 repo），
+所以每台要自己 add 一次，之後 yaml 改了就 edit：
+
+```bash
+skillshare hooks add <名字> --file ~/.config/skillshare/hooks/<名字>.yaml -g --sync   # 這台第一次
+skillshare hooks edit <名字> --file ~/.config/skillshare/hooks/<名字>.yaml -g --sync  # pull 到新版
+skillshare hooks list -g                                                           # 兩邊都是 ✓ 才算同步
+```
+
+Codex 不會跑沒審過的 hook：add 或 edit 之後開 Codex 打 `/hooks`，把新的或改過的那條設成 trusted。
+herdr、codegraph 這些工具自己寫的 hook 不收，`hooks list` 列成 `not managed` 是正常的，sync 不會動它們。
+
+| hook | 做什麼 |
+|---|---|
+| `speak` | Claude Code、Codex 回完話把回覆唸到個人電腦（dotfiles 的 `voice-out-speak`，沒勾 `snapserver` 的機器直接略過） |
 
 **跨機器**
 
