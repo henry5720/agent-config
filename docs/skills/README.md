@@ -32,7 +32,7 @@ OpenCode 自己會掃 `~/.claude/skills/`、`~/.agents/skills/`、`~/.config/ope
 - obsidian-wiki 那包：pip 套件自己連進 `~/.agents/skills`、`~/.codex/skills`
 - `~/.claude/skills/synced/`：Claude 自己同步的
 - `~/.config/opencode/skills/`：dotfiles 部署的 OpenCode 專用 skill，加上 oh-my-opencode-slim 自己放的
-- Claude plugin 帶的 skill：`/plugin` 管
+- plugin 帶的 skill：跟著整包 plugin 走，`skillshare plugin` 管，`skillshare update` 管不到
 
 `skillshare status` 的 `N local` 就是落在 target 目錄裡、但不是 skillshare 放的那些，不是錯誤。
 
@@ -91,12 +91,13 @@ grep -ohE '<command-name>[^<]+</command-name>' $(find . -name '*.jsonl') | sort 
 ```mermaid
 flowchart TD
   Q{"要關的是？"}
-  Q -- "plugin 帶的" --> P["/plugin 或 enabledPlugins"]
+  Q -- "plugin 帶的" --> P["skillshare plugin disable<br/>再 sync plugins"]
   Q -- "整包不要了" --> M["移走兩處 symlink"]
   Q -- "留著偶爾自己叫" --> O["skillOverrides:<br/>user-invocable-only"]
 ```
 
 plugin 帶的 skill 只能從 plugin 那層關，移走 symlink 和 `skillOverrides` 都管不到。
+`plugin disable` 只存選擇，要 `skillshare sync plugins` 才真的從 client 移掉。
 兩處 symlink 是 `~/.claude/skills` 和 `~/.agents/skills` 底下那支，都要移。
 
 ### 三家各自的關法
