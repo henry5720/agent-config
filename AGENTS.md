@@ -35,6 +35,7 @@
 | skill | `skills/<名字>/`；補第三方 skill 沒寫的步驟也是另寫一支 |
 | MCP | `skillshare mcp add`，寫進 `mcp.yaml` |
 | hook | 自己寫的用 `skillshare hooks add`；工具自己裝的（herdr、codegraph、wakatime）不收，重裝時它們會再寫一次 |
+| plugin | `skillshare plugin add`，記在 `config.yaml` 的 `plugins:`（不進 repo，每台各自 add）。wakatime 的由 dotfiles apply 裝，不收 |
 | agent | `agents/<名字>.md`，`skillshare sync agents` 連到 `~/.claude/agents`（路徑由 dotfiles 的 `modify_config.yaml.tmpl` 釘）。Codex 的 subagent 是 TOML，要用時另走 extras 的 `codex-agents` extension |
 
 ## 改完怎麼驗證
