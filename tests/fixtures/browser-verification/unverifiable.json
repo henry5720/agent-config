@@ -7,6 +7,13 @@
     "model": "codex",
     "same_model": false
   },
+  "environment": {
+    "frontend": "本機 dev server @ abc123（起不來）",
+    "backend": null,
+    "browser": null,
+    "data": null,
+    "before": null
+  },
   "criteriaSource": "issue",
   "criteria": [],
   "consoleErrors": [],

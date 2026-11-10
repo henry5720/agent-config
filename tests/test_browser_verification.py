@@ -51,6 +51,15 @@ class BrowserVerificationTest(unittest.TestCase):
         outside = copy.deepcopy(original)
         outside["criteria"][0]["evidence"] = ["../auth.json"]
         variants.append(outside)
+        passed_without_steps = copy.deepcopy(original)
+        passed_without_steps["criteria"][0]["steps"] = []
+        variants.append(passed_without_steps)
+        failed_without_data_source = copy.deepcopy(original)
+        failed_without_data_source["criteria"][1]["dataSource"] = None
+        variants.append(failed_without_data_source)
+        no_environment = copy.deepcopy(original)
+        del no_environment["environment"]
+        variants.append(no_environment)
         inferred_too_many = copy.deepcopy(original)
         inferred_too_many["criteria"].append(copy.deepcopy(original["criteria"][0]))
         variants.append(inferred_too_many)

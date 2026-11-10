@@ -33,11 +33,7 @@
 
 ## 發布
 
-呼叫者不是 runner 或 `pr-review-and-verify` 時，驗完由你發布。L0 沒有瀏覽器驗收 comment。
-
-1. 這個分支有 PR（`gh pr view --json number`）就問使用者一次：「要把這份回報發成 PR #<N> 的 comment 嗎？」
-2. 同意：照 [report-template.md](report-template.md) 發。
-3. 不同意或沒有 PR：回報列出 `<E>` 路徑，並說明暫存資料夾不會長久保留。
+互動 session 由你發布，先問使用者，照 [report-template.md](report-template.md)「誰發布」。
 
 ## 卡住時換工具
 
