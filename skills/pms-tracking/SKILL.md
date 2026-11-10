@@ -1,6 +1,6 @@
 ---
 name: pms-tracking
-description: 在 teamsync-pms 開、更新給 PM 看的追蹤單，讓 PM 不用看 GitHub 也能掌握進度。使用者說「同步進度到 PMS」「PMS 開單／開追蹤單」「更新 PMS 進度」「問題轉工作」時使用；從 Slack 待辦或 GitHub map 開單、需要在 PMS 留一份給 PM 看時也用。
+description: 在 PMS 開、更新給 PM 看的追蹤單，讓 PM 不用看 GitHub 也能掌握進度。使用者說「同步進度到 PMS」「PMS 開單／開追蹤單」「更新 PMS 進度」「問題轉工作」時使用；從 Slack 待辦或 GitHub map 開單、需要在 PMS 留一份給 PM 看時也用。
 ---
 
 # PMS 追蹤單
@@ -9,11 +9,11 @@ description: 在 teamsync-pms 開、更新給 PM 看的追蹤單，讓 PM 不用
 
 ## 連線
 
-- 用 `teamsync-pms-project`（project surface）。自己的子任務、工時才用 `teamsync-pms-work`。
+- 用 `pms` MCP；專案追蹤、自己的子任務與工時共用這個連線。
 - 這個 session 載不到 PMS 工具時（`ToolSearch` 找不到），就用 headless 跑：
 
   ```bash
-  claude -p --allowedTools 'mcp__teamsync-pms-project' < prompt.txt
+  claude -p --allowedTools 'mcp__pms' < prompt.txt
   ```
 
   - prompt 從 stdin 傳。`--allowedTools` 會把後面的參數全部吃掉，所以 prompt 不能直接接在後面。

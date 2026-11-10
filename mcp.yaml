@@ -26,13 +26,9 @@ servers:
     url: https://mcp.grep.app
     targets: [claude, codex, opencode]
   # 公司 PMS（正式環境）。OAuth（DCR），各 client 第一次用時自己登入，repo 不存 token。
-  # 分兩個 surface：work＝個人工作、project＝專案交付，名字跟網址最後一段一樣。
-  # 不接不帶 surface 的 /mcp：那裡是另一套扁平工具（create_issue、clock_in…），沒有 get_my_context。
-  teamsync-pms-work:
-    url: https://pms.teamsync.com.tw/c/tnt_6b24e7fe8a974ac6850f84557cfc15ce/mcp/work
-    targets: [claude, codex, opencode]
-  teamsync-pms-project:
-    url: https://pms.teamsync.com.tw/c/tnt_6b24e7fe8a974ac6850f84557cfc15ce/mcp/project
+  # 單一 /mcp 入口，整合個人工作與專案交付。
+  pms:
+    url: https://pms.teamsync.com.tw/c/tnt_6b24e7fe8a974ac6850f84557cfc15ce/mcp
     targets: [claude, codex, opencode]
   # 操作 Windows 桌面（localhost 模式）。包裝腳本只在桌機 WSL 找得到 windows-mcp.exe，
   # 其他機器會直接結束，這個 server 顯示連不上。經 sh 展開 $HOME，各台的家目錄不同也能用。
