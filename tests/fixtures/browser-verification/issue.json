@@ -7,11 +7,23 @@
     "model": "claude-sonnet-4-6",
     "same_model": true
   },
+  "environment": {
+    "frontend": "本機 dev server @ abc123",
+    "backend": "staging",
+    "browser": "Chromium 1440×900、zh-TW、淺色",
+    "data": "真實 API",
+    "before": null
+  },
   "criteriaSource": "issue",
   "criteria": [
     {
       "criterion": "顯示 A | B",
+      "steps": [
+        "開 /demo",
+        "看 <標題>"
+      ],
       "observed": "看到 <A>\nB",
+      "dataSource": "real",
       "status": "passed",
       "reason": null,
       "account": null,

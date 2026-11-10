@@ -7,11 +7,24 @@
     "model": "claude-sonnet-4-6",
     "same_model": true
   },
+  "environment": {
+    "frontend": "本機 dev server @ abc123",
+    "backend": "staging（版本：openapi 有新欄位，用欄位推斷）",
+    "browser": "Chromium 1440×900、zh-TW、淺色",
+    "data": "讀取走真實 API；寫入以 route 攔截回 mock",
+    "before": null
+  },
   "criteriaSource": "inferred",
   "criteria": [
     {
       "criterion": "儲存後出現 toast",
-      "observed": "點儲存後顯示「儲存成功」",
+      "steps": [
+        "開編輯頁",
+        "改名稱",
+        "按儲存"
+      ],
+      "observed": "顯示「儲存成功」",
+      "dataSource": "mock",
       "status": "passed",
       "reason": null,
       "account": "E2E_ADMIN",
@@ -24,7 +37,12 @@
     },
     {
       "criterion": "取消後關閉對話框",
-      "observed": "按取消後對話框仍開著",
+      "steps": [
+        "開刪除對話框",
+        "按取消"
+      ],
+      "observed": "對話框仍開著",
+      "dataSource": "real",
       "status": "failed",
       "reason": "對話框未關閉",
       "account": "E2E_ADMIN",
@@ -37,7 +55,9 @@
     },
     {
       "criterion": "viewer 不能刪除",
+      "steps": [],
       "observed": "無 viewer 帳號可登入",
+      "dataSource": null,
       "status": "skipped",
       "reason": "缺少 E2E_VIEWER_EMAIL、E2E_VIEWER_PASSWORD",
       "account": "E2E_VIEWER",

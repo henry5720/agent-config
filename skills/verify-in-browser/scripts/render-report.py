@@ -37,6 +37,8 @@ def validate(report):
     for item in report["criteria"]:
         if item["status"] == "passed" and (not item["evidence"] or item["reason"] is not None):
             raise ValueError("passed 必須有證據，reason 為 null")
+        if item["status"] in ("passed", "failed") and (not item["steps"] or item["dataSource"] is None):
+            raise ValueError("passed、failed 必須寫操作步驟 steps 與資料來源 dataSource")
         if item["status"] in ("failed", "skipped") and not item["reason"]:
             raise ValueError("failed、skipped 必須寫 reason")
         if item["change"] == "fixed":
@@ -130,17 +132,59 @@ def split_rows(report):
     return parts
 
 
-def render_table(items, base, with_before):
-    if with_before:
-        lines = ["| 條件 | 結果 | 帳號 | 看到什麼／原因 | 改前 | 改後 |", "|---|---|---|---|---|---|"]
-    else:
-        lines = ["| 條件 | 結果 | 帳號 | 看到什麼／原因 | 證據 |", "|---|---|---|---|---|"]
+STATUS_LABEL = {"passed": "✅ 通過", "failed": "❌ 失敗", "skipped": "⏭ 略過"}
+DATA_LABEL = {"real": "真實", "mock": "mock", "mixed": "真實＋mock", None: "—"}
+ENVIRONMENT_ROWS = (("frontend", "前端"), ("backend", "後端"), ("browser", "瀏覽器"), ("data", "資料"), ("before", "改前"))
+
+
+def shared_account(report):
+    """所有條件用同一個帳號時回傳它（可為 None），否則回傳 False：帳號就寫進環境表，不另開一欄。"""
+    accounts = {item["account"] for item in report["criteria"]}
+    return accounts.pop() if len(accounts) == 1 else False
+
+
+def render_environment(report):
+    rows = [(label, report["environment"][key]) for key, label in ENVIRONMENT_ROWS]
+    account = shared_account(report)
+    if account:
+        rows.insert(3, ("帳號", account))
+    rows = [(label, value) for label, value in rows if value]
+    if not rows:
+        return []
+    lines = ["| 環境 | |", "|---|---|"]
+    lines.extend(f"| {label} | {cell(value)} |" for label, value in rows)
+    return lines + [""]
+
+
+def steps_cell(steps):
+    return "<br>".join(f"{index}. {cell(step)}" for index, step in enumerate(steps, 1)) or "—"
+
+
+def observed_cell(item):
+    text = cell(item["observed"])
+    if item["reason"]:
+        text += "<br>**原因**：" + cell(item["reason"])
+    return text
+
+
+def render_table(items, base, with_before, with_account, numbers):
+    headers = ["#", "驗收項目", "操作", "看到", "資料", "結果"]
+    if with_account:
+        headers.append("帳號")
+    headers.extend(["改前", "改後"] if with_before else ["證據"])
+    lines = ["| " + " | ".join(headers) + " |", "|" + "---|" * len(headers)]
     texts = []
     for item in items:
-        observed = item["observed"]
-        if item["reason"]:
-            observed += "／" + item["reason"]
-        columns = [cell(item["criterion"]), cell(item["status"]), cell(item["account"] or "—"), cell(observed)]
+        columns = [
+            str(numbers[id(item)]),
+            cell(item["criterion"]),
+            steps_cell(item["steps"]),
+            observed_cell(item),
+            DATA_LABEL[item["dataSource"]],
+            STATUS_LABEL[item["status"]],
+        ]
+        if with_account:
+            columns.append(cell(item["account"] or "—"))
         if with_before:
             columns.append(before_cell(item))
         columns.append(evidence_cell(item["evidence"]))
@@ -186,10 +230,14 @@ def render(report, base, part):
     items, media = parts[part - 1]
     title = "## 瀏覽器驗收" + (f"（{part}/{total}）" if total > 1 else "")
     lines = [title, "", f"驗收 commit：`{report['sha']}`", ""]
+    if part == 1:
+        lines.extend(render_environment(report))
     if report["status"] == "unverifiable":
         lines.extend([f"驗不了：{report['unverifiableReason']}", ""])
     else:
-        lines.extend(render_table(items, base, has_before_column(report)))
+        numbers = {id(item): index for index, item in enumerate(report["criteria"], 1)}
+        with_account = shared_account(report) is False
+        lines.extend(render_table(items, base, has_before_column(report), with_account, numbers))
     if part == 1:
         lines.extend(render_footer(report))
     text = "\n".join(lines).rstrip() + "\n"

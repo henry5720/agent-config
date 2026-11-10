@@ -23,17 +23,19 @@ cd <E> && playwright-cli -s=<S> <指令>
 |---|---|
 | 1. 開頁面、固定 viewport | repo 有設定檔時先解析絕對路徑，`open --config=<設定檔絕對路徑> <url>`，切到 `<E>` 後仍用該路徑；沒有就 `open <url>`。再 `resize 1440 900`。語系設在設定檔的 `browser.contextOptions.locale`，頂層不生效 |
 | 4. 截圖 | `screenshot --filename=<E>/after-<狀態>.png` |
-| 4. 錄影 | `video-start <E>/<流程>.webm`／`video-stop` |
+| 4. 錄影 | `video-start <E>/<流程>.webm`／`video-stop`，接著照 `compress-video` 轉成 `<E>/<流程>.mp4`，刪掉 `.webm` |
 | 4. 確認結構 | `snapshot --filename=<E>/<狀態>.yml` 或 `find "<文字>"` |
-| 4. console | `console error` |
-| 4. mock | `route` 攔截，資料來源記「mock」 |
+| 4. console | `console error`；換頁前先查，換頁會清掉 |
+| 4. mock | `route` 攔截，攔了什麼寫成該條的一步，`dataSource` 填 `mock` 或 `mixed` |
 | 5. 收尾 | 每個 session `close`；刪掉 `<E>/.playwright-cli/` 與所有 `<E>/auth*.json` |
 
 ## 登入
 
+帳密照 dotenv 的順序取：環境變數有值就用它，沒有才讀帳密檔（該 repo e2e 讀的那個 `.env`）。不知道變數名時只列名字：`env | grep -o '^[A-Za-z_][A-Za-z0-9_]*='`、`grep -o '^[A-Za-z_][A-Za-z0-9_]*=' <帳密檔絕對路徑>`。
+
 1. **帶既有的登入狀態。** `<E>/auth.json` 已經有就 `state-load <E>/auth.json`。repo 有拿 token 的方法就 `--raw localstorage-set <key> "<token>"` 再 `goto`。
-2. **填表單。** 密碼一進欄位就會到處出現（0.1.22 實測：`find`、填完後任何動作自動存的 `.playwright-cli/page-*.yml`，都含明文），所以：
-   - 欄位用 selector 指（`'input[type=password]'`、`'getByPlaceholder("密碼")'`），不必先 snapshot。
+2. **填表單。** 照該 repo 既有的登入方式（先找 e2e 的登入 helper 或截圖腳本）。密碼一進欄位就會到處出現（0.1.22 實測：`find`、填完後任何動作自動存的 `.playwright-cli/page-*.yml`，都含明文），所以：
+   - 欄位用 selector 指（`'input[type=password]'`、`'getByPlaceholder("密碼")'`）；真的要 snapshot 找欄位，只能在填密碼之前。
    - 填密碼，值只在展開裡：
 
      ```bash
@@ -42,10 +44,10 @@ cd <E> && playwright-cli -s=<S> <指令>
 
    - 每個 `fill`、`localstorage-set` 都加 `--raw`：不加會把產生的 Playwright code 連同值印回對話。
    - 填完密碼的下一個指令就是 `--raw click <送出按鈕>`。
-   - 送出後馬上 `rm -rf <E>/.playwright-cli`，再確認登入：`--raw eval "<判斷式>"`。
-   - 失敗時重開登入頁用 `goto`；成功就 `state-save <E>/auth.json`。
+   - 送出後馬上 `rm -rf <E>/.playwright-cli`，再確認登入：`--raw eval "<判斷式>"`，判斷式只回 true／false，不印 token。
+   - 失敗（還停在登入頁）時用 `goto` 重開登入頁清掉欄位，再查原因；成功就 `state-save <E>/auth.json`。
 
-## 0.1.22 踩過的雷
+## 踩過的雷
 
 | 症狀 | 做法 |
 |---|---|
