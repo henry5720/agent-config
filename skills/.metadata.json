@@ -262,6 +262,19 @@
         "references/video-recording.md": "sha256:1c800b897824cb54394c34265d8ebffdbb530adfc8d612c5d798b667a1799f48"
       }
     },
+    "ponytail": {
+      "source": "github.com/dietrichgebert/ponytail/skills/ponytail",
+      "type": "github-subdir",
+      "installed_at": "2026-11-14T06:07:38.70942471Z",
+      "repo_url": "https://github.com/dietrichgebert/ponytail.git",
+      "subdir": "skills/ponytail",
+      "version": "96608e0",
+      "tree_hash": "e8d3fa76e7ff9223a784dbd4bcfc9ff46b3fa55d",
+      "commit": "96608e078b2d5ea607c5c3b8b5a54d1c1fba6846",
+      "file_hashes": {
+        "SKILL.md": "sha256:9badd22a32e19cb884e46dfa8d3aae82bb81dfa5484105b8b4f0262df823a509"
+      }
+    },
     "pr": {
       "source": "https://github.com/mattpocock/skills.git/skills/engineering/pr",
       "type": "github-subdir",
