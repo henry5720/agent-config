@@ -14,7 +14,7 @@ server 本身的坑（400、307、session）看 [reference.md](reference.md)；�
 
 ## 第一次安裝
 
-在 Windows PowerShell 跑：
+Windows-MCP 是第三方開源專案（[CursorTouch/Windows-MCP](https://github.com/CursorTouch/Windows-MCP)），工具清單和選項以它的 README 為準。在 Windows PowerShell 跑：
 
 ```powershell
 winget install --exact --id Python.Python.3.14 --scope user
