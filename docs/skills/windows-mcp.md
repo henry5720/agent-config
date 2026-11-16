@@ -29,6 +29,8 @@ server 一定要在你登入的桌面起：你在那台桌面開 PowerShell（�
 
 ## 第一次：在那台裝 Windows-MCP
 
+Windows-MCP 是第三方開源專案：[CursorTouch/Windows-MCP](https://github.com/CursorTouch/Windows-MCP)。下面是這裡用的裝法，其他裝法和選項看它的 README。
+
 ```powershell
 winget install --exact --id Python.Python.3.14 --scope user
 winget install --exact --id astral-sh.uv
