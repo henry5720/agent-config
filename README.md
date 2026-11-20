@@ -98,8 +98,8 @@ skillshare pull && skillshare sync mcp -g       # 其他台；pull 只同步 ski
 
 **裝進來的每一支，description 每個 request 都會常駐在 context 裡。** 職責重疊的不要裝兩份。
 
-[caveman](https://github.com/JuliusBrussee/caveman) 是例子：它的 repo 有 20 個 skill，只裝了核心的
-`caveman`。6 個要 Caveman Cloud 帳號；`investigate-first`、`safe-refactor`、`surgical-patch`、
+[caveman](https://github.com/JuliusBrussee/caveman) 是例子：它的 repo 有 20 個 skill，原本只裝了核心的
+`caveman`，後來也移除了：回覆要精簡已經寫在全域規則，裝了一個多月沒用過。其他的 6 個要 Caveman Cloud 帳號；`investigate-first`、`safe-refactor`、`surgical-patch`、
 `lean-build`、`verify-and-stop`、`caveman-explore`、`cavecrew` 跟 mattpocock 那組
 （`diagnosing-bugs` / `tdd` / `prototype`）和內建的 `Explore` agent 重疊。
 
