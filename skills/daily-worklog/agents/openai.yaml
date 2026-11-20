@@ -1,0 +1,5 @@
+interface:
+  display_name: "Daily Worklog"
+  short_description: "從當天的 git commit 產生給主管看的繁中工作日誌。"
+policy:
+  allow_implicit_invocation: false
