@@ -25,6 +25,11 @@ servers:
   gh_grep:
     url: https://mcp.grep.app
     targets: [claude, codex, opencode]
+  # Graphify Cloud：把 repo 做成圖（熱點、架構、PR 影響範圍），跟 codegraph 並存試用（#99，到 2026-12-04）。
+  # OAuth（PKCE），各 client 第一次用時自己登入，不收 API key，repo 不存 token。
+  graphify:
+    url: https://api.graphify.com/mcp
+    targets: [claude, codex, opencode]
   # 公司 PMS（正式環境）。OAuth（DCR），各 client 第一次用時自己登入，repo 不存 token。
   # 單一 /mcp 入口，整合個人工作與專案交付。
   pms:
