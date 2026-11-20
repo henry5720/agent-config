@@ -29,15 +29,10 @@ server 一定要在你登入的桌面起：你在那台桌面開 PowerShell（�
 
 ## 第一次：在那台裝 Windows-MCP
 
-Windows-MCP 是第三方開源專案：[CursorTouch/Windows-MCP](https://github.com/CursorTouch/Windows-MCP)。下面是這裡用的裝法，其他裝法和選項看它的 README。
-
-```powershell
-winget install --exact --id Python.Python.3.14 --scope user
-winget install --exact --id astral-sh.uv
-# 重開 PowerShell
-uv tool install --python 3.14 windows-mcp
-uv tool update-shell
-```
+Windows-MCP 是第三方開源專案：[CursorTouch/Windows-MCP](https://github.com/CursorTouch/Windows-MCP)。
+有用 dotfiles 的 Windows 主機照 [dotfiles〈windows-mcp〉](https://github.com/henry5720/dotfiles/blob/main/docs/install/windows.md#windows-mcp)：`tools` 選單勾 windows-mcp 再
+`chezmoi apply`，由 mise 裝；以前手動 `uv tool install` 過的，那份也寫了怎麼刪舊的。WSL 裡的 agent 只找得到 mise 裝的這份。
+沒用 dotfiles 的機器照 Windows-MCP 的 README 裝，這時只能由你在 PowerShell 貼指令起 server。
 
 重開的 PowerShell 跑 `windows-mcp --help` 有輸出就好。走 quick tunnel 的再裝 cloudflared
 （[remote-access 的 Cloudflare quick tunnel](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access/README.md#cloudflare-quick-tunnel)）。

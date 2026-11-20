@@ -9,7 +9,7 @@
   - agent 只連得到 ssh 時，經使用者核准，用暫時的 Interactive scheduled task 起（2026-11-05 在 henry-laptop 這樣起成功）。使用者要登入著桌面。收掉 server 後一定刪掉 task：
 
     ```powershell
-    $a = New-ScheduledTaskAction -Execute "$env:USERPROFILE\.local\bin\windows-mcp.exe" -Argument 'serve --host <綁的位址>'
+    $a = New-ScheduledTaskAction -Execute "$env:LOCALAPPDATA\mise\shims\windows-mcp.exe" -Argument 'serve --host <綁的位址>'
     $p = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive
     Register-ScheduledTask -TaskName windows-mcp-temp -Action $a -Principal $p -Force | Out-Null
     Start-ScheduledTask -TaskName windows-mcp-temp

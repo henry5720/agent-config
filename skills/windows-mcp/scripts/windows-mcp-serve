@@ -7,8 +7,7 @@ set -euo pipefail
 
 listening() { pwsh "(Get-NetTCPConnection -LocalPort $PORT -State Listen -ErrorAction SilentlyContinue | Measure-Object).Count"; }
 
-exe_win=$(pwsh '"$env:USERPROFILE\.local\bin\windows-mcp.exe"')
-[ -f "$(wslpath "$exe_win")" ] || { echo "沒裝 windows-mcp，照 SKILL.md「第一次安裝」裝好再跑" >&2; exit 1; }
+exe_win=$(exe_win) || exit 1
 # server 跑著時換 key 不生效、舊 key 照樣能用（2026-11-05 henry-laptop 實測），所以先確認沒有 server 再換
 [ "$(listening)" = 0 ] || { echo "$PORT 已經有程式在聽，先跑 windows-mcp-stop" >&2; exit 1; }
 

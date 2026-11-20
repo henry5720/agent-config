@@ -1,5 +1,5 @@
-# windows-mcp-serve、windows-mcp-stop、windows-mcp-auth-header 共用：叫 PowerShell、找 Windows 家目錄、讀 key。
-# 不是可以直接跑的腳本，由那三支 source。要在桌機 WSL：靠 powershell.exe 操作 Windows 那邊。
+# windows-mcp-stdio、windows-mcp-serve、windows-mcp-stop、windows-mcp-auth-header 共用：叫 PowerShell、找 Windows 家目錄、
+# 找 windows-mcp、讀 key。不是可以直接跑的腳本，由那四支 source。要在桌機 WSL：靠 powershell.exe 操作 Windows 那邊。
 
 PORT=8000
 
@@ -14,3 +14,17 @@ win_home() { wslpath "$(pwsh '$env:USERPROFILE')"; }
 
 # 印出 Windows 那邊 ~/.windows-mcp/config.toml 的 auth_key；沒有就回非 0
 auth_key() { grep -oP 'auth_key\s*=\s*"\K[^"]+' "$(win_home)/.windows-mcp/config.toml"; }
+
+# mise 的 shim（dotfiles 在 Windows 主機勾 windows-mcp 時裝）。寫完整路徑、不靠 PATH：powershell.exe -NoProfile
+# 的 PATH 沒有 mise shims，會拿到手動 uv tool install 在 .local\bin 的舊版（2026-11-20 henry-desktop 實測）
+SHIM='mise\shims\windows-mcp.exe'
+
+# 印出 shim 的 Windows 路徑；沒裝就在 stderr 說怎麼裝、回非 0
+exe_win() {
+  local la; la=$(pwsh '$env:LOCALAPPDATA')
+  [ -f "$(wslpath "$la")/${SHIM//\\//}" ] || {
+    echo "windows-mcp：找不到 %LOCALAPPDATA%\\$SHIM（mise 裝的 windows-mcp）。在 Windows 主機的 dotfiles tools 選單勾 windows-mcp 再 apply" >&2
+    return 1
+  }
+  printf '%s\\%s\n' "$la" "$SHIM"
+}

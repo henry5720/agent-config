@@ -24,6 +24,7 @@ QUICK_SCRIPT = ROOT / "skills" / "expose-port" / "scripts" / "expose-port-quick-
 AUTH_HEADER_SCRIPT = ROOT / "skills" / "windows-mcp" / "scripts" / "windows-mcp-auth-header"
 SERVE_SCRIPT = ROOT / "skills" / "windows-mcp" / "scripts" / "windows-mcp-serve"
 STOP_SCRIPT = ROOT / "skills" / "windows-mcp" / "scripts" / "windows-mcp-stop"
+STDIO_SCRIPT = ROOT / "skills" / "windows-mcp" / "scripts" / "windows-mcp-stdio"
 
 HOST = "box.tail123.ts.net"
 QUICK_HOST = "quiet-fox-123.trycloudflare.com"
@@ -609,10 +610,16 @@ cmd="$3"
 case "$cmd" in
   *" auth --transport "*) [ -n "$FAKE_AUTH_BROKEN" ] || printf 'auth_key = "rotated-%s"\n' "$RANDOM" > "$FAKE_WINHOME/.windows-mcp/config.toml" ;;
   '$env:USERPROFILE') printf 'C:\\Users\\me\r\n' ;;
-  *windows-mcp.exe\") printf 'C:\\Users\\me\\.local\\bin\\windows-mcp.exe\r\n' ;;
+  '$env:LOCALAPPDATA') printf 'C:\\Users\\me\\AppData\\Local\r\n' ;;
   *Measure-Object\).Count*) [ -e "$FAKE_STATE/listening" ] && echo 1 || echo 0 ;;
   *Start-Process*) touch "$FAKE_STATE/listening" ;;
 esac
+"""
+
+# 假 wslpath：C:\Users\me 底下的路徑換成假 Windows 家目錄底下
+FAKE_WSLPATH = r"""#!/usr/bin/env bash
+p=${1#'C:\Users\me'}
+echo "__HOME__${p//\\//}"
 """
 
 
@@ -627,16 +634,14 @@ class WindowsMcpServeTest(unittest.TestCase):
             (home / ".windows-mcp").mkdir(parents=True)
             config = home / ".windows-mcp" / "config.toml"
             config.write_text(f'transport = "streamable-http"\nauth_key = "{KEY}"\n')
-            (home / ".local" / "bin").mkdir(parents=True)
-            (home / ".local" / "bin" / "windows-mcp.exe").write_text("")
+            (home / "AppData/Local/mise/shims").mkdir(parents=True)
+            (home / "AppData/Local/mise/shims/windows-mcp.exe").write_text("")
             state = tmp / "state"
             state.mkdir()
             bin_dir = tmp / "bin"
             bin_dir.mkdir()
             (bin_dir / "powershell.exe").write_text(FAKE_POWERSHELL)
-            (bin_dir / "wslpath").write_text(
-                f'#!/usr/bin/env bash\ncase "$1" in *windows-mcp.exe) echo {home}/.local/bin/windows-mcp.exe ;; *) echo {home} ;; esac\n'
-            )
+            (bin_dir / "wslpath").write_text(FAKE_WSLPATH.replace("__HOME__", str(home)))
             (bin_dir / "clip.exe").write_text(f'#!/usr/bin/env bash\ncat > {state}/clip\n')
             for p in bin_dir.iterdir():
                 p.chmod(0o755)
@@ -670,6 +675,49 @@ class WindowsMcpServeTest(unittest.TestCase):
         result, _, _ = self.run_script(STOP_SCRIPT, auth_broken=True)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertNotIn("已收掉", result.stdout)
+
+
+class WindowsMcpStdioTest(unittest.TestCase):
+    """windows-mcp-stdio：mcp.yaml 的進入點，exec Windows 那邊 mise 的 shim；沒裝或不是 WSL 時說原因、結束。"""
+
+    def run_stdio(self, wsl=True, installed=True):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            home = tmp / "winhome"
+            shims = home / "AppData/Local/mise/shims"
+            shims.mkdir(parents=True)
+            if installed:
+                # 假 shim 印出收到的參數與 stdin，確認是 exec 它、stdin 沒被 powershell.exe 吃掉
+                (shims / "windows-mcp.exe").write_text('#!/usr/bin/env bash\necho "shim $*"; cat\n')
+                (shims / "windows-mcp.exe").chmod(0o755)
+            bin_dir = tmp / "bin"
+            bin_dir.mkdir()
+            if wsl:
+                (bin_dir / "powershell.exe").write_text(FAKE_POWERSHELL)
+            (bin_dir / "wslpath").write_text(FAKE_WSLPATH.replace("__HOME__", str(home)))
+            for p in bin_dir.iterdir():
+                p.chmod(0o755)
+            env = {**os.environ, "PATH": f"{bin_dir}:/usr/bin:/bin"}
+            return subprocess.run(["bash", str(STDIO_SCRIPT)], env=env, input="mcp-message\n",
+                                  capture_output=True, text=True, timeout=15)
+
+    def test_execs_mise_shim_with_stdio_transport(self):
+        result = self.run_stdio()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "shim serve --transport stdio\nmcp-message\n")
+
+    def test_missing_shim_says_to_tick_windows_mcp(self):
+        result = self.run_stdio(installed=False)
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("找不到 %LOCALAPPDATA%\\mise\\shims\\windows-mcp.exe", result.stderr)
+        self.assertIn("勾 windows-mcp 再 apply", result.stderr)
+
+    def test_not_wsl_exits(self):
+        result = self.run_stdio(wsl=False)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("不是 Windows 桌機的 WSL", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
