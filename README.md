@@ -115,9 +115,9 @@ caveman 另外有 proxy（`caveman claude`）和 MCP server，**都沒用**：pr
 
 ## MCP 的 API key
 
-`mcp.yaml` 只寫 `fromEnv: CONTEXT7_API_KEY`，各 client 設定裡留的也只是參照。值由 dotfiles export
+`mcp.yaml` 只寫 `fromEnv: CONTEXT7_API_KEY`、`bearerToken: {fromEnv: GRAPHIFY_API_KEY}`，各 client 設定裡留的也只是參照。值由 dotfiles export
 （chezmoi 渲染成 `~/.config/zsh/env.zsh`），所以 agent 要從 zsh 開起來才讀得到。沒填 key，context7
-就走匿名額度。
+就走匿名額度；graphify 沒有 key 就連不上。
 
 ## sync mcp 撞到衝突
 
