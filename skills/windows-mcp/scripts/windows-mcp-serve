@@ -16,9 +16,11 @@ exe_win=$(pwsh '"$env:USERPROFILE\.local\bin\windows-mcp.exe"')
 allow=$(pwsh "Get-NetFirewallRule -Direction Inbound -Action Allow -Enabled True | Where-Object { (\$_ | Get-NetFirewallApplicationFilter).Program -match 'windows-mcp|\\\\uv\\\\' } | ForEach-Object DisplayName")
 [ -z "$allow" ] || { echo "防火牆有放行 windows-mcp 的 inbound 規則，區網可直連 $PORT：$allow" >&2; exit 1; }
 
-# 2. 換新 key
+# 2. 換新 key。pwsh 吞掉錯誤，所以比對前後的 key：沒換掉就停，不然會把上一輪交出去的舊 key 再交一次
 echo "換新 key…"
+old=$(auth_key || true)
 pwsh "& '$exe_win' auth --transport streamable-http --host 0.0.0.0 --port $PORT --force *> \$null"
+[ "$(auth_key || true)" != "$old" ] || { echo "key 沒換掉（auth --force 失敗），不起 server" >&2; exit 1; }
 
 # 3. 起 server，等它開始聽
 echo "啟動 server（最小化視窗，log 在那個視窗裡）…"

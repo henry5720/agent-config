@@ -243,7 +243,8 @@ def render(report, base, part):
     text = "\n".join(lines).rstrip() + "\n"
     # 內嵌文字與 observed 可能帶執行主機的路徑：證據資料夾換成 `.`，家目錄換成 `~`。
     for local, public in ((report["evidenceDir"].rstrip("/"), "."), (str(base), "."), (str(Path.home()), "~")):
-        text = text.replace(local, public)
+        if local:  # evidenceDir 是 "/" 時 rstrip 後為空，replace("") 會在每個字之間插入
+            text = text.replace(local, public)
     return text, media, total
 
 

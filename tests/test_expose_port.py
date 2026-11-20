@@ -23,6 +23,7 @@ SCRIPT = ROOT / "skills" / "expose-port" / "scripts" / "expose-port-funnel"
 QUICK_SCRIPT = ROOT / "skills" / "expose-port" / "scripts" / "expose-port-quick-tunnel"
 AUTH_HEADER_SCRIPT = ROOT / "skills" / "windows-mcp" / "scripts" / "windows-mcp-auth-header"
 SERVE_SCRIPT = ROOT / "skills" / "windows-mcp" / "scripts" / "windows-mcp-serve"
+STOP_SCRIPT = ROOT / "skills" / "windows-mcp" / "scripts" / "windows-mcp-stop"
 
 HOST = "box.tail123.ts.net"
 QUICK_HOST = "quiet-fox-123.trycloudflare.com"
@@ -601,10 +602,12 @@ class WindowsMcpAuthHeaderTest(unittest.TestCase):
         self.assertEqual(result.stdout, f"Authorization: Bearer {KEY}\n")
 
 
-# 只認 windows-mcp-serve 會送的幾種 PowerShell 指令；server 起來後 listening 檔案在
+# 只認 windows-mcp-serve／stop 會送的幾種 PowerShell 指令；server 起來後 listening 檔案在。
+# auth --force 改寫 config.toml 的 key；FAKE_AUTH_BROKEN=1 時什麼都不做（模擬換 key 失敗）
 FAKE_POWERSHELL = r"""#!/usr/bin/env bash
 cmd="$3"
 case "$cmd" in
+  *" auth --transport "*) [ -n "$FAKE_AUTH_BROKEN" ] || printf 'auth_key = "rotated-%s"\n' "$RANDOM" > "$FAKE_WINHOME/.windows-mcp/config.toml" ;;
   '$env:USERPROFILE') printf 'C:\\Users\\me\r\n' ;;
   *windows-mcp.exe\") printf 'C:\\Users\\me\\.local\\bin\\windows-mcp.exe\r\n' ;;
   *Measure-Object\).Count*) [ -e "$FAKE_STATE/listening" ] && echo 1 || echo 0 ;;
@@ -614,16 +617,16 @@ esac
 
 
 class WindowsMcpServeTest(unittest.TestCase):
-    """windows-mcp-serve：起 server 後把 key 放進 Windows 剪貼簿，不印出來。"""
+    """windows-mcp-serve／stop：換新 key、key 放進 Windows 剪貼簿不印出來；key 沒換掉就失敗。"""
 
-    def test_copies_key_to_clipboard_without_printing_it(self):
+    def run_script(self, script, auth_broken=False):
+        """在假 Windows 環境跑 script，回 (結果, 剪貼簿內容, 跑完後 config 裡的 key)。"""
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp)
             home = tmp / "winhome"
             (home / ".windows-mcp").mkdir(parents=True)
-            (home / ".windows-mcp" / "config.toml").write_text(
-                f'transport = "streamable-http"\nauth_key = "{KEY}"\n'
-            )
+            config = home / ".windows-mcp" / "config.toml"
+            config.write_text(f'transport = "streamable-http"\nauth_key = "{KEY}"\n')
             (home / ".local" / "bin").mkdir(parents=True)
             (home / ".local" / "bin" / "windows-mcp.exe").write_text("")
             state = tmp / "state"
@@ -637,14 +640,36 @@ class WindowsMcpServeTest(unittest.TestCase):
             (bin_dir / "clip.exe").write_text(f'#!/usr/bin/env bash\ncat > {state}/clip\n')
             for p in bin_dir.iterdir():
                 p.chmod(0o755)
-            env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "FAKE_STATE": str(state)}
-            result = subprocess.run(["bash", str(SERVE_SCRIPT)], env=env, capture_output=True, text=True, timeout=30)
+            env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "FAKE_STATE": str(state),
+                   "FAKE_WINHOME": str(home), "FAKE_AUTH_BROKEN": "1" if auth_broken else ""}
+            result = subprocess.run(["bash", str(script)], env=env, capture_output=True, text=True, timeout=30)
             clip = (state / "clip").read_text() if (state / "clip").exists() else ""
+            key = config.read_text().split('auth_key = "')[1].split('"')[0]
+        return result, clip, key
+
+    def test_copies_new_key_to_clipboard_without_printing_it(self):
+        result, clip, key = self.run_script(SERVE_SCRIPT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(clip, KEY)
-        self.assertNotIn(KEY, result.stdout + result.stderr)
+        self.assertNotEqual(key, KEY)
+        self.assertEqual(clip, key)
+        self.assertNotIn(key, result.stdout + result.stderr)
         self.assertIn("key 已複製到 Windows 剪貼簿", result.stdout)
 
+    def test_serve_refuses_when_key_not_rotated(self):
+        result, clip, _ = self.run_script(SERVE_SCRIPT, auth_broken=True)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(clip, "")
+        self.assertIn("key 沒換掉", result.stderr)
+
+    def test_stop_rotates_key(self):
+        result, _, key = self.run_script(STOP_SCRIPT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotEqual(key, KEY)
+
+    def test_stop_fails_when_key_not_rotated(self):
+        result, _, _ = self.run_script(STOP_SCRIPT, auth_broken=True)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertNotIn("已收掉", result.stdout)
 
 if __name__ == "__main__":
     unittest.main()

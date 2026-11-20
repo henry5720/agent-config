@@ -700,33 +700,6 @@ class SlackListTest(unittest.TestCase):
             "large.html", b"x" * (slack_list.ARTIFACT_MAX_BYTES + 1))
         self.assert_artifact_rejected(path, "單檔上限")
 
-    def assert_remote_artifact_rejected(self, path, expected):
-        with patch.object(slack_list, "ARTIFACT_DRAFTS_ROOT", Path(self.tmp.name)), \
-                patch.object(slack_list, "config") as config, \
-                redirect_stderr(io.StringIO()) as errors:
-            with self.assertRaises(SystemExit):
-                slack_list.cmd_artifact([
-                    "RecA", "--file", str(path), "--kind", "artifact",
-                    "--summary", "remote 測試", "--remote",
-                ])
-        self.assertIn(expected, errors.getvalue())
-        self.assertTrue(path.exists())
-        config.assert_not_called()
-
-    def test_remote_artifact_rejects_zip_and_js_but_local_extensions_remain_compatible(self):
-        for suffix in (".zip", ".js"):
-            with self.subTest(suffix=suffix):
-                path = self.artifact_path(f"local{suffix}", b"local")
-                self.assert_remote_artifact_rejected(path, "remote artifact")
-                with patch.object(slack_list, "ARTIFACT_DRAFTS_ROOT", Path(self.tmp.name)):
-                    resolved, data = slack_list.artifact_file(path)
-                self.assertEqual(resolved, path.resolve())
-                self.assertEqual(data, b"local")
-
-    def test_remote_html_requires_explicit_html_flag(self):
-        path = self.artifact_path("remote.html")
-        self.assert_remote_artifact_rejected(path, "明確加上 --html")
-
     def test_local_artifact_command_keeps_zip_and_js_compatibility(self):
         for suffix in (".zip", ".js"):
             with self.subTest(suffix=suffix):

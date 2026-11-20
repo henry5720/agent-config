@@ -74,8 +74,6 @@ ARTIFACT_ROOT_ENV = "SLACK_LIST_ARTIFACT_ROOT"
 ARTIFACT_ALLOWED_EXTENSIONS = frozenset({
     ".html", ".md", ".css", ".js", ".json", ".png", ".zip",
 })
-# remote runtime 的格式邊界比 local CLI 窄；HTML 另外需要呼叫者明確標記。
-REMOTE_ARTIFACT_ALLOWED_EXTENSIONS = frozenset({".png", ".md", ".html"})
 # artifact 是受限 runtime 的交付入口；先擋住單檔大小，避免把 container 的記憶體
 # 交給 Slack upload。讀取時仍會以 fd 的實際內容再次檢查，防止檔案在 fstat 後長大。
 ARTIFACT_MAX_BYTES = 10 * 1024 * 1024
@@ -722,20 +720,7 @@ def upload_md(token, channel, thread_ts, path):
     p = Path(path)
     if not p.exists():
         die(f"找不到 {p}")
-    data = p.read_bytes()
-    slot = api_get("files.getUploadURLExternal",
-                   {"filename": p.name, "length": str(len(data))}, token)
-    req = urllib.request.Request(slot["upload_url"], data=data,
-                                 headers={"Content-Type": "application/octet-stream"})
-    try:
-        urllib.request.urlopen(req, timeout=60).read()
-    except (urllib.error.URLError, OSError, http.client.HTTPException) as e:
-        die(f"檔案上傳失敗：{getattr(e, 'reason', e)}")
-    api("files.completeUploadExternal", {
-        "files": [{"id": slot["file_id"], "title": p.stem}],
-        "channel_id": channel, "thread_ts": thread_ts,
-    }, token)
-    return slot["file_id"]
+    return upload_bytes(token, channel, thread_ts, p.name, p.read_bytes())
 
 
 def artifact_root():
@@ -1643,23 +1628,7 @@ def cmd_artifact(argv):
     ap.add_argument("--kind", required=True, choices=("prototype", "artifact"),
                     help="交付物種類")
     ap.add_argument("--summary", required=True, help="給 PM 的簡短摘要")
-    ap.add_argument("--remote", action="store_true",
-                    help="啟用 remote runtime 格式限制：只接受 PNG、Markdown、HTML")
-    ap.add_argument("--html", action="store_true",
-                    help="明確表示 remote artifact 是 HTML；只能和 --remote 一起用")
     args = ap.parse_args(argv)
-
-    suffix = Path(args.file).suffix.lower()
-    if args.html and not args.remote:
-        die("--html 只能和 --remote 一起使用")
-    if args.remote:
-        if suffix not in REMOTE_ARTIFACT_ALLOWED_EXTENSIONS:
-            allowed = "、".join(sorted(REMOTE_ARTIFACT_ALLOWED_EXTENSIONS))
-            die(f"remote artifact 只接受：{allowed}；收到 {suffix or '(無)'}")
-        if suffix == ".html" and not args.html:
-            die("remote HTML 必須由呼叫者明確加上 --html")
-        if args.html and suffix != ".html":
-            die("--html 只能搭配 .html artifact")
 
     path, data = artifact_file(args.file)
     if not args.summary.strip():

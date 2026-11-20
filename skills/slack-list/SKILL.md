@@ -347,9 +347,7 @@ SLACK_LIST_ARTIFACT_ROOT=~/.local/share/slack-list/drafts \
 不要把 artifact 交到 DM、一般 channel 或新開的 thread。若 runtime 沒有原 Slack item 的
 `record_id`/thread context，不能保證回到原 thread；先回報這項 deployment 限制，不要猜 channel。
 
-預設 local CLI 保留上述副檔名白名單。remote runtime 要明確加 `--remote`，只接受 `.png`、`.md`、
-`.html`；`.html` 還必須由呼叫者加 `--html`。成功完成 upload 與 thread 訊息後，工具會刪除
-來源 regular file；upload、complete 或 post 任一步失敗都保留來源，避免無法重試或查證。
+成功完成 upload 與 thread 訊息後，工具會刪除來源 regular file；upload、complete 或 post 任一步失敗都保留來源，避免無法重試或查證。
 
 container cron／entrypoint 可呼叫：
 
