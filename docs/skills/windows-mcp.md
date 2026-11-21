@@ -29,17 +29,13 @@ server 一定要在你登入的桌面起：你在那台桌面開 PowerShell（�
 
 ## 第一次：在那台裝 Windows-MCP
 
-Windows-MCP 是第三方開源專案：[CursorTouch/Windows-MCP](https://github.com/CursorTouch/Windows-MCP)。下面是這裡用的裝法，其他裝法和選項看它的 README。
+Windows-MCP 是第三方開源專案：[CursorTouch/Windows-MCP](https://github.com/CursorTouch/Windows-MCP)。
+由 dotfiles 用 mise 裝：裝 dotfiles 時勾 windows-mcp，已經裝好的在 PowerShell 打 `tools` 加勾，勾完會 apply。
+怎麼裝、以前手動 `uv tool install` 的舊版怎麼刪，見 [dotfiles 的〈windows-mcp〉](https://github.com/henry5720/dotfiles/blob/main/docs/install/windows.md#windows-mcp)。
+同一台 WSL 的 `mcp.yaml` 和 agent 的腳本只找 mise 那份（`%LOCALAPPDATA%\mise\shims\windows-mcp.exe`），找不到會叫你勾了再 apply。
+沒裝 dotfiles 的機器（別人的、臨時借用）照 Windows-MCP 的 README 裝。
 
-```powershell
-winget install --exact --id Python.Python.3.14 --scope user
-winget install --exact --id astral-sh.uv
-# 重開 PowerShell
-uv tool install --python 3.14 windows-mcp
-uv tool update-shell
-```
-
-重開的 PowerShell 跑 `windows-mcp --help` 有輸出就好。走 quick tunnel 的再裝 cloudflared
+勾完新開一個 PowerShell 跑 `windows-mcp --help`，有輸出就好。走 quick tunnel 的再裝 cloudflared
 （[remote-access 的 Cloudflare quick tunnel](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access/README.md#cloudflare-quick-tunnel)）。
 winget 裝完，當下的 PowerShell 找不到 `cloudflared`：重開 PowerShell，或用完整路徑
 `& 'C:\Program Files (x86)\cloudflared\cloudflared.exe'`。
@@ -110,6 +106,7 @@ winget 裝完，當下的 PowerShell 找不到 `cloudflared`：重開 PowerShell
 | server 從 ssh session 起 | 2026-11-05 實測起不來：`No active interactive desktop`，要在桌面起（終端機或 Interactive scheduled task） |
 | `auth --force` 每次寫入新 key | 2026-11-05 實測：config 的 key 雜湊每跑一次就不同 |
 | tailnet 內（ssh 轉發、tailscale serve） | 未實測 |
+| 同一台 WSL 的 client 經 `mcp.yaml` 帶起 mise 裝的 windows-mcp（shim） | 未實測（路徑照 2026-11-20 henry-desktop 實測的安裝位置） |
 
 server 本身的坑（`/mcp/` 307、log 在哪、`Host` 檢查、session 順序）見
 [`skills/windows-mcp/reference.md`](../../skills/windows-mcp/reference.md)。

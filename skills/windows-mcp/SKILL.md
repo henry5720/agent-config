@@ -14,17 +14,9 @@ server 本身的坑（400、307、session）看 [reference.md](reference.md)；�
 
 ## 第一次安裝
 
-Windows-MCP 是第三方開源專案（[CursorTouch/Windows-MCP](https://github.com/CursorTouch/Windows-MCP)），工具清單和選項以它的 README 為準。在 Windows PowerShell 跑：
+Windows-MCP 是第三方開源專案（[CursorTouch/Windows-MCP](https://github.com/CursorTouch/Windows-MCP)），工具清單和選項以它的 README 為準。安裝交給使用者，照 agent-config 的 `docs/skills/windows-mcp.md`〈第一次：在那台裝 Windows-MCP〉（由 dotfiles 用 mise 裝）。腳本只找 mise 的 shim `%LOCALAPPDATA%\mise\shims\windows-mcp.exe`，找不到會印出要使用者做什麼，照轉達。
 
-```powershell
-winget install --exact --id Python.Python.3.14 --scope user
-winget install --exact --id astral-sh.uv
-# 重開 PowerShell
-uv tool install --python 3.14 windows-mcp
-uv tool update-shell
-```
-
-完成條件：重開的 PowerShell 跑 `windows-mcp --help` 有輸出。
+完成條件：使用者在新開的 PowerShell 跑 `windows-mcp --help` 有輸出。
 
 只用需要時才開的方式。`windows-mcp install` 會建登入時自動啟動的 scheduled task，這裡用不到。
 
