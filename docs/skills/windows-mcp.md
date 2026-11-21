@@ -43,11 +43,11 @@ winget 裝完，當下的 PowerShell 找不到 `cloudflared`：重開 PowerShell
 
 ## quick tunnel：你要貼的
 
-1. **起 server、換 key**：那台 PowerShell 依序貼上。最後一行把 key 複製到剪貼簿，不會印在畫面上。
+1. **起 server、換 key**：那台 PowerShell 依序貼上。第一行換 key 時會把新 key 印出來，所以導到 `$null`（畫面上的 key 會被 agent 的截圖拍到）；最後一行把 key 複製到剪貼簿，不會印在畫面上。
    上一輪的 server 還開著的話先照〈用完收掉〉收：server 跑著時換 key 不生效，舊 key 照樣能用。
 
    ```powershell
-   windows-mcp auth --transport streamable-http --host 127.0.0.1 --port 8000 --force
+   windows-mcp auth --transport streamable-http --host 127.0.0.1 --port 8000 --force *> $null
    Start-Process -WindowStyle Minimized windows-mcp -ArgumentList 'serve'
    (Select-String "$HOME\.windows-mcp\config.toml" -Pattern 'auth_key\s*=\s*"([^"]+)"').Matches.Groups[1].Value | Set-Clipboard
    ```
@@ -67,7 +67,7 @@ winget 裝完，當下的 PowerShell 找不到 `cloudflared`：重開 PowerShell
    ```powershell
    Get-Process cloudflared -ErrorAction SilentlyContinue | Stop-Process -Force
    Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
-   windows-mcp auth --transport streamable-http --host 127.0.0.1 --port 8000 --force
+   windows-mcp auth --transport streamable-http --host 127.0.0.1 --port 8000 --force *> $null
    (Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | Measure-Object).Count
    (Get-Process cloudflared -ErrorAction SilentlyContinue | Measure-Object).Count
    ```

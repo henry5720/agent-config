@@ -41,7 +41,7 @@ Windows-MCP 是第三方開源專案（[CursorTouch/Windows-MCP](https://github.
 **agent 就在那台 Windows**（原生 Windows 的 Claude Code，不經 WSL）時，`scripts/` 跑不了（要 WSL 的 bash、`powershell.exe`、`wslpath`）。改成 agent 用 PowerShell tool 自己跑[〈使用者在那台 PowerShell 貼〉](#使用者在那台-powershell-貼)的起、收那幾段，不用請使用者貼；這個 agent 要是從使用者桌面開的，不然 server 一啟動就結束。起的完成條件改成 agent 自己查：過幾秒跑那節的計數那行（`Get-NetTCPConnection … | Measure-Object`）印的不是 `0`，再照那節交 key；收的完成條件同那節。公開網址照 `expose-port` 的〈agent 就在那台 Windows〉，驗證輸入如下（key 只寫進暫存檔，不印出來）：
 
 - `<印出 header 的 PowerShell>`：`"Authorization: Bearer $((Select-String "$HOME\.windows-mcp\config.toml" -Pattern 'auth_key\s*=\s*"([^"]+)"').Matches.Groups[1].Value)"`
-- `<curl 參數>`：先把 [Funnel](#funnel) 第 2 步 `-d` 後面的 JSON 寫進檔案（`$body = New-TemporaryFile; '<那串 JSON>' | Set-Content $body -Encoding ascii -NoNewline`），再填 `'-X', 'POST', '-H', 'Accept: application/json, text/event-stream', '-H', 'Content-Type: application/json', '-d', "@$body"`，驗完 `Remove-Item $body`。
+- `<curl 參數>`：先把 [Funnel](#funnel) 第 2 步 `-d` 後面的 JSON 寫進檔案，再填 `'-X', 'POST', '-H', 'Accept: application/json, text/event-stream', '-H', 'Content-Type: application/json', '-d', "@$body"`。寫檔那行 `$body = New-TemporaryFile; '<那串 JSON>' | Set-Content $body -Encoding ascii -NoNewline` 跟 `expose-port` 第 3 步那段放在同一次 PowerShell 呼叫（tool 不一定在兩次呼叫間保留變數），插在 `$hdr = New-TemporaryFile` 前一行，並把那段的 `finally` 改成 `finally { Remove-Item $hdr, $body }`。
 - 不帶／帶驗證：`401`／`200`；`<路徑>`：`/mcp`。
 
 ### 交 key 和交代 agent（每條都一樣）
@@ -53,10 +53,10 @@ Windows-MCP 是第三方開源專案（[CursorTouch/Windows-MCP](https://github.
 
 那台沒有 WSL 或沒有 skillshare 時，server 由使用者起、收。`<綁的位址>` 照各條：要讓代理改寫 `Host` 或走 ssh 轉發時 `127.0.0.1`；Funnel、tailscale serve 不能改寫 `Host`，用 `0.0.0.0`。
 
-- **起 server、換 key**：先確認 8000 沒有程式在聽（`(Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | Measure-Object).Count` 是 `0`；不是就先照下面〈收掉〉收）。server 跑著時 `auth --force` 換的 key 不生效，舊 key 照樣能用（2026-11-05 在 henry-laptop 實測舊 key 仍回 `200`），所以一定是沒有 server 時換 key、再起。`auth --force` 換一把新 key，最後一行把 key 複製到剪貼簿、不會印出來。取 key 都用最後一行；`config.toml` 開在畫面上時 key 會被 `Screenshot` 拍進去，真的用記事本開過就立刻關掉。綁 `0.0.0.0` 時，先請使用者確認防火牆沒放行 windows-mcp 的 inbound（不然區網能直連 8000，只剩 key 擋）。
+- **起 server、換 key**：先確認 8000 沒有程式在聽（`(Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | Measure-Object).Count` 是 `0`；不是就先照下面〈收掉〉收）。server 跑著時 `auth --force` 換的 key 不生效，舊 key 照樣能用（2026-11-05 在 henry-laptop 實測舊 key 仍回 `200`），所以一定是沒有 server 時換 key、再起。`auth --force` 換一把新 key，但會把新 key 印出來（`Generated auth key: …` 和帶 `Bearer` 的 client 設定），所以輸出導到 `$null`，不然 key 會進 agent 的 tool 輸出、或留在畫面上被 `Screenshot` 拍到。最後一行把 key 複製到剪貼簿、不印出來；取 key 都用最後一行。`config.toml` 開在畫面上時 key 會被 `Screenshot` 拍進去，真的用記事本開過就立刻關掉。綁 `0.0.0.0` 時，先請使用者確認防火牆沒放行 windows-mcp 的 inbound（不然區網能直連 8000，只剩 key 擋）。
 
   ```powershell
-  windows-mcp auth --transport streamable-http --host <綁的位址> --port 8000 --force
+  windows-mcp auth --transport streamable-http --host <綁的位址> --port 8000 --force *> $null
   Start-Process -WindowStyle Minimized windows-mcp -ArgumentList 'serve','--host','<綁的位址>'
   (Select-String "$HOME\.windows-mcp\config.toml" -Pattern 'auth_key\s*=\s*"([^"]+)"').Matches.Groups[1].Value | Set-Clipboard
   ```
@@ -66,7 +66,7 @@ Windows-MCP 是第三方開源專案（[CursorTouch/Windows-MCP](https://github.
 
   ```powershell
   Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
-  windows-mcp auth --transport streamable-http --host 127.0.0.1 --port 8000 --force
+  windows-mcp auth --transport streamable-http --host 127.0.0.1 --port 8000 --force *> $null
   (Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | Measure-Object).Count
   ```
 
