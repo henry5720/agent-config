@@ -1,11 +1,7 @@
 # 個人偏好
 
-> 這份是**跨 repo、跨 agent** 的個人偏好，只寫「換到任何一個 repo 都還成立」的事。
-> 先看讀者。給人看的：README 只放專案層（是什麼、怎麼裝），細節放 `docs/<主題>.md` 由 README 連過去；
-> 工具的通用用法連官方、不抄；設定檔的註解就是它的文件，不另寫一份。
-> 給 agent 的：每次都要遵守的寫該 repo 的 `AGENTS.md`；重複的流程寫成 skill；連外部系統用 MCP；
-> 一定要發生的用 hook。細節看官方：[AGENTS.md](https://agents.md/)、
-> [Claude Code](https://code.claude.com/docs/en/features-overview)、[Codex](https://learn.chatgpt.com/docs/customization/overview)。
+寫給人看的文件（README、`docs/`）時載入 `writing-for-humans`。
+寫給 agent 的文件（skill、`AGENTS.md`、`CLAUDE.md`）時載入 `writing-for-agents`。
 
 ## 語言
 
@@ -26,29 +22,20 @@
 
 ## 照讀者選格式
 
-- 給人看的說明偏好精簡的視覺呈現；簡單內容用短文，避免同一內容重複展示。
-- agent 指引用精確的文字步驟、契約與完成條件，照 `writing-for-agents` skill。
+- 給人看的說明：流程、前後比較、目錄關係用表格或縮排樹；一句話講得完的不畫圖，同一內容不重複展示。
 - 依接收平台選擇可直接閱讀的形式；PR/GitHub 不提供只能本機檢視的 HTML。
 - 要畫圖前先確認那個地方渲染得出來 —— 終端機和 Slack 都不會渲染 mermaid，改用文字箭頭或縮排樹；表格可以用。
-
-## PR body
-
-撰寫或更新 PR body 時使用 `pr` skill，遵循 repo 的 PR 規則。驗證段使用 `## 驗證`，列實際執行的指令與結果，以及未驗項目和原因。視覺證據按需附真實截圖；靜態圖不足以表達互動時才附短影片。證據須對應本次變更、不含敏感資料，作為附件提供、不 commit。
 
 ## 誠實
 
 - 不要說「看起來沒問題」「應該可以」。有疑慮直說「可以跑，但…」。
 - 講風險、講影響範圍時要附檔案路徑、行號或指令輸出。憑印象講的不算數。
 - 回覆裡提到的路徑、檔名、函式名，先確認存在再寫出來。
+- 截圖、影片等證據作為附件提供，不 commit、不含敏感資料。
 
 ## Issue 狀態
 
-處理 issue 時，先讀 repo 的 `AGENTS.md`／`CLAUDE.md` 指向的 issue tracker 規則；若未指向，檢查 `docs/agents/issue-tracker.md`。repo 明寫的項目優先，未寫的沿用以下預設；有 tracker 文件不代表整段預設失效。
-
-1. **認領**：動工前讀取 issue 狀態、assignees 與 blockers。已關閉、有未解除的 blocker 或其他人承接時，先回報並處理該條件，再動工；可承接時先 assign 自己，確認寫入成功。GitHub 用 `gh issue edit <number> --add-assignee @me`；其他 tracker 用對應操作。
-2. **卡住**：在 issue 留言寫明卡點、解除條件及已完成的工作，保留 open 與 assignee。有原生 dependency 欄位時同步維護 blocker 關係，解除後更新。
-3. **完成**：更新完成清單，附 PR／commit 與實際驗證結果。有 PR 就寫 `Closes`，merge 時關（目標分支不會自動關單時，merge 後手動關）；無 PR 則實作完成就關。只差實機驗收照樣關；沒做完的部分另開 issue。issue 要解決的事本身只有實機驗得到時，PR 改寫 `Refs`、保留 open、寫明剩餘項目，驗過才關。
-4. **交接**：結束回覆前，重新讀取本次處理的每張 issue，確認 assignee、blockers、完成清單及 open／closed 與實際進度一致；修正不符處。寫入失敗時明確回報未同步的項目與原因。
+處理 issue 前先載入 `issue-status` skill（認領、卡住、完成、交接）。
 
 ## Commit 共同作者
 
@@ -60,10 +47,6 @@
 
 別人正在用的 worktree 只讀，要動碼就自己開一個：另一個 session 可能住在裡面，`git switch` 會把它的 HEAD 和未提交的檔案帶到你的分支。
 
-<!-- 以下整段是 `codegraph install` 自己寫進 ~/.claude/CLAUDE.md 的。
-     這份檔案由 chezmoi 部署,不收進 repo 的話下次 apply 就會被刪掉,codegraph 就沒人告訴 agent 要用。
-     刻意保留英文原文、連 START/END 標記一起留:`codegraph upgrade` 會重寫兩個標記之間的內容,
-     翻成中文的話每次升級都會產生 chezmoi diff。 -->
 <!-- CODEGRAPH_START -->
 ## CodeGraph
 
