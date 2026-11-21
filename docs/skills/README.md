@@ -3,7 +3,7 @@
 skill 是一套「做某件事的步驟」。本體（SKILL.md 內文）用到才載入，但 **name + description
 每個 request 都常駐在 context 裡**（見〈怎麼關〉）。
 
-指令（裝、更新、同步）在 [README 的日常操作](../../README.md#日常操作)，這份不重寫；
+指令（裝、更新、同步）看 [skillshare 官方文件](https://skillshare.runkids.cc)，這份不重寫；
 這份講背後的安排。
 
 ## 從哪來、落到哪
@@ -44,6 +44,18 @@ skillshare install herdrdev/herdr/skills/herdr --branch v<新版> --force && ski
 
 `playwright-cli` 的 skill 同理，釘在跟本機 `@playwright/cli` 同版的上游 commit，升級步驟見
 [verify-in-browser.md](verify-in-browser.md#升級-playwright-cli-後跟上-skill)。
+
+## 選 skill 的原則
+
+**裝進來的每一支，description 每個 request 都會常駐在 context 裡。** 職責重疊的不要裝兩份。
+
+[caveman](https://github.com/JuliusBrussee/caveman) 是例子：它的 repo 有 20 個 skill，原本只裝了核心的
+`caveman`，後來也移除了：回覆要精簡已經寫在全域規則，裝了一個多月沒用過。其他的 6 個要 Caveman Cloud 帳號；`investigate-first`、`safe-refactor`、`surgical-patch`、
+`lean-build`、`verify-and-stop`、`caveman-explore`、`cavecrew` 跟 mattpocock 那組
+（`diagnosing-bugs` / `tdd` / `prototype`）和內建的 `Explore` agent 重疊。
+
+caveman 另外有 proxy（`caveman claude`）和 MCP server，**都沒用**：proxy 會改寫送進模型的內容，
+出問題時分不清是模型的問題還是被壓壞了，而且它要換掉 `claude` 的啟動入口。
 
 ## 為什麼第三方 skill 用 skillshare 裝，不手抄
 

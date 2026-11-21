@@ -1,127 +1,25 @@
 # agent-config
 
-[skillshare](https://github.com/runkids/skillshare) 的設定目錄（`~/.config/skillshare`），整個目錄進版控
-（`git_root: root`）。三台機器共用同一份：Claude Code、Codex、OpenCode 的規則、skills 和 MCP 都從這裡來。
+[skillshare](https://github.com/runkids/skillshare) 的設定目錄（`~/.config/skillshare`）。三台機器的
+Claude Code、Codex、OpenCode 共用同一份全域規則、skills、MCP 和 hook，改一次全部跟著動。
+dotfiles（chezmoi）負責裝 skillshare 和各 client 的設定，這個 repo 負責 client 要讀的內容。
 
-```mermaid
-flowchart LR
-  dotfiles["dotfiles（chezmoi）<br/>client 設定"]
-  agentconfig["agent-config（skillshare）<br/>規則、skills、MCP"]
-  clients["Claude Code<br/>Codex<br/>OpenCode"]
+## 安裝
 
-  dotfiles --> clients
-  agentconfig --> clients
-  dotfiles -. "裝 skillshare、放 config.yaml" .-> agentconfig
-```
+照 dotfiles 的 [new-machine-setup.md](https://github.com/henry5720/dotfiles/blob/main/docs/new-machine-setup.md) 做：
+它會裝 skillshare、clone 這個 repo、放好 `config.yaml`。規則、skill、MCP、plugin 各歸誰管看 dotfiles 的
+[ai-agent-setup.md](https://github.com/henry5720/dotfiles/blob/main/docs/ai-agent/ai-agent-setup.md)。
 
-規則、skill、MCP、plugin 各歸誰管、檔案在哪，看 dotfiles 的
-[ai-agent-setup.md](https://github.com/henry5720/dotfiles/blob/main/docs/ai-agent/ai-agent-setup.md)；
-新機器怎麼裝起來看 [new-machine-setup.md](https://github.com/henry5720/dotfiles/blob/main/docs/new-machine-setup.md)。
-這份只管「裝好之後怎麼用」。詞彙（source、target、local…）見 [GLOSSARY.md](GLOSSARY.md)。
+## 裝完之後去哪
 
-**公開 repo。** 秘密不進來：MCP 的 key 用 `fromEnv`，skill 的 token 放 `~/.config/<skill>/.env`。
+- 裝、更新、同步 skill 和 MCP：[skillshare 官方文件](https://skillshare.runkids.cc)。
+- 這台改完怎麼推、其他台怎麼跟上：[docs/architecture.md〈跨機器〉](docs/architecture.md#跨機器)。
+- 詞彙（source、target、local…）：[GLOSSARY.md](GLOSSARY.md)。
 
-## 裡面有什麼
+## 文件索引
 
-```text
-mcp.yaml              三個 client 共用的 MCP server
-hooks/<名字>.yaml      自己寫的 hook（skillshare 的 hook entry），每台各自 add
-docs/                 給人看的文件
-  mcp/                MCP：三個 client 怎麼共用、key、衝突、Graphify
-  skills/README.md    skill：從哪來、裝給誰、怎麼關
-  skills/<名字>.md     要自己動手的 skill 才有一份
-skills/
-  .metadata.json      第三方 skill 從哪裝、哪個 commit（update --all 讀它）
-  <名字>/SKILL.md     自己寫的 + 第三方裝進來的，都在這層
-tests/                自己寫的 skill 的 script 測試
-```
+- [docs/skills/](docs/skills/README.md)：skill 從哪來、裝給誰、怎麼選、怎麼關，以及要自己動手的 skill 的說明。
+- [docs/mcp/](docs/mcp/README.md)：三個 client 怎麼共用 MCP、API key、sync 衝突、Graphify。
+- [docs/hooks/](docs/hooks/README.md)：自己寫的 hook 怎麼 add、edit，Codex 要設 trusted。
 
-`config.yaml` 不在 repo 裡：skillshare 的 root 模式會自動 ignore 它，`push` 時就算 commit 了也會被
-拿出來，因為它寫的是這台機器的路徑。所以由 dotfiles 用 chezmoi 放（`modify_config.yaml.tmpl`：新機器給 source 路徑和 targets，
-之後每次 apply 只釘 `extras` 段，也就是規則連到哪）。以後要不同機器不同配置，改那份就好。
-
-## 日常操作
-
-```mermaid
-flowchart LR
-  a["任一台<br/>install / mcp add"] -- "sync → push" --> repo["agent-config"]
-  repo -- "pull → sync mcp -g" --> b["其他台"]
-```
-
-**skill**
-
-```bash
-skillshare list -v                              # 裝了哪些、各自來自哪
-skillshare install <帳號>/<repo> -s <名字>        # 裝別人的，只挑這幾個
-skillshare update --all                         # 全部照來源更新
-skillshare uninstall <名字>
-skillshare sync                                 # 同步到 ~/.claude/skills、~/.agents/skills
-```
-
-**MCP**
-
-```bash
-skillshare mcp list
-skillshare mcp add <名字> --url <https://...>   # 或 -- <指令> <參數>；不加 --sync 只存進 mcp.yaml
-skillshare sync mcp -g                          # 寫進三個 client，只動自己寫的條目
-```
-
-**hook**
-
-自己寫的 hook 定義放 `hooks/<名字>.yaml`。skillshare 把 hook 存在 `config.yaml`（不進 repo），
-所以每台要自己 add 一次，之後 yaml 改了就 edit：
-
-```bash
-skillshare hooks add <名字> --file ~/.config/skillshare/hooks/<名字>.yaml -g --sync   # 這台第一次
-skillshare hooks edit <名字> --file ~/.config/skillshare/hooks/<名字>.yaml -g --sync  # pull 到新版
-skillshare hooks list -g                                                           # 兩邊都是 ✓ 才算同步
-```
-
-Codex 不會跑沒審過的 hook：add 或 edit 之後開 Codex 打 `/hooks`，把新的或改過的那條設成 trusted。
-herdr、codegraph 這些工具自己寫的 hook 不收，`hooks list` 列成 `not managed` 是正常的，sync 不會動它們。
-
-| hook | 做什麼 |
-|---|---|
-| `speak` | Claude Code、Codex 回完話把回覆唸到個人電腦（dotfiles 的 `voice-out-speak`，沒勾 `snapserver` 的機器直接略過） |
-
-**跨機器**
-
-```bash
-skillshare push                                 # 這台改完
-skillshare pull && skillshare sync mcp -g       # 其他台；pull 只同步 skill，MCP 要另外 sync
-```
-
-進階用法（project 範圍 `-p`、dashboard、audit、`.skillignore`）看
-[skillshare 官方文件](https://skillshare.runkids.cc)。
-
-## 選 skill 的原則
-
-**裝進來的每一支，description 每個 request 都會常駐在 context 裡。** 職責重疊的不要裝兩份。
-
-[caveman](https://github.com/JuliusBrussee/caveman) 是例子：它的 repo 有 20 個 skill，原本只裝了核心的
-`caveman`，後來也移除了：回覆要精簡已經寫在全域規則，裝了一個多月沒用過。其他的 6 個要 Caveman Cloud 帳號；`investigate-first`、`safe-refactor`、`surgical-patch`、
-`lean-build`、`verify-and-stop`、`caveman-explore`、`cavecrew` 跟 mattpocock 那組
-（`diagnosing-bugs` / `tdd` / `prototype`）和內建的 `Explore` agent 重疊。
-
-caveman 另外有 proxy（`caveman claude`）和 MCP server，**都沒用**：proxy 會改寫送進模型的內容，
-出問題時分不清是模型的問題還是被壓壞了，而且它要換掉 `claude` 的啟動入口。
-
-⚠️ `update` 會**蓋掉手改過的第三方 skill**。要改別人的，先複製成自己的 skill 再改。
-
-## 自己寫的 skill
-
-放 `skills/<名字>/`。skill 要呼叫的 script 放同一個資料夾（例如 slack-list 的 `scripts/`），
-裝 skill 就裝到 script。秘密放 `~/.config/<名字>/.env`，repo 裡只留 `.env.example`。
-
-## MCP 的 key、sync 衝突
-
-API key 怎麼設、`sync mcp` 撞到衝突、OpenCode 的空殼 `opencode.jsonc`，見 [docs/mcp/](docs/mcp/README.md)。
-
-## 測試
-
-[uv](https://docs.astral.sh/uv/) 會在隔離環境準備 `tests/requirements.txt` 的依賴，再執行既有 unittest；首次下載套件需要連網。
-
-```bash
-uv run --isolated --no-project --with-requirements tests/requirements.txt \
-  python3 -B -m unittest discover -s tests
-```
+改這個 repo：結構看 [docs/architecture.md](docs/architecture.md)，規則看 [AGENTS.md](AGENTS.md)。
