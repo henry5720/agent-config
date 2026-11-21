@@ -11,7 +11,7 @@ description: 把本機某個 port 開成 tailnet 外連得到的公開網址：�
 
 ## 選分支
 
-開出去的那台**跑得到登入使用者 tailnet 的 tailscale** → [Funnel](#funnel)。那台不加進使用者的 tailnet（別人的機器、臨時借用）→ [quick tunnel](#quick-tunnel)。差異看 [比較表](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access/README.md#比較表)。
+開出去的那台**跑得到登入使用者 tailnet 的 tailscale** → [Funnel](#funnel)。那台不加進使用者的 tailnet（別人的機器、臨時借用）→ [quick tunnel](#quick-tunnel)。差異看 [比較表](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access/README.md#比較表)。你自己就跑在那台 Windows（不經 WSL）時，選完照 [agent 就在那台 Windows](#agent-就在那台-windows) 做。
 
 ## 跟 app 要的輸入
 
@@ -23,7 +23,7 @@ description: 把本機某個 port 開成 tailnet 外連得到的公開網址：�
 | app 對 `Host` 的要求 | 綁 loopback 時只接受 `localhost` |
 | 驗證打哪個路徑、帶什麼請求 | `/mcp`，POST MCP `initialize` |
 | 不帶驗證、帶驗證各要回什麼 | `401`、`200` |
-| 怎麼拿驗證 header | 一支印出 `Authorization: Bearer <key>` 的指令 |
+| 怎麼拿驗證 header | 一支印出 `Authorization: Bearer <key>` 的指令（[agent 就在那台 Windows](#agent-就在那台-windows) 時是一段 PowerShell） |
 
 驗證 header 由指令印出、腳本自己讀，你不用也不要看到 key。
 
@@ -125,3 +125,44 @@ tailscale funnel --https=<對外 port> <app port>    # Linux 沒設 operator 要
      完成條件：印出 `0`（假設那台沒有別的 cloudflared），`check-closed` exit 0。
 
    接著由 app 停掉它的 server（app 的文件寫怎麼確認沒有程式在聽那個 port）。
+
+## agent 就在那台 Windows
+
+agent 直接跑在要開出去的那台 Windows（原生 Windows 的 Claude Code，不經 WSL）時，兩支腳本都跑不了：它們是 python3，靠 `pgrep`／`pkill`、`SIGHUP`，dotfiles 在 Windows 也不裝 Python。分支照[選分支](#選分支)選，各步改成 agent 用 PowerShell tool 自己跑。下面的 `<程式>` 是 `tailscale`（Funnel）或 `cloudflared`（quick tunnel）；日誌路徑每次都寫完整，因為 PowerShell tool 不一定在兩次呼叫間保留變數。
+
+1. **對好 `Host`**：同各分支第 1 步。
+2. **開**：先確認 `(Get-Process <程式> -ErrorAction SilentlyContinue | Measure-Object).Count` 是 `0`。不是 `0` 就是有人開著（腳本遇到這種情況會拒絕開），停下問使用者，不要硬開，第 5 步也會一起停掉它。接著背景起、輸出寫進暫存檔：
+
+   ```powershell
+   # Funnel：對外 port 照 Funnel 第 2 步挑
+   Start-Process tailscale -ArgumentList 'funnel','--https=<對外 port>','<app port>' -WindowStyle Hidden -RedirectStandardOutput "$env:TEMP\expose-port.log" -RedirectStandardError "$env:TEMP\expose-port.err"
+   # quick tunnel：沒裝 cloudflared 先 winget 裝（同〈那台沒有這支腳本〉那條）；app 不檢查 Host 就拿掉最後兩個參數
+   Start-Process 'C:\Program Files (x86)\cloudflared\cloudflared.exe' -ArgumentList 'tunnel','--url','http://127.0.0.1:<app port>','--http-host-header','localhost' -WindowStyle Hidden -RedirectStandardOutput "$env:TEMP\expose-port.log" -RedirectStandardError "$env:TEMP\expose-port.err"
+   ```
+
+   過幾秒讀 `$env:TEMP\expose-port.log`、`$env:TEMP\expose-port.err` 找網址：Funnel 是 `https://<機器名>.<tailnet>.ts.net:<對外 port>`（印的是 admin console 連結時，請使用者開好 Funnel 權限，照第 5 步收掉再開一次），quick tunnel 是 `https://<隨機>.trycloudflare.com`。
+   完成條件：拿到網址，`<程式>` 的行程數是 `1`。
+3. **驗**：取代 `verify`。照腳本的做法用公開 DNS 查 IP 再 `--resolve` 過去（這台自己查 ts.net 會拿到 tailnet IP），header 寫進暫存檔用 `-H @檔案` 帶，key 不印出來、不進 curl 參數。`<印出 header 的 PowerShell>` 由 app skill 給；curl 參數裡的 JSON 寫進檔案用 `-d "@檔案"` 帶（Windows PowerShell 5.1 傳給外部程式時會吃掉參數裡的雙引號）。
+
+   ```powershell
+   $base = '<網址>'; $path = '<路徑>'
+   $u = [uri]$base
+   $ip = ((Invoke-RestMethod "https://cloudflare-dns.com/dns-query?name=$($u.Host)&type=A" -Headers @{accept = 'application/dns-json'} -TimeoutSec 10).Answer | Where-Object type -eq 1 | Select-Object -Last 1).data
+   if (-not $ip) { 'ip=空：公開 DNS 查不到'; return }
+   $probe = { param([string[]]$more) curl.exe -s -m 30 -o NUL -w '%{http_code}' --resolve "$($u.Host):$($u.Port):$ip" @more "$base$path" }
+   $hdr = New-TemporaryFile
+   try {
+     <印出 header 的 PowerShell> | Set-Content $hdr -Encoding ascii -NoNewline
+     "ip=$ip 不帶驗證=$(& $probe @(<curl 參數>)) 帶驗證=$(& $probe @(<curl 參數>, '-H', "@$hdr"))"
+   } finally { Remove-Item $hdr }
+   ```
+
+   完成條件：印出 `ip=<IP>`，兩個碼都跟 app 要的一樣。印 `ip=空` 或不帶驗證的碼不對時，等幾秒重跑（剛開的網址要幾秒才通，Funnel 的公開 DNS 也會晚一點才查得到）；重跑一分鐘還不對就照第 5 步收掉，再照 [reference.md](reference.md) 查。
+4. **交網址**：同各分支。
+5. **收掉**：停掉 `<程式>` 再確認。`tailscale` 只對到 CLI 的 `tailscale.exe`，不會停掉 tailscale 本身；兩種都會停掉這台所有同名行程（第 2 步確認過開之前是 `0`）。
+
+   ```powershell
+   Get-Process <程式> -ErrorAction SilentlyContinue | Stop-Process -Force; (Get-Process <程式> -ErrorAction SilentlyContinue | Measure-Object).Count
+   ```
+
+   完成條件：印出 `0`，再跑一次第 3 步那段：印 `ip=空`，或不帶驗證的碼是 `000`（Funnel）／`530`（quick tunnel）。剛停掉時可能還通一下，等幾秒重跑。接著由 app 停掉它的 server。
