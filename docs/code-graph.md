@@ -3,7 +3,7 @@
 程式碼圖譜是把自家 repo 的 symbol、呼叫、依賴做成圖，讓 agent 不用 grep 一路讀檔就查得到的工具（code knowledge graph）。
 查第三方套件文件的 context7、搜 GitHub 公開程式碼的 grep.app 不算這類。
 
-現在有兩個：codegraph、Graphify Cloud。找定義、誰呼叫、改了影響什麼兩個都做得到，差在**看哪一版程式碼**、**能不能跨 repo**。
+現在有兩個：codegraph、Graphify Cloud。找定義、誰呼叫、改了影響什麼兩個都做得到，差在**看哪一版程式碼**、**一次查詢涵蓋幾個 repo**。
 agent 該用哪個寫在全域規則（`instructions/agents-md/AGENTS.md` 的「Graphify」段），這份講給人看的差別和坑。
 Graphify 的試用紀錄在 [#99](https://github.com/henry5720/agent-config/issues/99)（到 2026-12-04）。
 
@@ -11,11 +11,13 @@ Graphify 的試用紀錄在 [#99](https://github.com/henry5720/agent-config/issu
 |---|---|---|
 | 索引在哪 | 本機 `<repo>/.codegraph/`，監看檔案自動更新 | 雲端，push 到 GitHub **預設分支**才重建 |
 | 看得到 | 手上 checkout 的程式碼，含沒 push 的改動 | 預設分支最後建圖的 commit；其他分支、PR 分支不建 |
-| 跨 repo | 不行，一次一個專案 | 可以，有合併 workspace（例如 `teamsync-core`） |
+| 查多個 repo | 可以，用 `projectPath` 一次查一個；本機要有 checkout 和 `.codegraph/`，呼叫關係不跨 repo 串 | 可以，合併 workspace（例如 `teamsync-core`）一次查詢涵蓋全部 |
+| 不知道在哪個 repo | 一個一個查 | `search` 一次搜所有 repo |
 | 給人看的 | 沒有 | app.graphify.com 的 Graphs（圖形畫布）、Wiki；GitHub PR 上自動 review |
 | 裝在哪 | dotfiles 裝 CLI，見 [codegraph.md](https://github.com/henry5720/dotfiles/blob/main/docs/ai-agent/codegraph.md) | 只有 `mcp.yaml` 一筆，本機不裝東西 |
 
-所以平常在 `dev` 上改程式讓 agent 用 codegraph；跨前後端查、看架構圖、看 PR review 才用 Graphify。
+所以平常在 `dev` 上改程式讓 agent 用 codegraph，前後端都在本機就各查一次；不知道在哪個 repo、本機沒有的 repo、看架構圖、看 PR review 才用 Graphify。
+合併 workspace 會不會把前端的 API 呼叫連到後端的 route，官方只寫「answers follow owners across services」，還沒實測。
 
 加新工具時：表格加一欄，全域規則寫清楚哪些情況才用它，有自己的坑就在下面開一節。
 

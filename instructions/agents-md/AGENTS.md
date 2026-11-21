@@ -79,6 +79,6 @@ If there is no `.codegraph/` directory, skip CodeGraph entirely — indexing is 
 
 Graphify Cloud 的圖只從 GitHub 預設分支建，本機改動和其他分支都不在裡面。查程式碼預設用 CodeGraph（上一段），只有這三種情況才用 Graphify：
 
-- 跨 repo：前端打的是哪支後端 API、某個 symbol 有哪些 repo 在用（`search`，或 `teamsync-core` 這類合併 workspace）。
+- 不知道在哪個 repo：某個 symbol、API 有哪些 repo 在用（`search`，或 `teamsync-core` 這類合併 workspace）。幾個 repo 都在本機且有 `.codegraph/` 時，用 CodeGraph 的 `projectPath` 各查一次。
 - 本機沒 checkout、或沒有 `.codegraph/` 的 repo。
 - 讀寫 workspace 共用的 memory（`recall`／`remember`）。
