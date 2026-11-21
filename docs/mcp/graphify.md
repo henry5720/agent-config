@@ -13,9 +13,9 @@ Graphify Cloud 是雲端的程式碼圖譜：把自家 repo 的 symbol、呼叫�
 ## 坑
 
 - **換 key 後 agent 連不上（401）**：agent 啟動時讀環境變數，key 改了要從新的 zsh 重開 agent。先確認 key 本身能用：
-  在 zsh 對 `https://api.graphify.com/v1/mcp` 送 `initialize`，回 200 就是 agent 拿到舊值。key 怎麼設見 [MCP 的〈API key〉](README.md#api-key)。
-- **答案是舊的**：結果帶 `commitSha`，跟 `git rev-parse HEAD` 不同就以本機檔案為準。在非預設分支上幾乎一定不同。
-- **PR review 只跑一次**：PR 開啟、重開、轉 ready 時跑，後續 push 不會重跑；要重跑在 PR 留言 `@graphify review`。比對基準是預設分支的圖。
+  在 zsh 對 `https://api.graphify.com/v1/mcp` 送 `initialize`，回 200 就是 agent 拿到舊值。key 怎麼設見 [MCP 的〈API key〉](README.md#api-key)。（2026-11-21 記錄）
+- **答案是舊的**：結果帶 `commitSha`，跟 `git rev-parse HEAD` 不同就以本機檔案為準。在非預設分支上幾乎一定不同。（2026-11-21 記錄）
+- **PR review 只跑一次**：PR 開啟、重開、轉 ready 時跑，後續 push 不會重跑；要重跑在 PR 留言 `@graphify review`。比對基準是預設分支的圖。（2026-11-21 記錄）
 
 ## 跟 codegraph 差在哪
 

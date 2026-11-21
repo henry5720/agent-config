@@ -13,9 +13,9 @@ skillshare hooks list -g                                                        
 
 ## 坑
 
-- **Codex 不會跑沒審過的 hook。** add 或 edit 之後開 Codex 打 `/hooks`，把新的或改過的那條設成 trusted。
+- **Codex 不會跑沒審過的 hook。** add 或 edit 之後開 Codex 打 `/hooks`，把新的或改過的那條設成 trusted。（2026-11-07 記錄）
 - **工具自己寫的 hook 不收。** herdr、codegraph 這些工具自己寫的 hook，`hooks list` 列成 `not managed`
-  是正常的，sync 不會動它們。
+  是正常的，sync 不會動它們。（2026-11-07 記錄）
 
 ## 一覽
 

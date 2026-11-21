@@ -39,8 +39,8 @@ hook 和 plugin 也存在 `config.yaml`，所以每台要各自 add（hook 見 [
 | `agent-commit` | `~/.config/agent-commit/instructions.md` |
 | `opencode-commit` | `~/.config/opencode/commit-instructions.md` |
 
-連到哪由 dotfiles 釘，照那台勾了哪些 client 產生。要加連結改 dotfiles，不要用 `skillshare extras` 指令，
-下次 `chezmoi apply` 會蓋回去。
+連到哪由 dotfiles 釘，照那台勾了哪些 client 產生，所以每次 `chezmoi apply` 都會把連結蓋回 dotfiles 寫的樣子；
+要加連結怎麼做見 [AGENTS.md〈放哪〉](../AGENTS.md#放哪)。
 
 ## 全域規則的維護
 
@@ -54,10 +54,3 @@ hook 和 plugin 也存在 `config.yaml`，所以每台要各自 add（hook 見 [
 - 保留英文原文和兩個標記，不翻譯、不手改；改了下次升級就被蓋回去。
 - 說明寫在這裡，不寫成全域規則裡的 HTML 註解：Claude 會拿掉 HTML 註解，Codex、OpenCode 會原樣送進
   context（見[研究紀錄](research/agent-instructions-best-practices.md)）。
-
-## 跨機器
-
-```bash
-skillshare push                                 # 這台改完
-skillshare pull && skillshare sync mcp -g       # 其他台；pull 只同步 skill，MCP 要另外 sync
-```

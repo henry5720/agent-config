@@ -13,7 +13,7 @@ dotfiles（chezmoi）負責裝 skillshare 和各 client 的設定，這個 repo 
 ## 裝完之後去哪
 
 - 裝、更新、同步 skill 和 MCP：[skillshare 官方文件](https://skillshare.runkids.cc)。
-- 這台改完怎麼推、其他台怎麼跟上：[docs/architecture.md〈跨機器〉](docs/architecture.md#跨機器)。
+- 這台改完怎麼推、其他台怎麼跟上：[docs/skills/〈跨機器〉](docs/skills/README.md#跨機器)。
 - 詞彙（source、target、local…）：[GLOSSARY.md](GLOSSARY.md)。
 
 ## 文件索引

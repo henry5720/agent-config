@@ -49,4 +49,4 @@ skillshare sync mcp -g --dry-run        # MCP 會怎麼寫進三個 client
 skillshare hooks sync -g --dry-run      # hook 會怎麼寫進 Claude Code、Codex
 ```
 
-驗完用 `skillshare push` 推（它會 commit 再 push），其他機器怎麼跟上見 [docs/architecture.md〈跨機器〉](docs/architecture.md#跨機器)。
+驗完用 `skillshare push` 推（它會 commit 再 push），其他機器怎麼跟上見 [docs/skills/〈跨機器〉](docs/skills/README.md#跨機器)。
