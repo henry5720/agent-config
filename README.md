@@ -27,7 +27,7 @@ flowchart LR
 mcp.yaml              三個 client 共用的 MCP server
 hooks/<名字>.yaml      自己寫的 hook（skillshare 的 hook entry），每台各自 add
 docs/                 給人看的文件
-  mcp.md              MCP：三個 client 怎麼共用、舊條目怎麼清
+  mcp/                MCP：三個 client 怎麼共用、key、衝突、Graphify
   skills/README.md    skill：從哪來、裝給誰、怎麼關
   skills/<名字>.md     要自己動手的 skill 才有一份
 skills/
@@ -113,30 +113,9 @@ caveman 另外有 proxy（`caveman claude`）和 MCP server，**都沒用**：pr
 放 `skills/<名字>/`。skill 要呼叫的 script 放同一個資料夾（例如 slack-list 的 `scripts/`），
 裝 skill 就裝到 script。秘密放 `~/.config/<名字>/.env`，repo 裡只留 `.env.example`。
 
-## MCP 的 API key
+## MCP 的 key、sync 衝突
 
-`mcp.yaml` 只寫 `fromEnv: CONTEXT7_API_KEY`、`bearerToken: {fromEnv: GRAPHIFY_API_KEY}`，各 client 設定裡留的也只是參照。值由 dotfiles export
-（chezmoi 渲染成 `~/.config/zsh/env.zsh`），所以 agent 要從 zsh 開起來才讀得到。沒填 key，context7
-就走匿名額度；graphify 沒有 key 就連不上。
-
-## sync mcp 撞到衝突
-
-skillshare 遇到不是它寫的同名條目會**整批停下**（`existing entry is not managed`），什麼都不寫。
-
-```bash
-skillshare sync mcp -g --dry-run                # 先看 conflict 清單
-```
-
-逐一決定：
-
-- **照 `mcp.yaml` 的版本**：刪掉 client 裡那條（例如 `claude mcp remove <名字> -s user`）再 sync，
-  或在 dashboard 按 **Replace with source**
-- **收進 agent-config**：`skillshare mcp import <名字> --from <client>`，再 push
-- **跟 `mcp.yaml` 一模一樣**：不會衝突（列為 `unchanged`），但 skillshare 不會認領，之後從
-  `mcp.yaml` 拿掉也不會刪。要它接手一樣用 `mcp import`
-
-OpenCode 同時有 `opencode.json` 和只含 `$schema` 的空殼 `opencode.jsonc` 時，sync 會直接拒絕
-（`all exist; consolidate them into one file`）。確認空殼只有 `$schema` 就刪掉。
+API key 怎麼設、`sync mcp` 撞到衝突、OpenCode 的空殼 `opencode.jsonc`，見 [docs/mcp/](docs/mcp/README.md)。
 
 ## 測試
 

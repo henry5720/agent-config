@@ -3,7 +3,7 @@
 MCP 是讓 agent 連到外部服務的通道 —— 查文件、開瀏覽器、讀 Slack、連資料庫。**跟 skill 是兩回事**：
 skill 是步驟說明（純文字），MCP 是真的能對外做事的工具。也是可選的，想接什麼再裝什麼。
 
-指令（加、同步、跨機器）在 [README 的日常操作](../README.md#日常操作)，這份不重寫。
+指令（加、同步、跨機器）在 [README 的日常操作](../../README.md#日常操作)，這份不重寫。
 
 ## 誰寫哪一段
 
@@ -30,9 +30,28 @@ client 專屬的欄位 skillshare 不寫。例如 Codex 的 `startup_timeout_sec
 
 ## API key
 
-`mcp.yaml` 只寫 `fromEnv`，值從哪來見 [README 的〈MCP 的 API key〉](../README.md#mcp-的-api-key)。
-重點是 **agent 要從 zsh 開起來才讀得到**，因為 key 是 dotfiles 渲染成 `~/.config/zsh/env.zsh`
-再由 `.zshrc` 載入的。
+`mcp.yaml` 只寫 `fromEnv: CONTEXT7_API_KEY`、`bearerToken: {fromEnv: GRAPHIFY_API_KEY}`，各 client 設定裡留的也只是參照。
+值由 dotfiles export（chezmoi 渲染成 `~/.config/zsh/env.zsh`，再由 `.zshrc` 載入），所以 **agent 要從 zsh 開起來才讀得到**。
+沒填 key，context7 就走匿名額度；graphify 沒有 key 就連不上。
+
+## sync mcp 撞到衝突
+
+skillshare 遇到不是它寫的同名條目會**整批停下**（`existing entry is not managed`），什麼都不寫。
+
+```bash
+skillshare sync mcp -g --dry-run                # 先看 conflict 清單
+```
+
+逐一決定：
+
+- **照 `mcp.yaml` 的版本**：刪掉 client 裡那條（例如 `claude mcp remove <名字> -s user`）再 sync，
+  或在 dashboard 按 **Replace with source**
+- **收進 agent-config**：`skillshare mcp import <名字> --from <client>`，再 push
+- **跟 `mcp.yaml` 一模一樣**：不會衝突（列為 `unchanged`），但 skillshare 不會認領，之後從
+  `mcp.yaml` 拿掉也不會刪。要它接手一樣用 `mcp import`
+
+OpenCode 同時有 `opencode.json` 和只含 `$schema` 的空殼 `opencode.jsonc` 時，sync 會直接拒絕
+（`all exist; consolidate them into one file`）。確認空殼只有 `$schema` 就刪掉。
 
 ## 從舊版 dotfiles 升上來的機器
 
@@ -43,7 +62,7 @@ client 專屬的欄位 skillshare 不寫。例如 Codex 的 `startup_timeout_sec
 |---|---|
 | 舊版 chezmoi 寫的 | `chezmoi apply` 時 dotfiles 的 [`run_once_after_remove-chezmoi-mcp.py.tmpl`](https://github.com/henry5720/dotfiles/blob/main/home/.chezmoiscripts/run_once_after_remove-chezmoi-mcp.py.tmpl) 自動刪掉：Claude 的 chrome-devtools；Codex 的 chrome-devtools、codegraph、context7；OpenCode 的 chrome-devtools、codegraph。只刪跟舊版內容一字不差的，Codex 的 context7 例外（key 是各台自己的值，只比對 url 與欄位）。刪掉時會印出來 |
 | 舊版 chezmoi 放的 skill | `~/.codex/skills/`、`~/.config/opencode/skills/` 底下的 `company-imagegen-fallback`（已停用刪除）由 dotfiles 的 `.chezmoiremove` 在 `chezmoi apply` 時刪掉 |
-| 手動加的（`claude mcp add`、`codegraph install`）、OpenCode 的空殼 `opencode.jsonc` | 見 [README 的〈sync mcp 撞到衝突〉](../README.md#sync-mcp-撞到衝突) |
+| 手動加的（`claude mcp add`、`codegraph install`）、OpenCode 的空殼 `opencode.jsonc` | 見[〈sync mcp 撞到衝突〉](#sync-mcp-撞到衝突) |
 
 順序：
 
@@ -58,5 +77,5 @@ chezmoi update → skillshare sync mcp -g --dry-run → 處理 conflict → skil
 | server | 看哪 |
 |---|---|
 | chrome-devtools | dotfiles 的[瀏覽器](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access/browser.md)：9222 上要先有 Chrome（headless 或使用者的獨立 profile）；版本釘在 `mcp.yaml` |
-| codegraph | dotfiles 的 [codegraph.md](https://github.com/henry5720/dotfiles/blob/main/docs/ai-agent/codegraph.md)：CLI 安裝、索引、worktree 與 git hook 都由 dotfiles 管；跟 Graphify 怎麼分見 [code-graph.md](code-graph.md) |
-| graphify | [code-graph.md](code-graph.md)：跟 codegraph 的差別、網頁要用帳號登入、換 key 後 401 |
+| codegraph | dotfiles 的 [codegraph.md](https://github.com/henry5720/dotfiles/blob/main/docs/ai-agent/codegraph.md)：CLI 安裝、索引、worktree 與 git hook 都由 dotfiles 管；跟 Graphify 怎麼分見 [graphify.md 的〈跟 codegraph 差在哪〉](graphify.md#跟-codegraph-差在哪) |
+| graphify | [graphify.md](graphify.md)：跟 codegraph 的差別、網頁要用帳號登入、換 key 後 401 |
