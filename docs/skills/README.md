@@ -162,7 +162,7 @@ done
 
 | skill | 你要做的事 |
 |---|---|
-| [browser-access](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access/browser.md)（人看的在 dotfiles） | agent 接瀏覽器：自己的 headless、你的獨立 profile（9222，多分頁）、你日常的 Chrome（插件）；擋機房 IP 時借你的對外 IP |
+| [browser-access](https://github.com/henry5720/dotfiles/blob/main/docs/how-to/remote-access/browser.md)（人看的在 dotfiles） | agent 接瀏覽器：自己的 headless、你的獨立 profile（9222，多分頁）、你日常的 Chrome（插件）；擋機房 IP 時借你的對外 IP |
 | [verify-in-browser](verify-in-browser.md) | 選瀏覽器工具（playwright-cli、Claude in Chrome、Codex）、裝 ffmpeg 轉影片、升級 playwright-cli 後跟上官方 skill |
 | [slack-list](slack-list.md) | 建 Slack app、填 `.env`、排錯 |
 | [daily-worklog](daily-worklog.md) | 兩種用法：裝成 skill，或整份貼給其他 agent |

@@ -7,8 +7,8 @@ description: 接瀏覽器：自己的 headless、使用者的獨立 profile（92
 
 指令、怎麼確認成功、踩過的坑都在 dotfiles 的〈瀏覽器〉服務卡：
 
-- 本機有 dotfiles：`~/.local/share/chezmoi/docs/remote-access/browser.md`
-- 沒有：<https://github.com/henry5720/dotfiles/blob/main/docs/remote-access/browser.md>
+- 本機有 dotfiles：`~/.local/share/chezmoi/docs/how-to/remote-access/browser.md`
+- 沒有：<https://github.com/henry5720/dotfiles/blob/main/docs/how-to/remote-access/browser.md>
 
 ## 先看使用者在哪
 

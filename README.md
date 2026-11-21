@@ -8,7 +8,7 @@ dotfiles（chezmoi）負責裝 skillshare 和各 client 的設定，這個 repo 
 
 照 dotfiles 的 [new-machine-setup.md](https://github.com/henry5720/dotfiles/blob/main/docs/new-machine-setup.md) 做：
 它會裝 skillshare、clone 這個 repo、放好 `config.yaml`。規則、skill、MCP、plugin 各歸誰管看 dotfiles 的
-[ai-agent-setup.md](https://github.com/henry5720/dotfiles/blob/main/docs/ai-agent/ai-agent-setup.md)。
+[architecture.md](https://github.com/henry5720/dotfiles/blob/main/docs/architecture.md)。
 
 ## 裝完之後去哪
 

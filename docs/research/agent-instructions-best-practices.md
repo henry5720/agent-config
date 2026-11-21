@@ -3,7 +3,7 @@
 - 查證日期：2026-11-21；版本：Claude Code 2.1.330、codex-cli 0.171.0、opencode 1.18.35
 - 來源標記：**文件**（官方文件）／**原始碼**（固定到本機版本的 tag）／**實測**（本機指令輸出）／**未查證**
 - 審查對象：全域規則 `instructions/agents-md/AGENTS.md`（symlink 成 `~/.claude/CLAUDE.md`、`~/.codex/AGENTS.md`、`~/.config/opencode/AGENTS.md`）、本 repo 的 `AGENTS.md`、dotfiles 的 `AGENTS.md`
-- 不重查、直接引用：dotfiles 的 [`docs/research/agent-instructions-sharing.md`](https://github.com/henry5720/dotfiles/blob/main/docs/research/agent-instructions-sharing.md)（三家載入行為的第一輪研究）、[`docs/ai-agent/ai-agent-principles.md`](https://github.com/henry5720/dotfiles/blob/main/docs/ai-agent/ai-agent-principles.md)（「規則要寫什麼」的判斷表）。本文只補那兩份沒有的：大小上限的實際算法、HTML 註解、`~/code` 祖先 `CLAUDE.md` 的影響，以及逐條對照。
+- 不重查、直接引用：dotfiles 的 [`docs/research/agent-instructions-sharing.md`](https://github.com/henry5720/dotfiles/blob/main/docs/research/agent-instructions-sharing.md)（三家載入行為的第一輪研究）、[`docs/architecture/agent-principles.md`](https://github.com/henry5720/dotfiles/blob/main/docs/architecture/agent-principles.md)（「規則要寫什麼」的判斷表）。本文只補那兩份沒有的：大小上限的實際算法、HTML 註解、`~/code` 祖先 `CLAUDE.md` 的影響，以及逐條對照。
 - 只研究，沒有改任何檔案、沒有開 issue。
 
 ## 結論
