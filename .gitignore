@@ -3,3 +3,5 @@ config.yaml
 __pycache__/
 .env
 draft/
+# skillshare extras memory 的筆記：這個 repo 是 public，不讓筆記跟著 push（dotfiles#313）
+extras/memory/
