@@ -7,7 +7,7 @@
 
 ## 開哪一種
 
-照 dotfiles 的 [remote-access 判準](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access/README.md#判準)：
+照 dotfiles 的 [remote-access 判準](https://github.com/henry5720/dotfiles/blob/main/docs/how-to/remote-access/README.md#判準)：
 
 ```
 對方 agent 在你的 tailnet 內？
@@ -22,7 +22,7 @@
 tailscale serve 要把第一、二行的 `127.0.0.1` 換成 `0.0.0.0`（agent 會講），再貼 agent 給你的那行開網址的指令。
 agent 本身就跑在那台 Windows（原生 Windows 的 Claude Code，不經 WSL）時，這些 PowerShell 它自己跑，你只要交 key、說收掉。
 
-兩種差在哪（網址固不固定、SSE、並行上限）見 [比較表](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access/README.md#比較表)。
+兩種差在哪（網址固不固定、SSE、並行上限）見 [比較表](https://github.com/henry5720/dotfiles/blob/main/docs/how-to/remote-access/README.md#比較表)。
 Windows-MCP 回應可能用 SSE，quick tunnel 不支援 SSE：走 quick tunnel 時某個操作卡住或斷線，先懷疑這個。
 
 server 一定要在你登入的桌面起：你在那台桌面開 PowerShell（或 WSL）跑；agent 只連得到 ssh 時，
@@ -32,12 +32,12 @@ server 一定要在你登入的桌面起：你在那台桌面開 PowerShell（�
 
 Windows-MCP 是第三方開源專案：[CursorTouch/Windows-MCP](https://github.com/CursorTouch/Windows-MCP)。
 由 dotfiles 用 mise 裝：裝 dotfiles 時勾 windows-mcp，已經裝好的在 PowerShell 打 `tools` 加勾，勾完會 apply。
-怎麼裝、以前手動 `uv tool install` 的舊版怎麼刪，見 [dotfiles 的〈windows-mcp〉](https://github.com/henry5720/dotfiles/blob/main/docs/install/windows.md#windows-mcp)。
+怎麼裝、以前手動 `uv tool install` 的舊版怎麼刪，見 [dotfiles 的〈windows-mcp〉](https://github.com/henry5720/dotfiles/blob/main/docs/how-to/windows.md#windows-mcp)。
 同一台 WSL 的 `mcp.yaml` 和 agent 的腳本只找 mise 那份（`%LOCALAPPDATA%\mise\shims\windows-mcp.exe`），找不到會叫你勾了再 apply。
 沒裝 dotfiles 的機器（別人的、臨時借用）照 Windows-MCP 的 README 裝。
 
 勾完新開一個 PowerShell 跑 `windows-mcp --help`，有輸出就好。走 quick tunnel 的再裝 cloudflared
-（[remote-access 的 Cloudflare quick tunnel](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access/README.md#cloudflare-quick-tunnel)）。
+（[remote-access 的 Cloudflare quick tunnel](https://github.com/henry5720/dotfiles/blob/main/docs/how-to/remote-access/README.md#cloudflare-quick-tunnel)）。
 winget 裝完，當下的 PowerShell 找不到 `cloudflared`：重開 PowerShell，或用完整路徑
 `& 'C:\Program Files (x86)\cloudflared\cloudflared.exe'`。
 

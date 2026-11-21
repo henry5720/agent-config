@@ -29,7 +29,7 @@ Graphify Cloud 是雲端的程式碼圖譜：把自家 repo 的 symbol、呼叫�
 | 查多個 repo | 可以，用 `projectPath` 一次查一個；本機要有 checkout 和 `.codegraph/`，呼叫關係不跨 repo 串 | 可以，合併 workspace（例如 `teamsync-core`）一次查詢涵蓋全部 |
 | 不知道在哪個 repo | 一個一個查 | `search` 一次搜所有 repo |
 | 給人看的 | 沒有 | app.graphify.com 的 Graphs（圖形畫布）、Wiki；GitHub PR 上自動 review |
-| 裝在哪 | dotfiles 裝 CLI，見 [codegraph.md](https://github.com/henry5720/dotfiles/blob/main/docs/ai-agent/codegraph.md) | 只有 `mcp.yaml` 一筆，本機不裝東西 |
+| 裝在哪 | dotfiles 裝 CLI，見 [codegraph.md](https://github.com/henry5720/dotfiles/blob/main/docs/tools/codegraph.md) | 只有 `mcp.yaml` 一筆，本機不裝東西 |
 
 所以平常在 `dev` 上改程式讓 agent 用 codegraph，前後端都在本機就各查一次；不知道在哪個 repo、本機沒有的 repo、看架構圖、看 PR review 才用 Graphify。
 合併 workspace 串得到的是 import、呼叫、共用型別；前端用字串組 URL 打後端 API 串不起來（[官方](https://docs.graphify.com/cookbooks/cross-repo-dependencies)：「A URL assembled at runtime isn't a static link.」），要把共用的 client 或 schema 套件也加進合併 workspace。

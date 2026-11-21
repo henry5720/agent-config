@@ -15,7 +15,7 @@
 - **新增 skill 或 MCP 用 skillshare 指令，不要手寫 `.metadata.json`。** `install` 會記來源，
   `mcp add` 會寫 `mcp.yaml`。
 - **指令只寫一份，skill 是索引。** 人和 agent 照同一份文件做：指令、怎麼確認成功、踩過的坑都寫在那份。
-  跟 dotfiles 部署的工具或連線有關的寫在 dotfiles 的 `docs/`（例如 `docs/remote-access/`）；這個 repo 的照種類放：
+  跟 dotfiles 部署的工具或連線有關的寫在 dotfiles 的 `docs/`（例如 `docs/how-to/remote-access/`）；這個 repo 的照種類放：
   只跟這支 skill 有關、人要自己動手（跑 script、設定、排錯）的寫 `docs/skills/<名字>.md`，MCP 的寫 `docs/mcp/`，
   hook 的寫 `docs/hooks/`，repo 結構和 `config.yaml`、extras 的來歷寫 `docs/architecture.md`。README 只當入口。
   SKILL.md 只寫什麼時候讀哪份、只有 agent 要守的限制，再連過去（只隔一層）。通用概念連官方或高品質來源，不抄。
