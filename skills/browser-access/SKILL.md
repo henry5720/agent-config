@@ -12,15 +12,26 @@ description: 接瀏覽器：自己的 headless、使用者的獨立 profile（92
 
 ## 先看使用者在哪
 
+- **跟你在同一台 Windows**（`uname -s` 印 `MINGW*`／`MSYS*`，使用者就坐在這台前面）→ 他的 Chrome 就在本機，不用轉發也不用 tunnel，照下面〈同一台 Windows〉。
 - **tailnet 內、連得到你這台的 ssh** → 讀〈先挑哪支 Chrome〉決定用哪支，再照那一節做到它寫的「怎麼確認」成立。轉發由使用者在他的個人電腦開；ssh 指令照抄那份給他。
 - **tailnet 外**（例如 company agent 的 container、使用者沒有 ssh key）→ 接他 Chrome 的路是插件加一次性 tunnel：照下面〈接插件〉跑 `--tunnel`，把輸出交給他。
 
 ## 只有你要守的
 
 - **9222、9377、1080 只走 tailnet 內的 ssh、只綁 127.0.0.1**，它們都沒有驗證。開到 tailnet 外的只有插件的 relay，而且只經 `personal-chrome-attach --tunnel` 開。
-- **port 被佔就回報。** 9222、9555、1080 已經有程式在聽：用 `ss -ltnp | grep <port>` 找出是誰，告訴使用者，由他決定怎麼處理。9222 上是使用者的獨立 profile（`/json/version` 不是 `HeadlessChrome`）時直接用它，不另開 headless。
+- **port 被佔就回報。** 9222、9555、1080 已經有程式在聽：用 `ss -ltnp | grep <port>` 找出是誰（Windows 沒有 `ss`，改用 `powershell -NoProfile -Command "Get-NetTCPConnection -State Listen -LocalPort <port> | ForEach-Object { Get-Process -Id \$_.OwningProcess }"`），告訴使用者，由他決定怎麼處理。9222 上是使用者的獨立 profile（`/json/version` 不是 `HeadlessChrome`）時直接用它，不另開 headless。
 - **使用者的 Chrome 開新分頁再操作。** 接上他的獨立 profile 或插件後，用 `tab-new <網址>`；他正在看的分頁留給他。插件接上後一樣能開多個分頁（收在同一個分頁群組），用 `tab-list` 確認看得到。
 - **用完收。** 自己開的 headless、`show` 收掉；接使用者的 Chrome 用 `detach`（Chrome 和分頁留給他），tailnet 內再請他關 ssh。
+
+## 同一台 Windows
+
+`scripts/personal-chrome-attach` 在 Windows 跑不了（要 `/proc`、`mkfifo`、`python3`），也用不到：它做的是把 relay 轉到使用者那台，同一台時 relay 本來就在使用者的 `127.0.0.1`。
+
+1. 背景跑 `playwright-cli -s=<S> attach --extension=chrome`，它停住等使用者接上。它自己用這台的 Chrome 開插件的 connect 分頁，網址不印出來。
+2. 請使用者在那個分頁的插件畫面選分頁、按允許。沒跳出分頁，或插件畫面說沒裝插件，就請他在那支 Chrome 裝 Playwright Extension（<https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm>）再重跑。
+3. 沒有 `personal-chrome-attach` 的逾時：使用者說不接了，或你等不下去，就把背景的 attach 收掉，不留著。
+
+完成條件和收尾同下面〈接插件〉：`playwright-cli -s=<S> tab-list` 看得到使用者的分頁；用完 `playwright-cli -s=<S> detach`。
 
 ## 接插件：`scripts/personal-chrome-attach`
 
