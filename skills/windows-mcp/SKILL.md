@@ -14,15 +14,9 @@ server 本身的坑（400、307、session）看 [reference.md](reference.md)；�
 
 ## 第一次安裝
 
-Windows-MCP 是第三方開源專案（[CursorTouch/Windows-MCP](https://github.com/CursorTouch/Windows-MCP)），工具清單和選項以它的 README 為準。在 Windows PowerShell 跑：
+Windows-MCP 是第三方開源專案（[CursorTouch/Windows-MCP](https://github.com/CursorTouch/Windows-MCP)），工具清單和選項以它的 README 為準。由 dotfiles 用 mise 裝：請使用者在那台 Windows 裝 dotfiles 時勾 windows-mcp，已經裝好的在 PowerShell 打 `tools` 加勾，勾完會 apply（[dotfiles 的〈windows-mcp〉](https://github.com/henry5720/dotfiles/blob/main/docs/install/windows.md#windows-mcp)）。不要自己用 winget、`uv tool install` 裝。
 
-```powershell
-winget install --exact --id Python.Python.3.14 --scope user
-winget install --exact --id astral-sh.uv
-# 重開 PowerShell
-uv tool install --python 3.14 windows-mcp
-uv tool update-shell
-```
+腳本只找 mise 的 shim `%LOCALAPPDATA%\mise\shims\windows-mcp.exe`。以前手動 `uv tool install` 的 `%USERPROFILE%\.local\bin\windows-mcp.exe` 不找，也不會跟著 `mise up` 更新，照 dotfiles 那段刪掉。沒裝 dotfiles 的機器（別人的、臨時借用）照 Windows-MCP 的 README 裝。
 
 完成條件：重開的 PowerShell 跑 `windows-mcp --help` 有輸出。
 
