@@ -44,7 +44,16 @@ hook 和 plugin 也存在 `config.yaml`，所以每台要各自 add（hook 見 [
 
 ## 全域規則的維護
 
-待補（#113）。
+全域規則每個 session 都會載入，只寫換到任何一個 repo 都還成立的事；只在特定任務用到的流程寫成 skill，
+全域留一行什麼時候載入。
+
+`<!-- CODEGRAPH_START -->` 到 `<!-- CODEGRAPH_END -->` 之間是 `codegraph install` 自己寫進
+`~/.claude/CLAUDE.md` 的段落，`codegraph upgrade` 會重寫兩個標記之間的內容。所以：
+
+- 收進這份檔，不然 codegraph 沒地方告訴 agent 要用它。
+- 保留英文原文和兩個標記，不翻譯、不手改；改了下次升級就被蓋回去。
+- 說明寫在這裡，不寫成全域規則裡的 HTML 註解：Claude 會拿掉 HTML 註解，Codex、OpenCode 會原樣送進
+  context（見[研究紀錄](research/agent-instructions-best-practices.md)）。
 
 ## 跨機器
 
