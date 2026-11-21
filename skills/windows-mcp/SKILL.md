@@ -38,10 +38,10 @@ Windows-MCP 是第三方開源專案（[CursorTouch/Windows-MCP](https://github.
 
 有沒有 WSL 不影響選哪條，只決定 server 由誰起：有 WSL 時 agent 在那台 WSL 跑 `~/.claude/skills/windows-mcp/scripts/` 的腳本（靠 `powershell.exe` 操作 Windows；這個 WSL 要是從使用者桌面開的）；沒有 WSL（或那台沒有 skillshare）時請使用者照[〈使用者在那台 PowerShell 貼〉](#使用者在那台-powershell-貼)貼。公開網址的開、驗、收都交給 `expose-port`，這裡只寫 server 那半和要給 `expose-port` 的輸入。
 
-**agent 就在那台 Windows**（原生 Windows 的 Claude Code，不經 WSL）時，`scripts/` 跑不了（要 WSL 的 bash、`powershell.exe`、`wslpath`）。改成 agent 用 PowerShell tool 自己跑[〈使用者在那台 PowerShell 貼〉](#使用者在那台-powershell-貼)的起、收那幾段，不用請使用者貼；這個 agent 要是從使用者桌面開的，不然 server 一啟動就結束。公開網址照 `expose-port` 的〈agent 就在那台 Windows〉，驗證輸入如下（key 只寫進暫存檔，不印出來）：
+**agent 就在那台 Windows**（原生 Windows 的 Claude Code，不經 WSL）時，`scripts/` 跑不了（要 WSL 的 bash、`powershell.exe`、`wslpath`）。改成 agent 用 PowerShell tool 自己跑[〈使用者在那台 PowerShell 貼〉](#使用者在那台-powershell-貼)的起、收那幾段，不用請使用者貼；這個 agent 要是從使用者桌面開的，不然 server 一啟動就結束。起的完成條件改成 agent 自己查：過幾秒跑那節的計數那行（`Get-NetTCPConnection … | Measure-Object`）印的不是 `0`，再照那節交 key；收的完成條件同那節。公開網址照 `expose-port` 的〈agent 就在那台 Windows〉，驗證輸入如下（key 只寫進暫存檔，不印出來）：
 
 - `<印出 header 的 PowerShell>`：`"Authorization: Bearer $((Select-String "$HOME\.windows-mcp\config.toml" -Pattern 'auth_key\s*=\s*"([^"]+)"').Matches.Groups[1].Value)"`
-- `<curl 參數>`：先把 [Funnel](#funnel) 第 2 步 `-d` 後面的 JSON 寫進檔案（`$body = New-TemporaryFile; '<那串 JSON>' | Set-Content $body -Encoding ascii -NoNewline`），再填 `'-X', 'POST', '-H', 'Accept: application/json, text/event-stream', '-H', 'Content-Type: application/json', '-d', "@$body"`。
+- `<curl 參數>`：先把 [Funnel](#funnel) 第 2 步 `-d` 後面的 JSON 寫進檔案（`$body = New-TemporaryFile; '<那串 JSON>' | Set-Content $body -Encoding ascii -NoNewline`），再填 `'-X', 'POST', '-H', 'Accept: application/json, text/event-stream', '-H', 'Content-Type: application/json', '-d', "@$body"`，驗完 `Remove-Item $body`。
 - 不帶／帶驗證：`401`／`200`；`<路徑>`：`/mcp`。
 
 ### 交 key 和交代 agent（每條都一樣）
@@ -95,7 +95,7 @@ Windows-MCP 是第三方開源專案（[CursorTouch/Windows-MCP](https://github.
 
 Funnel 不能改寫 `Host`，所以這條 server 綁 `0.0.0.0:8000`。2026-11-05 在 henry-laptop 實測過 Windows 原生 tailscale 開 Funnel：server 綁 `0.0.0.0`、用 Interactive scheduled task 在桌面 session 起，在 Windows 前景開 Funnel（對外 8443 → 本機 8000），公網不帶 key `401`、帶 key `200`。從 WSL 跑下面第 2 步整條**未實測**（那輪是直接在 Windows 跑 tailscale）。收的時候停掉呼叫端不會停掉 Windows 的 `tailscale.exe`，口子會一直開著；照 `expose-port` 收，看到 `已收乾淨` 才算收掉。
 
-**那台沒有 WSL** 時下面的腳本用不了：server 照[〈使用者在那台 PowerShell 貼〉](#使用者在那台-powershell-貼)起（`<綁的位址>` 填 `0.0.0.0`），公開網址照 `expose-port` 的 Funnel 分支〈那台沒有這支腳本〉請使用者在那台 PowerShell 開，驗證用的 header 照 [quick tunnel](#quick-tunnel) 表裡的 `--auth-header-cmd`。收掉時先照 `expose-port` 收公開網址，再照上面那節收 server。下面 1–4 是有 WSL 的做法。
+**那台沒有 WSL** 時下面的腳本用不了（agent 自己就在那台時照上面〈agent 就在那台 Windows〉）：server 照[〈使用者在那台 PowerShell 貼〉](#使用者在那台-powershell-貼)起（`<綁的位址>` 填 `0.0.0.0`），公開網址照 `expose-port` 的 Funnel 分支〈那台沒有這支腳本〉請使用者在那台 PowerShell 開，驗證用的 header 照 [quick tunnel](#quick-tunnel) 表裡的 `--auth-header-cmd`。收掉時先照 `expose-port` 收公開網址，再照上面那節收 server。下面 1–4 是有 WSL 的做法。
 
 1. **起 server、換 key**：跑 `windows-mcp-serve`。它先確認防火牆沒放行 windows-mcp 的 inbound（區網直連 8000 只靠防火牆擋），換新 key，在 `0.0.0.0:8000` 起 server，再把 key 複製到 Windows 剪貼簿。
    完成條件：印出 `server 在 0.0.0.0:8000，key 已複製到 Windows 剪貼簿`。
