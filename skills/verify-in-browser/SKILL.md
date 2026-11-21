@@ -72,4 +72,4 @@ description: 瀏覽器驗收：照驗收條件逐條判定，留截圖證據。�
 
 唯一的驗收結果是符合 schema 與[契約](result-contract.md)的 JSON，存成 `<E>/result.json`；runner 透過結構化結果取得同一份內容。呼叫者不是 runner 時，用 `scripts/render-report.py` 產生要發的 Markdown，照 [report-template.md](report-template.md) 發。
 
-**完成條件**：`uv run <skill 絕對路徑>/scripts/render-report.py <E>/result.json` 成功印出報告（它先驗 schema 與跨欄位語意，格式錯先修 JSON）。`command -v uv` 找不到就回報缺 uv，請使用者裝（Windows：`winget install --id astral-sh.uv -e`，裝完開新的終端機）。
+**完成條件**：`uv run <skill 絕對路徑>/scripts/render-report.py <E>/result.json` 成功印出報告（它先驗 schema 與跨欄位語意，格式錯先修 JSON）。`command -v uv` 找不到就回報缺 uv，請使用者照 agent-config 的 [docs/skills/verify-in-browser.md](https://github.com/henry5720/agent-config/blob/main/docs/skills/verify-in-browser.md)〈你要做的事〉裝。
