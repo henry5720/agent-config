@@ -42,7 +42,7 @@ description: 瀏覽器驗收：照驗收條件逐條判定，留截圖證據。�
 驗收前先讀 [逐條判定契約](result-contract.md) 和 [schema](result.schema.json)。issue 有 `## Acceptance criteria` 就逐條保留原文（`criteriaSource: issue`）；沒有，或使用者只說「去看這頁」時，先把目的寫成 1～3 條可判定條件（`inferred`），再操作。
 
 1. **確認工具。** `command -v playwright-cli` 找得到就用它；找不到就回 `unverifiable`，原因寫瀏覽器工具不在，並提示可裝 `npm i -g @playwright/cli`。L3 的 WebKit 開不了就把 WebKit 列進「未驗」，Chromium 照做。
-2. **定證據資料夾 `E`，整趟照抄成字面值：** 呼叫端指定的絕對路徑優先；沒指定時，有 `$CLAUDE_JOB_DIR` 用 `$CLAUDE_JOB_DIR/tmp/verify-<名字>`，沒有用 `/tmp/verify-<名字>`；`<名字>` = `<repo 名>-<分支名>`，`/` 換成 `-`（例：`agent-config-feat-login`）。先 `mkdir -p <E> && chmod 700 <E>`：裡面會有登入狀態和工具暫存檔，只給自己讀。證據檔都落在 `<E>`；工具存到別處（例如下載資料夾）就搬進來。
+2. **定證據資料夾 `E`，整趟照抄成字面值：** 呼叫端指定的絕對路徑優先；沒指定時，有 `$CLAUDE_JOB_DIR` 用 `$CLAUDE_JOB_DIR/tmp/verify-<名字>`，沒有用 `/tmp/verify-<名字>`；`<名字>` = `<repo 名>-<分支名>`，`/` 換成 `-`（例：`agent-config-feat-login`）。先 `mkdir -p <E> && chmod 700 <E>`：裡面會有登入狀態和工具暫存檔，只給自己讀。Windows（Git Bash）的 `chmod` 在 NTFS 不生效，改用 `MSYS_NO_PATHCONV=1 icacls "$(cygpath -w <E>)" /inheritance:r /grant:r "$USERNAME:(OI)(CI)F"`（拿掉繼承來的權限、只留自己；`MSYS_NO_PATHCONV=1` 不讓 Git Bash 把 `/inheritance:r` 當成路徑改寫），再 `icacls "$(cygpath -w <E>)"` 確認只列出你自己。證據檔都落在 `<E>`；工具存到別處（例如下載資料夾）就搬進來。
 3. **定環境，整趟固定，寫進 `environment`：** viewport 預設 1440×900（工具調不了就記實際尺寸），語系、主題、角色帳號、後端（local／staging）。切主題走 app 自己的切換（設定頁，或它讀的儲存值後重新載入）：只改 `<html>` 的 class 只翻 CSS 變數，JS 端的主題（例如 antd `ConfigProvider`）不會跟著切，截到的是假畫面。改前改後必須相同；改前取自線上部署時例外，見 [before.md](before.md)。
    - **後端版本對得上才開瀏覽器。** PR 寫了依賴的後端 commit 時，確認後端 HEAD 包含它：`git -C <後端 repo> merge-base --is-ancestor <PR 寫的 commit> <後端 HEAD>`。PR 沒寫才退回查 openapi 有沒有這次的新欄位，`environment.backend` 註明「用欄位推斷」。對不上就停下回報。
 
@@ -72,4 +72,4 @@ description: 瀏覽器驗收：照驗收條件逐條判定，留截圖證據。�
 
 唯一的驗收結果是符合 schema 與[契約](result-contract.md)的 JSON，存成 `<E>/result.json`；runner 透過結構化結果取得同一份內容。呼叫者不是 runner 時，用 `scripts/render-report.py` 產生要發的 Markdown，照 [report-template.md](report-template.md) 發。
 
-**完成條件**：`uv run <skill 絕對路徑>/scripts/render-report.py <E>/result.json` 成功印出報告（它先驗 schema 與跨欄位語意，格式錯先修 JSON）。
+**完成條件**：`uv run <skill 絕對路徑>/scripts/render-report.py <E>/result.json` 成功印出報告（它先驗 schema 與跨欄位語意，格式錯先修 JSON）。`command -v uv` 找不到就回報缺 uv，請使用者照 agent-config 的 [docs/skills/verify-in-browser.md](https://github.com/henry5720/agent-config/blob/main/docs/skills/verify-in-browser.md)〈你要做的事〉裝。
