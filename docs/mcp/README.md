@@ -3,7 +3,7 @@
 MCP 是讓 agent 連到外部服務的通道 —— 查文件、開瀏覽器、讀 Slack、連資料庫。**跟 skill 是兩回事**：
 skill 是步驟說明（純文字），MCP 是真的能對外做事的工具。也是可選的，想接什麼再裝什麼。
 
-指令（加、同步、跨機器）在 [README 的日常操作](../../README.md#日常操作)，這份不重寫。
+指令（加、同步）看 [skillshare 官方文件](https://skillshare.runkids.cc)，跨機器看 [architecture.md〈跨機器〉](../architecture.md#跨機器)，這份不重寫。
 
 ## 誰寫哪一段
 
