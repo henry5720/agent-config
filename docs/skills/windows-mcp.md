@@ -47,7 +47,7 @@ winget 裝完，當下的 PowerShell 找不到 `cloudflared`：重開 PowerShell
    上一輪的 server 還開著的話先照〈用完收掉〉收：server 跑著時換 key 不生效，舊 key 照樣能用。
 
    ```powershell
-   windows-mcp auth --transport streamable-http --host 127.0.0.1 --port 8000 --force *> $null
+   windows-mcp auth --transport streamable-http --host 127.0.0.1 --port 8000 --force *> $null; if ($LASTEXITCODE) { throw 'windows-mcp auth 失敗，key 沒換' }
    Start-Process -WindowStyle Minimized windows-mcp -ArgumentList 'serve'
    (Select-String "$HOME\.windows-mcp\config.toml" -Pattern 'auth_key\s*=\s*"([^"]+)"').Matches.Groups[1].Value | Set-Clipboard
    ```
@@ -67,7 +67,7 @@ winget 裝完，當下的 PowerShell 找不到 `cloudflared`：重開 PowerShell
    ```powershell
    Get-Process cloudflared -ErrorAction SilentlyContinue | Stop-Process -Force
    Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
-   windows-mcp auth --transport streamable-http --host 127.0.0.1 --port 8000 --force *> $null
+   windows-mcp auth --transport streamable-http --host 127.0.0.1 --port 8000 --force *> $null; if ($LASTEXITCODE) { throw 'windows-mcp auth 失敗，key 沒換' }
    (Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | Measure-Object).Count
    (Get-Process cloudflared -ErrorAction SilentlyContinue | Measure-Object).Count
    ```

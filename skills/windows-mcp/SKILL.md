@@ -56,7 +56,7 @@ Windows-MCP 是第三方開源專案（[CursorTouch/Windows-MCP](https://github.
 - **起 server、換 key**：先確認 8000 沒有程式在聽（`(Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | Measure-Object).Count` 是 `0`；不是就先照下面〈收掉〉收）。server 跑著時 `auth --force` 換的 key 不生效，舊 key 照樣能用（2026-11-05 在 henry-laptop 實測舊 key 仍回 `200`），所以一定是沒有 server 時換 key、再起。`auth --force` 換一把新 key，但會把新 key 印出來（`Generated auth key: …` 和帶 `Bearer` 的 client 設定），所以輸出導到 `$null`，不然 key 會進 agent 的 tool 輸出、或留在畫面上被 `Screenshot` 拍到。最後一行把 key 複製到剪貼簿、不印出來；取 key 都用最後一行。`config.toml` 開在畫面上時 key 會被 `Screenshot` 拍進去，真的用記事本開過就立刻關掉。綁 `0.0.0.0` 時，先請使用者確認防火牆沒放行 windows-mcp 的 inbound（不然區網能直連 8000，只剩 key 擋）。
 
   ```powershell
-  windows-mcp auth --transport streamable-http --host <綁的位址> --port 8000 --force *> $null
+  windows-mcp auth --transport streamable-http --host <綁的位址> --port 8000 --force *> $null; if ($LASTEXITCODE) { throw 'windows-mcp auth 失敗，key 沒換' }
   Start-Process -WindowStyle Minimized windows-mcp -ArgumentList 'serve','--host','<綁的位址>'
   (Select-String "$HOME\.windows-mcp\config.toml" -Pattern 'auth_key\s*=\s*"([^"]+)"').Matches.Groups[1].Value | Set-Clipboard
   ```
@@ -66,7 +66,7 @@ Windows-MCP 是第三方開源專案（[CursorTouch/Windows-MCP](https://github.
 
   ```powershell
   Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
-  windows-mcp auth --transport streamable-http --host 127.0.0.1 --port 8000 --force *> $null
+  windows-mcp auth --transport streamable-http --host 127.0.0.1 --port 8000 --force *> $null; if ($LASTEXITCODE) { throw 'windows-mcp auth 失敗，key 沒換' }
   (Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | Measure-Object).Count
   ```
 
