@@ -35,7 +35,7 @@ Windows-MCP 是第三方開源專案：[CursorTouch/Windows-MCP](https://github.
 同一台 WSL 的 `mcp.yaml` 和 agent 的腳本只找 mise 那份（`%LOCALAPPDATA%\mise\shims\windows-mcp.exe`），找不到會叫你勾了再 apply。
 沒裝 dotfiles 的機器（別人的、臨時借用）照 Windows-MCP 的 README 裝。
 
-重開的 PowerShell 跑 `windows-mcp --help` 有輸出就好。走 quick tunnel 的再裝 cloudflared
+勾完新開一個 PowerShell 跑 `windows-mcp --help`，有輸出就好。走 quick tunnel 的再裝 cloudflared
 （[remote-access 的 Cloudflare quick tunnel](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access/README.md#cloudflare-quick-tunnel)）。
 winget 裝完，當下的 PowerShell 找不到 `cloudflared`：重開 PowerShell，或用完整路徑
 `& 'C:\Program Files (x86)\cloudflared\cloudflared.exe'`。
