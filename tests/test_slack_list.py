@@ -812,7 +812,7 @@ class SlackListTest(unittest.TestCase):
             open_call.assert_not_called()
             self.assertIn("O_NOFOLLOW 或 O_DIRECTORY", errors.getvalue())
 
-    def windows(self):
+    def simulate_windows(self):
         """模擬 Windows：沒有 O_NOFOLLOW／O_DIRECTORY，也不能用 dir_fd。"""
         stack = ExitStack()
         stack.enter_context(patch.object(slack_list, "WINDOWS", True))
@@ -837,7 +837,7 @@ class SlackListTest(unittest.TestCase):
         nested.mkdir()
         path = nested / "shot.png"
         path.write_bytes(b"\x89PNG")
-        with self.windows():
+        with self.simulate_windows():
             resolved, data = slack_list.artifact_file(str(path))
             self.assertEqual((resolved, data), (path.resolve(), b"\x89PNG"))
             self.assertTrue(slack_list.delete_artifact(resolved))
@@ -845,7 +845,7 @@ class SlackListTest(unittest.TestCase):
 
     def test_windows_artifact_rejects_path_swapped_while_opening(self):
         path = self.artifact_path()
-        with self.windows(), \
+        with self.simulate_windows(), \
                 patch.object(slack_list.os.path, "samestat", return_value=False), \
                 redirect_stderr(io.StringIO()) as errors, self.assertRaises(SystemExit):
             slack_list.artifact_file(str(path))
@@ -859,7 +859,7 @@ class SlackListTest(unittest.TestCase):
             far = Path(outside) / "outside.html"
             far.write_bytes(b"x")
             for path in (link, far):
-                with self.subTest(path=path), self.windows(), \
+                with self.subTest(path=path), self.simulate_windows(), \
                         redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                     slack_list.artifact_file(str(path))
 
@@ -874,9 +874,9 @@ class SlackListTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp, \
                 patch.object(module.tempfile, "gettempdir", return_value=tmp):
             with module.add_lock("F/123"):
-                self.assertEqual(msvcrt.locking.call_args.args[1:], (1, 1))
+                self.assertEqual(msvcrt.locking.call_args.args[1:], (msvcrt.LK_LOCK, 1))
             self.assertTrue((Path(tmp) / "slack-list-add-F_123.lock").exists())
-        self.assertEqual(msvcrt.locking.call_args.args[1:], (0, 1))
+        self.assertEqual(msvcrt.locking.call_args.args[1:], (msvcrt.LK_UNLCK, 1))
 
     @patch.object(slack_list, "api")
     @patch.object(slack_list, "api_get")

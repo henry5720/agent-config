@@ -90,10 +90,11 @@ script 只用標準函式庫，但 Windows 不看 shebang，`python3` 多半是 
 winget install --id Python.Python.3.13 --exact
 ```
 
-之後每個指令前面加 `py`（Claude Code 在 Windows 跑 Git Bash，`~` 一樣會展開）：
+之後每個指令前面加 `py -3`（Claude Code 在 Windows 跑 Git Bash，`~` 一樣會展開）。
+`-3` 不能省：沒給版本時 launcher 會照 shebang 去 PATH 找 `python3`，又找回那個空殼。
 
 ```bash
-py ~/.claude/skills/slack-list/scripts/slack-list env
+py -3 ~/.claude/skills/slack-list/scripts/slack-list env
 ```
 
 - `.env` 在 `%USERPROFILE%\.config\slack-list\.env`，步驟同〈第一次設定〉。

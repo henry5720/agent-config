@@ -13,9 +13,8 @@ PM（chieh）與授權使用者把 bug 與需求記在 Slack 的一張 List：**
 > 內文寫 `slack-list <指令>` 時指的也是這支；它不在 PATH 上，要打完整路徑。
 > 本機由 skillshare sync 到那裡；container 的 skills 也掛在自己的 `~/.claude/skills`。
 > 設定讀 `~/.config/slack-list/.env`，環境變數裡已經有的值優先。
-> **原生 Windows**（不是 WSL）照 shebang 找不到 Python，每個指令前面加 `py`：
-> `py ~/.claude/skills/slack-list/scripts/slack-list rows`。`py` 不存在就是還沒裝 Python，
-> 請使用者照 agent-config 的 `docs/skills/slack-list.md`〈Windows〉裝，不要改用 `python3`（多半是 Microsoft Store 的空殼）。
+> **原生 Windows**（不是 WSL）每個指令前面加 `py -3`，不要用 `python3`。沒有 `py` 就請使用者照
+> agent-config 的 `docs/skills/slack-list.md`〈Windows〉裝 Python。
 > 其他 repo 只使用 runtime 明確提供的絕對路徑，host/container 的對應位置以 runtime 給的為準。
 
 要做的不只是讀時，先讀對應那份：

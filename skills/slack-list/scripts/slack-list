@@ -18,6 +18,7 @@ Slack 在建列時就替每一列開好了串，這支工具只查既有串、�
 """
 
 import argparse
+import errno
 import http.client
 import json
 import os
@@ -616,8 +617,10 @@ def add_lock(list_id):
                 try:
                     msvcrt.locking(lock.fileno(), msvcrt.LK_LOCK, 1)
                     break
-                except OSError:
-                    pass  # LK_LOCK 只重試 10 秒就放棄；另一個 add 還沒跑完，繼續等
+                except OSError as exc:
+                    # LK_LOCK 只重試 10 秒就放棄；另一個 add 還沒跑完，繼續等
+                    if exc.errno != errno.EDEADLOCK:
+                        raise
         try:
             yield
         finally:
