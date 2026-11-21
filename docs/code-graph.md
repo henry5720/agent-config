@@ -17,7 +17,7 @@ Graphify 的試用紀錄在 [#99](https://github.com/henry5720/agent-config/issu
 | 裝在哪 | dotfiles 裝 CLI，見 [codegraph.md](https://github.com/henry5720/dotfiles/blob/main/docs/ai-agent/codegraph.md) | 只有 `mcp.yaml` 一筆，本機不裝東西 |
 
 所以平常在 `dev` 上改程式讓 agent 用 codegraph，前後端都在本機就各查一次；不知道在哪個 repo、本機沒有的 repo、看架構圖、看 PR review 才用 Graphify。
-合併 workspace 會不會把前端的 API 呼叫連到後端的 route，官方只寫「answers follow owners across services」，還沒實測。
+合併 workspace 串得到的是 import、呼叫、共用型別；前端用字串組 URL 打後端 API 串不起來（[官方](https://docs.graphify.com/cookbooks/cross-repo-dependencies)：「A URL assembled at runtime isn't a static link.」），要把共用的 client 或 schema 套件也加進合併 workspace。
 
 加新工具時：表格加一欄，全域規則寫清楚哪些情況才用它，有自己的坑就在下面開一節。
 
