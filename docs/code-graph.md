@@ -1,8 +1,11 @@
-# Graphify：跟 codegraph 怎麼分
+# 程式碼圖譜：用哪個
 
-兩個都把程式碼做成圖給 agent 查，找定義、誰呼叫、改了影響什麼都做得到。差在**看哪一版程式碼**、**能不能跨 repo**。
-agent 該用哪個寫在全域規則的「Graphify」段（`instructions/agents-md/AGENTS.md`），這份講給人看的差別和坑。
-試用紀錄在 [#99](https://github.com/henry5720/agent-config/issues/99)（到 2026-12-04）。
+程式碼圖譜是把自家 repo 的 symbol、呼叫、依賴做成圖，讓 agent 不用 grep 一路讀檔就查得到的工具（code knowledge graph）。
+查第三方套件文件的 context7、搜 GitHub 公開程式碼的 grep.app 不算這類。
+
+現在有兩個：codegraph、Graphify Cloud。找定義、誰呼叫、改了影響什麼兩個都做得到，差在**看哪一版程式碼**、**能不能跨 repo**。
+agent 該用哪個寫在全域規則（`instructions/agents-md/AGENTS.md` 的「Graphify」段），這份講給人看的差別和坑。
+Graphify 的試用紀錄在 [#99](https://github.com/henry5720/agent-config/issues/99)（到 2026-12-04）。
 
 | | codegraph | Graphify Cloud |
 |---|---|---|
@@ -14,13 +17,17 @@ agent 該用哪個寫在全域規則的「Graphify」段（`instructions/agents-
 
 所以平常在 `dev` 上改程式讓 agent 用 codegraph；跨前後端查、看架構圖、看 PR review 才用 Graphify。
 
-## 人怎麼用
+加新工具時：表格加一欄，全域規則寫清楚哪些情況才用它，有自己的坑就在下面開一節。
+
+## Graphify
+
+### 人怎麼用
 
 - **看圖、Wiki、PR review**：用帳號登入 [app.graphify.com](https://app.graphify.com)。`GRAPHIFY_API_KEY` 只給 MCP 用，登不了網頁。
 - **加 repo**：在 app 的 Repositories 開啟。方案是 pro，repo 數不限。
 - 其他用法看[官方 docs](https://docs.graphify.com)。
 
-## 坑
+### 坑
 
 - **換 key 後 agent 連不上（401）**：agent 啟動時讀環境變數，key 改了要從新的 zsh 重開 agent。先確認 key 本身能用：
   在 zsh 對 `https://api.graphify.com/v1/mcp` 送 `initialize`，回 200 就是 agent 拿到舊值。key 怎麼設見 dotfiles 的 `docs/after-install.md`。
