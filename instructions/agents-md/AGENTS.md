@@ -47,7 +47,7 @@
 
 1. **認領**：動工前讀取 issue 狀態、assignees 與 blockers。已關閉、有未解除的 blocker 或其他人承接時，先回報並處理該條件，再動工；可承接時先 assign 自己，確認寫入成功。GitHub 用 `gh issue edit <number> --add-assignee @me`；其他 tracker 用對應操作。
 2. **卡住**：在 issue 留言寫明卡點、解除條件及已完成的工作，保留 open 與 assignee。有原生 dependency 欄位時同步維護 blocker 關係，解除後更新。
-3. **完成**：更新完成清單，附 PR／commit 與實際驗證結果，依 repo 規則關單。預設有 PR 就等 merge 後關；無 PR 則在實作與必要驗收完成後關。仍缺驗收時保留 open，寫明剩餘項目。使用 `Closes` 時確認目標分支會觸發自動關單；不會觸發時，在滿足關單條件後手動關閉。
+3. **完成**：更新完成清單，附 PR／commit 與實際驗證結果，依 repo 規則關單。預設有 PR 就用 `Closes`，merge 時關；無 PR 則實作完成就關。只有實機等這邊驗不到的項目，寫進 PR 的驗證段，不擋關單，之後驗出問題開新 issue。沒做完的部分另開 issue，再關原單。例外：issue 要解決的那件事本身還沒驗（修好沒有只有實機看得到），PR 改寫 `Refs`、保留 open、寫明剩餘項目，驗過才手動關。使用 `Closes` 時確認目標分支會觸發自動關單；不會觸發時，在滿足關單條件後手動關閉。
 4. **交接**：結束回覆前，重新讀取本次處理的每張 issue，確認 assignee、blockers、完成清單及 open／closed 與實際進度一致；修正不符處。寫入失敗時明確回報未同步的項目與原因。
 
 ## Commit 共同作者
