@@ -18,13 +18,13 @@ Slack 在建列時就替每一列開好了串，這支工具只查既有串、�
 """
 
 import argparse
-import fcntl
 import http.client
 import json
 import os
 import re
 import stat
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.parse
@@ -32,6 +32,14 @@ import urllib.request
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
+
+try:
+    import fcntl
+except ImportError:  # Windows 的 Python 沒有 fcntl
+    fcntl = None
+    import msvcrt
+
+WINDOWS = sys.platform == "win32"
 
 API = "https://slack.com/api/"
 
@@ -598,12 +606,26 @@ def normalized_title(value):
 def add_lock(list_id):
     """Serialize read-then-write add operations in one runtime."""
     safe_id = re.sub(r"[^A-Za-z0-9_-]", "_", list_id)
-    with Path(f"/tmp/slack-list-add-{safe_id}.lock").open("a+") as lock:
-        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+    lock_path = Path(tempfile.gettempdir()) / f"slack-list-add-{safe_id}.lock"
+    with lock_path.open("a+") as lock:
+        if fcntl:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        else:
+            lock.seek(0)
+            while True:
+                try:
+                    msvcrt.locking(lock.fileno(), msvcrt.LK_LOCK, 1)
+                    break
+                except OSError:
+                    pass  # LK_LOCK 只重試 10 秒就放棄；另一個 add 還沒跑完，繼續等
         try:
             yield
         finally:
-            fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+            if fcntl:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+            else:
+                lock.seek(0)
+                msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
 
 
 def checkbox_value(field):
@@ -752,7 +774,7 @@ def artifact_file(path):
 
     nofollow = getattr(os, "O_NOFOLLOW", 0)
     directory = getattr(os, "O_DIRECTORY", 0)
-    if not nofollow or not directory:
+    if not WINDOWS and (not nofollow or not directory):
         die("系統缺少 artifact 安全讀取需要的 O_NOFOLLOW 或 O_DIRECTORY；已拒絕操作")
 
     root = artifact_root().resolve()
@@ -763,16 +785,19 @@ def artifact_file(path):
     directory_fds = []
     fd = None
     try:
-        # 從 root fd 往下逐段走，避免 resolve 後任何父目錄被換成 symlink。
-        current_fd = os.open(root, os.O_RDONLY | directory | nofollow)
-        directory_fds.append(current_fd)
-        for component in relative.parts[:-1]:
-            current_fd = os.open(
-                component, os.O_RDONLY | directory | nofollow, dir_fd=current_fd)
+        if WINDOWS:
+            fd = windows_open_artifact(resolved)
+        else:
+            # 從 root fd 往下逐段走，避免 resolve 後任何父目錄被換成 symlink。
+            current_fd = os.open(root, os.O_RDONLY | directory | nofollow)
             directory_fds.append(current_fd)
+            for component in relative.parts[:-1]:
+                current_fd = os.open(
+                    component, os.O_RDONLY | directory | nofollow, dir_fd=current_fd)
+                directory_fds.append(current_fd)
 
-        # 最終檔名也禁止 symlink；之後只從這個 fd 讀，不再走 mutable path。
-        fd = os.open(relative.parts[-1], os.O_RDONLY | nofollow, dir_fd=current_fd)
+            # 最終檔名也禁止 symlink；之後只從這個 fd 讀，不再走 mutable path。
+            fd = os.open(relative.parts[-1], os.O_RDONLY | nofollow, dir_fd=current_fd)
         file_stat = os.fstat(fd)
         if not stat.S_ISREG(file_stat.st_mode):
             die(f"artifact 必須是 regular file，不接受 directory 或其他檔案：{candidate}")
@@ -806,6 +831,23 @@ def artifact_file(path):
     return resolved, data
 
 
+def windows_open_artifact(resolved):
+    """Windows 沒有 O_NOFOLLOW 和 dir_fd：開檔後再 resolve 一次，確認 fd 就是驗過的那個檔。
+
+    resolve 會解開 symlink 和 junction，所以 resolved 本身不含任何轉址；
+    開檔前若有父目錄被換掉，fd 指到的檔和 resolved 現在指的就不是同一個。
+    """
+    fd = os.open(resolved, os.O_RDONLY | getattr(os, "O_BINARY", 0))
+    try:
+        if (resolved.resolve() != resolved
+                or not os.path.samestat(os.fstat(fd), os.stat(resolved))):
+            die(f"artifact 路徑在開檔時被換掉，已拒絕：{resolved}")
+    except BaseException:
+        os.close(fd)
+        raise
+    return fd
+
+
 def delete_artifact(path):
     """只刪除 root 內、由安全 fd 確認為 regular file 的 artifact。"""
     candidate = Path(path)
@@ -819,6 +861,15 @@ def delete_artifact(path):
         return False
     if not relative.parts:
         return False
+
+    if WINDOWS:
+        try:
+            if resolved.resolve() != resolved or not stat.S_ISREG(os.lstat(resolved).st_mode):
+                return False
+            os.unlink(resolved)
+            return True
+        except OSError:
+            return False
 
     nofollow = getattr(os, "O_NOFOLLOW", 0)
     directory = getattr(os, "O_DIRECTORY", 0)
@@ -1960,6 +2011,9 @@ def usage():
 
 
 def main():
+    # Windows 的 stdout 接到 pipe 時用系統編碼（cp950、cp1252），印中文或 emoji 會 UnicodeEncodeError。
+    for stream in (sys.stdout, sys.stderr):
+        getattr(stream, "reconfigure", lambda **_: None)(encoding="utf-8")
     name = sys.argv[1] if len(sys.argv) > 1 else "todo"
     if name in ("-h", "--help", "help"):
         usage()

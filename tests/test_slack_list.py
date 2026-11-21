@@ -7,7 +7,7 @@ import re
 import sys
 import tempfile
 import unittest
-from contextlib import redirect_stderr, redirect_stdout
+from contextlib import ExitStack, redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -811,6 +811,72 @@ class SlackListTest(unittest.TestCase):
                     slack_list.artifact_file(path)
             open_call.assert_not_called()
             self.assertIn("O_NOFOLLOW 或 O_DIRECTORY", errors.getvalue())
+
+    def windows(self):
+        """模擬 Windows：沒有 O_NOFOLLOW／O_DIRECTORY，也不能用 dir_fd。"""
+        stack = ExitStack()
+        stack.enter_context(patch.object(slack_list, "WINDOWS", True))
+        stack.enter_context(patch.object(slack_list.os, "O_NOFOLLOW", 0, create=True))
+        stack.enter_context(patch.object(slack_list.os, "O_DIRECTORY", 0, create=True))
+        real_open, real_unlink = slack_list.os.open, slack_list.os.unlink
+
+        def no_dir_fd(real):
+            def call(*args, **kwargs):
+                if kwargs.get("dir_fd") is not None:
+                    raise NotImplementedError("dir_fd unavailable on this platform")
+                return real(*args, **kwargs)
+            return call
+
+        stack.enter_context(patch.object(slack_list.os, "open", side_effect=no_dir_fd(real_open)))
+        stack.enter_context(patch.object(slack_list.os, "unlink", side_effect=no_dir_fd(real_unlink)))
+        stack.enter_context(patch.object(slack_list, "ARTIFACT_DRAFTS_ROOT", Path(self.tmp.name)))
+        return stack
+
+    def test_windows_artifact_reads_and_deletes_without_nofollow(self):
+        nested = Path(self.tmp.name) / "nested"
+        nested.mkdir()
+        path = nested / "shot.png"
+        path.write_bytes(b"\x89PNG")
+        with self.windows():
+            resolved, data = slack_list.artifact_file(str(path))
+            self.assertEqual((resolved, data), (path.resolve(), b"\x89PNG"))
+            self.assertTrue(slack_list.delete_artifact(resolved))
+        self.assertFalse(path.exists())
+
+    def test_windows_artifact_rejects_path_swapped_while_opening(self):
+        path = self.artifact_path()
+        with self.windows(), \
+                patch.object(slack_list.os.path, "samestat", return_value=False), \
+                redirect_stderr(io.StringIO()) as errors, self.assertRaises(SystemExit):
+            slack_list.artifact_file(str(path))
+        self.assertIn("被換掉", errors.getvalue())
+
+    def test_windows_artifact_still_rejects_symlink_and_outside(self):
+        target = self.artifact_path("target.html")
+        link = Path(self.tmp.name) / "link.html"
+        link.symlink_to(target)
+        with tempfile.TemporaryDirectory() as outside:
+            far = Path(outside) / "outside.html"
+            far.write_bytes(b"x")
+            for path in (link, far):
+                with self.subTest(path=path), self.windows(), \
+                        redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                    slack_list.artifact_file(str(path))
+
+    def test_script_loads_and_locks_without_fcntl(self):
+        """Windows 的 Python 沒有 fcntl：import 不能炸，add 的鎖改走 msvcrt。"""
+        msvcrt = MagicMock(LK_LOCK=1, LK_UNLCK=0)
+        with patch.dict(sys.modules, {"fcntl": None, "msvcrt": msvcrt}):
+            windows_loader = importlib.machinery.SourceFileLoader("slack_list_win", str(SCRIPT))
+            module = importlib.util.module_from_spec(
+                importlib.util.spec_from_loader(windows_loader.name, windows_loader))
+            windows_loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.object(module.tempfile, "gettempdir", return_value=tmp):
+            with module.add_lock("F/123"):
+                self.assertEqual(msvcrt.locking.call_args.args[1:], (1, 1))
+            self.assertTrue((Path(tmp) / "slack-list-add-F_123.lock").exists())
+        self.assertEqual(msvcrt.locking.call_args.args[1:], (0, 1))
 
     @patch.object(slack_list, "api")
     @patch.object(slack_list, "api_get")

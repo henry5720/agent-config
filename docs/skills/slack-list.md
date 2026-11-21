@@ -81,6 +81,25 @@ target，放在 skill 資料夾裡就會有好幾份。
 開 issue 前一定先用 Slack 的 record ID 搜一次（`gh issue list --search "Rec0B…" --state all`），
 命中就不開。從 Slack 進 GitHub 這段是 agent 在開票，沒有人擋重複。
 
+## Windows（原生，不是 WSL）
+
+script 只用標準函式庫，但 Windows 不看 shebang，`python3` 多半是 Microsoft Store 的空殼。
+裝 python.org 的 Python，它會一起裝 `py` launcher：
+
+```powershell
+winget install --id Python.Python.3.13 --exact
+```
+
+之後每個指令前面加 `py`（Claude Code 在 Windows 跑 Git Bash，`~` 一樣會展開）：
+
+```bash
+py ~/.claude/skills/slack-list/scripts/slack-list env
+```
+
+- `.env` 在 `%USERPROFILE%\.config\slack-list\.env`，步驟同〈第一次設定〉。
+- `artifact` 要設 `SLACK_LIST_ARTIFACT_ROOT`，Windows 沒有 `/home/node/drafts`（見 [artifact.md](../../skills/slack-list/artifact.md)）。
+- `cleanup` 是給 container cron 用的，在 Windows 上不刪任何檔。
+
 ## 指令
 
 `slack-list <指令> --help` 看參數。
