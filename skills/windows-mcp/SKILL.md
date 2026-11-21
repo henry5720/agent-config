@@ -38,6 +38,12 @@ Windows-MCP 是第三方開源專案（[CursorTouch/Windows-MCP](https://github.
 
 有沒有 WSL 不影響選哪條，只決定 server 由誰起：有 WSL 時 agent 在那台 WSL 跑 `~/.claude/skills/windows-mcp/scripts/` 的腳本（靠 `powershell.exe` 操作 Windows；這個 WSL 要是從使用者桌面開的）；沒有 WSL（或那台沒有 skillshare）時請使用者照[〈使用者在那台 PowerShell 貼〉](#使用者在那台-powershell-貼)貼。公開網址的開、驗、收都交給 `expose-port`，這裡只寫 server 那半和要給 `expose-port` 的輸入。
 
+**agent 就在那台 Windows**（原生 Windows 的 Claude Code，不經 WSL）時，`scripts/` 跑不了（要 WSL 的 bash、`powershell.exe`、`wslpath`）。改成 agent 用 PowerShell tool 自己跑[〈使用者在那台 PowerShell 貼〉](#使用者在那台-powershell-貼)的起、收那幾段，不用請使用者貼；這個 agent 要是從使用者桌面開的，不然 server 一啟動就結束。公開網址照 `expose-port` 的〈agent 就在那台 Windows〉，驗證輸入如下（key 只寫進暫存檔，不印出來）：
+
+- `<印出 header 的 PowerShell>`：`"Authorization: Bearer $((Select-String "$HOME\.windows-mcp\config.toml" -Pattern 'auth_key\s*=\s*"([^"]+)"').Matches.Groups[1].Value)"`
+- `<curl 參數>`：先把 [Funnel](#funnel) 第 2 步 `-d` 後面的 JSON 寫進檔案（`$body = New-TemporaryFile; '<那串 JSON>' | Set-Content $body -Encoding ascii -NoNewline`），再填 `'-X', 'POST', '-H', 'Accept: application/json, text/event-stream', '-H', 'Content-Type: application/json', '-d', "@$body"`。
+- 不帶／帶驗證：`401`／`200`；`<路徑>`：`/mcp`。
+
 ### 交 key 和交代 agent（每條都一樣）
 
 - **交 key**：key 會先複製到那台的剪貼簿。請使用者交給對方 agent，最好設成它的環境變數 `WINDOWS_MCP_AUTH_KEY`。agent 自己讀 key、或把 key 傳到別的服務，都要先取得使用者明說同意。用聊天訊息交的話，用完一定要收掉並換 key。

@@ -20,6 +20,7 @@
 有沒有 WSL 不影響走哪條，只影響誰動手：那台有 WSL 時 agent 在 WSL 跑腳本起 server，你只要交 key；
 沒有 WSL 時你在那台 PowerShell 貼——起 server、收掉跟下面 quick tunnel 那兩段一樣，只是 Funnel、
 tailscale serve 要把第一、二行的 `127.0.0.1` 換成 `0.0.0.0`（agent 會講），再貼 agent 給你的那行開網址的指令。
+agent 本身就跑在那台 Windows（原生 Windows 的 Claude Code，不經 WSL）時，這些 PowerShell 它自己跑，你只要交 key、說收掉。
 
 兩種差在哪（網址固不固定、SSE、並行上限）見 [比較表](https://github.com/henry5720/dotfiles/blob/main/docs/remote-access/README.md#比較表)。
 Windows-MCP 回應可能用 SSE，quick tunnel 不支援 SSE：走 quick tunnel 時某個操作卡住或斷線，先懷疑這個。
@@ -106,6 +107,7 @@ winget 裝完，當下的 PowerShell 找不到 `cloudflared`：重開 PowerShell
 | server 從 ssh session 起 | 2026-11-05 實測起不來：`No active interactive desktop`，要在桌面起（終端機或 Interactive scheduled task） |
 | `auth --force` 每次寫入新 key | 2026-11-05 實測：config 的 key 雜湊每跑一次就不同 |
 | tailnet 內（ssh 轉發、tailscale serve） | 未實測 |
+| agent 跑在原生 Windows、自己用 PowerShell 起收 server、開收 Funnel／quick tunnel、用 `curl.exe` 驗（expose-port 的〈agent 就在那台 Windows〉） | 未實測 |
 | 同一台 WSL 的 client 經 `mcp.yaml` 帶起 mise 裝的 windows-mcp（shim） | 未實測（路徑照 2026-11-20 henry-desktop 實測的安裝位置） |
 
 server 本身的坑（`/mcp/` 307、log 在哪、`Host` 檢查、session 順序）見
