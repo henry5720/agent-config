@@ -1,11 +1,7 @@
 # 個人偏好
 
-> 這份是**跨 repo、跨 agent** 的個人偏好，只寫「換到任何一個 repo 都還成立」的事。
-> 先看讀者。給人看的：README 只放專案層（是什麼、怎麼裝），細節放 `docs/<主題>.md` 由 README 連過去；
-> 工具的通用用法連官方、不抄；設定檔的註解就是它的文件，不另寫一份。
-> 給 agent 的：每次都要遵守的寫該 repo 的 `AGENTS.md`；重複的流程寫成 skill；連外部系統用 MCP；
-> 一定要發生的用 hook。細節看官方：[AGENTS.md](https://agents.md/)、
-> [Claude Code](https://code.claude.com/docs/en/features-overview)、[Codex](https://learn.chatgpt.com/docs/customization/overview)。
+寫給人看的文件（README、`docs/`）時載入 `writing-for-humans`。
+寫給 agent 的文件（skill、`AGENTS.md`、`CLAUDE.md`）時載入 `writing-for-agents`。
 
 ## 語言
 
