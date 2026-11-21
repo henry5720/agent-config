@@ -45,6 +45,13 @@ skillshare install herdrdev/herdr/skills/herdr --branch v<新版> --force && ski
 `playwright-cli` 的 skill 同理，釘在跟本機 `@playwright/cli` 同版的上游 commit，升級步驟見
 [verify-in-browser.md](verify-in-browser.md#升級-playwright-cli-後跟上-skill)。
 
+## 跨機器
+
+```bash
+skillshare push                                 # 這台改完
+skillshare pull && skillshare sync mcp -g       # 其他台；pull 只同步 skill，MCP 要另外 sync
+```
+
 ## 選 skill 的原則
 
 **裝進來的每一支，description 每個 request 都會常駐在 context 裡。** 職責重疊的不要裝兩份。

@@ -3,7 +3,7 @@
 MCP 是讓 agent 連到外部服務的通道 —— 查文件、開瀏覽器、讀 Slack、連資料庫。**跟 skill 是兩回事**：
 skill 是步驟說明（純文字），MCP 是真的能對外做事的工具。也是可選的，想接什麼再裝什麼。
 
-指令（加、同步）看 [skillshare 官方文件](https://skillshare.runkids.cc)，跨機器看 [architecture.md〈跨機器〉](../architecture.md#跨機器)，這份不重寫。
+指令（加、同步）看 [skillshare 官方文件](https://skillshare.runkids.cc)，跨機器看 [skills/〈跨機器〉](../skills/README.md#跨機器)，這份不重寫。
 
 ## 誰寫哪一段
 
@@ -55,8 +55,7 @@ OpenCode 同時有 `opencode.json` 和只含 `$schema` 的空殼 `opencode.jsonc
 
 ## 從舊版 dotfiles 升上來的機器
 
-舊版 chezmoi 寫過的 MCP 條目，skillshare 會當成「不是它的」而**整批停下**
-（`existing entry is not managed`）。依來源處理：
+舊版 chezmoi 寫過的 MCP 條目，skillshare 會當成「不是它的」，撞到[〈sync mcp 撞到衝突〉](#sync-mcp-撞到衝突)那種停下。依來源處理：
 
 | 條目從哪來 | 怎麼處理 |
 |---|---|

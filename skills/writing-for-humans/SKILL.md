@@ -5,7 +5,7 @@ description: 寫給人看的文件：README、`docs/` 裡的工具文件、情�
 
 # 寫給人看的文件
 
-repo 的 `AGENTS.md` 對文件另有規定時，照 repo 的；這支只補 repo 沒寫的部分。
+repo 的 `AGENTS.md` 對文件另有規定時，照 repo 的；這支只補 repo 沒寫的部分。來源：[agents.md FAQ](https://agents.md/#faq)（指引衝突時，離被改的檔最近的 `AGENTS.md` 優先）。
 
 ## 先分讀者
 
@@ -20,12 +20,13 @@ repo 的 `AGENTS.md` 對文件另有規定時，照 repo 的；這支只補 repo
 
 一份文件只當一種。寫到一半發現在寫另一種，拆成兩份互連。來源：[Diátaxis](https://diataxis.fr/)。
 
-- **工具文件（reference）**：一個工具一份，結構跟著工具走。只寫 `--help` 和官網找不到的：這個 repo 為什麼這樣裝或這樣設、少用但要記的指令、踩過的坑。固定四段：為什麼裝、常用指令、坑、更多（連官網），沒內容的段省略。〈坑〉每條寫症狀、原因、解法、實測日期。來源：[Diátaxis reference](https://diataxis.fr/reference/)。
+- **工具文件（reference）**：一個工具一份，結構跟著工具走。來源：[Diátaxis reference](https://diataxis.fr/reference/)（reference 照產品本身的結構寫）。
+  - 只寫 `--help` 和官網找不到的：這個 repo 為什麼這樣裝或這樣設、少用但要記的指令、踩過的坑。固定四段：為什麼裝、常用指令、坑、更多（連官網），沒內容的段省略。〈坑〉每條寫症狀、原因、解法、實測日期。來源：本 repo 和 dotfiles 的自訂慣例，見 [henry5720/dotfiles#366](https://github.com/henry5720/dotfiles/issues/366)。
 - **情境文件（how-to）**：以要完成的一件事組織，可以跨好幾個工具，寫成照做的步驟和怎麼確認做好了。來源：[Diátaxis how-to guides](https://diataxis.fr/how-to-guides/)。
 - **說明（explanation）**：為什麼是這個結構、取捨、背景，例如目錄樹和設定檔的來歷。不放操作步驟。來源：[Diátaxis explanation](https://diataxis.fr/explanation/)。
-- 工具的通用用法連官方文件；設定檔的註解就是它的文件，不另寫一份。來源：[Diátaxis reference](https://diataxis.fr/reference/)（reference 描述產品本身，產品已有的文件就是那份 reference）。
+- 工具的通用用法連官方文件；設定檔的註解就是它的文件，不另寫一份。來源：自訂慣例，沒有外部出處。
 
 ## 交給別支 skill
 
-- 要畫圖或決定用表格、縮排樹時，照 `show-me`。
-- 改用詞、去掉空話時，照 `humanizer-zh`。
+- 要畫圖或決定用表格、縮排樹時，讀 `show-me` 的 SKILL.md 照它畫（它設了 `disable-model-invocation`，agent 不能用 Skill tool 叫）。來源：[humanlayer/skills 的 show-me](https://github.com/humanlayer/skills/tree/main/plugins/show-me/skills/show-me)。
+- 改用詞、去掉空話時，照 `humanizer-zh`。來源：[op7418/humanizer-zh](https://github.com/op7418/humanizer-zh)。
