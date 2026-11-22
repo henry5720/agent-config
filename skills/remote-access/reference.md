@@ -1,6 +1,6 @@
 # remote-access reference
 
-公網驗證沒過、或連得上但 app 回錯誤時才讀。坑照原因分層：先看經過代理的（每種方式都會遇到），再看 Funnel、quick tunnel 各自專屬的。app 本身的坑看 app 自己的文件（例如 windows-mcp 的 reference.md）。
+公網驗證沒過、或連得上但 app 回錯誤時才讀。坑照原因分層：先看經過代理的（每種方式都會遇到），再看 Funnel、quick tunnel 各自專屬的。app 本身的坑看 app 自己的文件（例如 windows-access 的 reference.md）。
 
 ## 經過本機代理或 tunnel（Funnel、quick tunnel）
 

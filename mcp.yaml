@@ -41,7 +41,7 @@ servers:
   # 其他機器會直接結束，這個 server 顯示連不上。經 sh 展開 $HOME，各台的家目錄不同也能用。
   windows-mcp:
     command: sh
-    args: [-c, 'exec "$HOME/.claude/skills/windows-mcp/scripts/windows-mcp-stdio"']
+    args: [-c, 'exec "$HOME/.claude/skills/windows-access/scripts/windows-mcp-stdio"']
     targets: [claude, codex, opencode]
   # 連別台 Windows 的 Windows-MCP HTTP server。url 寫死本機 18000，連哪台由 ssh -L 轉發決定；
   # key 由使用者在啟動 agent 的 shell export WINDOWS_MCP_AUTH_KEY，不進 repo、不進 chezmoi。
