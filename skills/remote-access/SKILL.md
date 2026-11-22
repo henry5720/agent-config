@@ -25,7 +25,7 @@ description: 連線：agent 跟服務不在同一台時怎麼連過去。同一�
 |---|---|---|---|
 | 9222 | Chrome 的 CDP（agent 的 headless 或使用者的獨立 profile），chrome-devtools MCP 寫死連它 | `browser-access` skill | 不行，沒有驗證 |
 | 9377 | `playwright-cli show` 的畫面（看 agent 的瀏覽器、接手） | `browser-access` skill | 不行，沒有驗證 |
-| 9555 | Playwright 插件的 relay（接使用者日常的 Chrome） | `browser-access` skill（`personal-chrome-attach`） | 只經 `personal-chrome-attach --tunnel` |
+| 9555 | Playwright 插件的 relay（接使用者日常的 Chrome） | `browser-access` skill（`playwright-extension-attach`） | 只經 `playwright-extension-attach --tunnel` |
 | 1080 | 反向 SOCKS（`ssh -R`，借使用者的網路） | `browser-access` skill | 不行，沒有驗證 |
 | 7681 | ttyd 網頁 shell | dotfiles 的 [share-shell](https://github.com/henry5720/dotfiles/blob/main/docs/how-to/remote-access/share-shell.md) | 可以，ttyd 帶隨機密碼 |
 | 8000→18000 | Windows-MCP 的 HTTP server：那台 Windows 聽 8000，agent 這台用 18000 接 | `windows-mcp` skill | 可以，帶 Bearer key |
