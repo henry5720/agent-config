@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-# 舊名 alias，等於 `remote-access funnel`。dotfiles 換成新名後由 agent-config#124 收掉。
-exec "$(dirname "$(readlink -f "$0")")/remote-access" funnel "$@"
