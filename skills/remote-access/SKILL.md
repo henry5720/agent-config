@@ -191,19 +191,21 @@ agent 直接跑在要開出去的那台 Windows（原生 Windows 的 Claude Code
 
    過幾秒讀 `$env:TEMP\remote-access.log`、`$env:TEMP\remote-access.err` 找網址：Funnel 是 `https://<機器名>.<tailnet>.ts.net:<對外 port>`（印的是 admin console 連結時，請使用者開好 Funnel 權限，照第 5 步收掉再開一次），quick tunnel 是 `https://<隨機>.trycloudflare.com`。
    完成條件：拿到網址，`<程式>` 的行程數是 `1`。
-3. **驗**：取代 `verify`。照腳本的做法用公開 DNS 查 IP 再 `--resolve` 過去（這台自己查 ts.net 會拿到 tailnet IP），header 寫進暫存檔用 `-H @檔案` 帶，key 不印出來、不進 curl 參數。`<印出 header 的 PowerShell>` 由 app skill 給；curl 參數裡的 JSON 寫進檔案用 `-d "@檔案"` 帶（Windows PowerShell 5.1 傳給外部程式時會吃掉參數裡的雙引號）。
+3. **驗**：取代 `verify`。照腳本的做法用公開 DNS 查 IP 再 `--resolve` 過去（這台自己查 ts.net 會拿到 tailnet IP），header 寫進暫存檔用 `-H @檔案` 帶，key 不印出來、不進 curl 參數。`<印出 header 的 PowerShell>`、`<curl 參數>`（不含 `-d`）、`$json`（請求 body，沒有就留 `''`）由 app skill 給。body 由這段寫進暫存檔用 `-d "@檔案"` 帶，不直接放進參數：Windows PowerShell 5.1 傳給外部程式時會吃掉參數裡的雙引號。
 
    ```powershell
-   $base = '<網址>'; $path = '<路徑>'
+   $base = '<網址>'; $path = '<路徑>'; $json = '<請求 body>'
    $u = [uri]$base
    $ip = ((Invoke-RestMethod "https://cloudflare-dns.com/dns-query?name=$($u.Host)&type=A" -Headers @{accept = 'application/dns-json'} -TimeoutSec 10).Answer | Where-Object type -eq 1 | Select-Object -Last 1).data
    if (-not $ip) { 'ip=空：公開 DNS 查不到'; return }
    $probe = { param([string[]]$more) curl.exe -s -m 30 -o NUL -w '%{http_code}' --resolve "$($u.Host):$($u.Port):$ip" @more "$base$path" }
-   $hdr = New-TemporaryFile
+   $hdr = New-TemporaryFile; $body = New-TemporaryFile
    try {
      <印出 header 的 PowerShell> | Set-Content $hdr -Encoding ascii -NoNewline
-     "ip=$ip 不帶驗證=$(& $probe @(<curl 參數>)) 帶驗證=$(& $probe @(<curl 參數>, '-H', "@$hdr"))"
-   } finally { Remove-Item $hdr }
+     $opts = @(<curl 參數>)
+     if ($json) { $json | Set-Content $body -Encoding ascii -NoNewline; $opts += '-d', "@$body" }
+     "ip=$ip 不帶驗證=$(& $probe $opts) 帶驗證=$(& $probe ($opts + '-H', "@$hdr"))"
+   } finally { Remove-Item $hdr, $body }
    ```
 
    完成條件：印出 `ip=<IP>`，兩個碼都跟 app 要的一樣。印 `ip=空` 或不帶驗證的碼不對時，等幾秒重跑（剛開的網址要幾秒才通，Funnel 的公開 DNS 也會晚一點才查得到）；重跑一分鐘還不對就照第 5 步收掉，再照 [reference.md](reference.md) 查。
