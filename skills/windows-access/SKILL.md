@@ -58,7 +58,7 @@ Invoke-WebRequest -UseBasicParsing https://raw.githubusercontent.com/henry5720/a
    它停掉聽 8000 的 windows-mcp，再換 key、設定改回 `127.0.0.1`，交出去的那把就作廢了。聽 8000 的不是 windows-mcp 時它不停那支，列出 PID 和程式名後 exit 1：照轉達給使用者，由他處理，不要自己停它。
    完成條件：印出 `還在聽 8000 的程式：0（要 0）` 和 `已收掉，key 已換新`。
 
-實測紀錄（2026-11-05，henry-laptop，當時是手動貼同樣的指令）：server 跑著時 `auth --force` 換的 key 不生效、舊 key 仍回 `200`，所以 script 一定先停再換；`Stop-Process` 停得掉 server，聽 8000 的數變 `0`。用新 key 重起的 server 拒絕舊 key（要 `401`）**未實測**；這支 script 本身在真的 Windows 上也還沒跑過。
+實測紀錄：2026-11-05 在 henry-laptop 手動貼同樣的指令，server 跑著時 `auth --force` 換的 key 不生效、舊 key 仍回 `200`，所以 script 一定先停再換。2026-11-22 在一台客戶的 Windows 主機（PowerShell 5.1，windows-mcp 用 uv tool 裝、經 PATH 找到）跑這支 script：`stop`、`auth-header` 從 ssh 跑可以，`start` 照上面要在桌面 session 跑；經 ssh 轉發不帶 key `401`、帶 key `200`，`windows-mcp-remote` 連得上、看得到 tools；`stop` 換 key 後重起，舊 key `401`、新 key `200`。
 
 ### 給 remote-access 的輸入
 

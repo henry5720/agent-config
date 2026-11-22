@@ -6,7 +6,7 @@
 
 - **從 ssh 起的 server 一啟動就結束**：ssh 進 Windows（或 ssh 進去再叫 `wsl.exe`、`powershell.exe`）是沒有互動桌面的 session，`serve` 在 lifespan 丟 `RuntimeError: No active interactive desktop for physical input control` 就結束，`windows-mcp-http.ps1 start` 會等滿 30 秒後報「server 30 秒內沒在 8000 起來」（2026-11-05 在 henry-laptop 實測）。server 要從使用者登入的桌面 session 起，兩種：
   - 使用者在那台桌面開 PowerShell 跑。
-  - agent 只連得到 ssh 時，經使用者核准，用暫時的 Interactive scheduled task 起（2026-11-05 在 henry-laptop 這樣起成功）。使用者要登入著桌面。收掉 server 後一定刪掉 task：
+  - agent 只連得到 ssh 時，經使用者核准，用暫時的 Interactive scheduled task 起（2026-11-05 在 henry-laptop、2026-11-22 在一台客戶的 Windows 主機這樣起成功）。使用者要登入著桌面。收掉 server 後一定刪掉 task：
 
     ```powershell
     $a = New-ScheduledTaskAction -Execute "$env:LOCALAPPDATA\mise\shims\windows-mcp.exe" -Argument 'serve --host <綁的位址>'
