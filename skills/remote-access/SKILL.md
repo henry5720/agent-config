@@ -28,7 +28,7 @@ description: 連線：agent 跟服務不在同一台時怎麼連過去。同一�
 | 9555 | Playwright 插件的 relay（接使用者日常的 Chrome） | `browser-access` skill（`playwright-extension-attach`） | 只經 `playwright-extension-attach --tunnel` |
 | 1080 | 反向 SOCKS（`ssh -R`，借使用者的網路） | `browser-access` skill | 不行，沒有驗證 |
 | 7681 | ttyd 網頁 shell | dotfiles 的 [share-shell](https://github.com/henry5720/dotfiles/blob/main/docs/how-to/remote-access/share-shell.md) | 可以，ttyd 帶隨機密碼 |
-| 8000→18000 | Windows-MCP 的 HTTP server：那台 Windows 聽 8000，agent 這台用 18000 接 | `windows-mcp` skill | 可以，帶 Bearer key |
+| 8000→18000 | Windows-MCP 的 HTTP server：那台 Windows 聽 8000，agent 這台用 18000 接 | `windows-access` skill | 可以，帶 Bearer key |
 
 8000→18000：agent 那台在 WSL mirrored networking 下，自己的 8000 可能被自己的 windows-mcp 佔走，所以本機用 18000。要同時接第二台時用 18001。
 
@@ -64,9 +64,9 @@ tailscale serve --bg --https=443 <port>                                         
 
 ### 跟 app 要的輸入
 
-叫這支的 app skill（例如 windows-mcp）要給齊，缺一項就回去問 app 的文件或使用者：
+叫這支的 app skill（例如 windows-access）要給齊，缺一項就回去問 app 的文件或使用者：
 
-| 輸入 | 例子（windows-mcp） |
+| 輸入 | 例子（windows-access） |
 |---|---|
 | 本機 port | `8000` |
 | app 對 `Host` 的要求 | 綁 loopback 時只接受 `localhost` |

@@ -2,7 +2,7 @@
 
 別台的 agent 要操作某台 Windows 的 GUI app（截圖、點擊、打字）時，它會照這個 skill 請你在那台
 起 Windows-MCP 的 server、交 key，再讓它連進來：在你的 tailnet 內就直接連，在外面才開成公開網址。agent 怎麼做寫在
-[`skills/windows-mcp/SKILL.md`](../../skills/windows-mcp/SKILL.md)，這份只寫你要在那台做的事。
+[`skills/windows-access/SKILL.md`](../../skills/windows-access/SKILL.md)，這份只寫你要在那台做的事。
 同一台的 agent（那台 WSL 裡的 Claude Code、Codex）不走這條，直接用 `mcp.yaml` 的 `windows-mcp`。
 
 ## 開哪一種
@@ -17,15 +17,14 @@
         └─ 否（別人的機器、臨時借用）→ quick tunnel：你在那台 PowerShell 貼幾行
 ```
 
-有沒有 WSL 不影響走哪條，只影響誰動手：那台有 WSL 時 agent 在 WSL 跑腳本起 server，你只要交 key；
-沒有 WSL 時你在那台 PowerShell 貼——起 server、收掉跟下面 quick tunnel 那兩段一樣，只是 Funnel、
-tailscale serve 要把第一、二行的 `127.0.0.1` 換成 `0.0.0.0`（agent 會講），再貼 agent 給你的那行開網址的指令。
-agent 本身就跑在那台 Windows（原生 Windows 的 Claude Code，不經 WSL）時，這些 PowerShell 它自己跑，你只要交 key、說收掉。
+起、收 server 都是在那台 PowerShell 跑 `windows-mcp-http.ps1 start`／`stop`（skill 的〈起、收 server〉，agent 會給你整行），
+下面 quick tunnel 那兩段手動貼的做的是同一件事。agent 本身就跑在那台 Windows（原生 Windows 的 Claude Code）時，
+它自己跑，你只要交 key、說收掉。
 
 兩種差在哪（網址固不固定、SSE、並行上限）見 [比較表](https://github.com/henry5720/dotfiles/blob/main/docs/how-to/remote-access/README.md#比較表)。
 Windows-MCP 回應可能用 SSE，quick tunnel 不支援 SSE：走 quick tunnel 時某個操作卡住或斷線，先懷疑這個。
 
-server 一定要在你登入的桌面起：你在那台桌面開 PowerShell（或 WSL）跑；agent 只連得到 ssh 時，
+server 一定要在你登入的桌面起：你在那台桌面開 PowerShell 跑；agent 只連得到 ssh 時，
 它會請你核准用一個暫時的 scheduled task 在你的桌面起，用完刪掉。從 ssh 直接起的沒有桌面，一啟動就結束。
 
 ## 第一次：在那台裝 Windows-MCP
@@ -33,7 +32,7 @@ server 一定要在你登入的桌面起：你在那台桌面開 PowerShell（�
 Windows-MCP 是第三方開源專案：[CursorTouch/Windows-MCP](https://github.com/CursorTouch/Windows-MCP)。
 由 dotfiles 用 mise 裝：裝 dotfiles 時勾 windows-mcp，已經裝好的在 PowerShell 打 `tools` 加勾，勾完會 apply。
 怎麼裝、以前手動 `uv tool install` 的舊版怎麼刪，見 [dotfiles 的〈windows-mcp〉](https://github.com/henry5720/dotfiles/blob/main/docs/how-to/windows.md#windows-mcp)。
-同一台 WSL 的 `mcp.yaml` 和 agent 的腳本只找 mise 那份（`%LOCALAPPDATA%\mise\shims\windows-mcp.exe`），找不到會叫你勾了再 apply。
+同一台 WSL 的 `mcp.yaml` 只找 mise 那份（`%LOCALAPPDATA%\mise\shims\windows-mcp.exe`），找不到會叫你勾了再 apply。
 沒裝 dotfiles 的機器（別人的、臨時借用）照 Windows-MCP 的 README 裝。
 
 勾完新開一個 PowerShell 跑 `windows-mcp --help`，有輸出就好。走 quick tunnel 的再裝 cloudflared
@@ -78,17 +77,15 @@ winget 裝完，當下的 PowerShell 找不到 `cloudflared`：重開 PowerShell
 
 ## Funnel、tailnet 內：你要做的
 
-那台有 WSL 時，agent 在那台 WSL 跑腳本起 server、開網址、驗證，key 會複製到那台的剪貼簿。你只要：
+在那台 PowerShell 跑 agent 給你的 `windows-mcp-http.ps1 start --host …`，key 會複製到剪貼簿。把 key 交給對方 agent（同上）；
+用完先收掉網址或轉發，再跑 `windows-mcp-http.ps1 stop`。
 
-1. 把剪貼簿的 key 交給對方 agent（同上）。
-2. 用完跟 agent 說收掉。它會撤掉網址、停 server、換 key，並從公網確認網址連不上。
-
-沒有 WSL、Funnel 是你在 PowerShell 開的：用完在那個視窗按 Ctrl+C，再貼
+Funnel 是你在 PowerShell 開的：用完在那個視窗按 Ctrl+C，再貼
 `Get-Process tailscale -ErrorAction SilentlyContinue | Stop-Process -Force`（只停 `tailscale` 指令本身，
 不會斷你的 tailscale 連線）。實測過只按 Ctrl+C、或斷掉 ssh 時 `tailscale.exe` 還在，網址照樣通，
 `tailscale funnel status` 卻顯示 `No serve config`。
 
-沒有 WSL 時照上面〈開哪一種〉最後那段自己貼。tailnet 內走 ssh 轉發時，server 留在 `127.0.0.1`，
+tailnet 內走 ssh 轉發時，server 留在 `127.0.0.1`，
 由對方 agent 那台開 ssh 轉發，不用開任何網址。
 
 ## 測過什麼
@@ -100,7 +97,6 @@ winget 裝完，當下的 PowerShell 找不到 `cloudflared`：重開 PowerShell
 | 長時間開著的 SSE stream 經 quick tunnel | 未實測（單次請求的 SSE 回應收得到） |
 | Windows 原生 tailscale 開 Funnel：不帶 key `401`、帶 key `200` | 2026-11-05 在 henry-laptop 實測（server 綁 `0.0.0.0`，用 Interactive scheduled task 在桌面起；從 ssh 前景跑 `tailscale funnel --https=8443 8000`；用公開 DNS 查到的 IP 加 `--resolve` 打） |
 | Funnel 收掉：停掉呼叫端後 `tailscale.exe` 還在、公網仍 `401`，`funnel status` 卻是 `No serve config`；`Get-Process tailscale \| Stop-Process` 後公網 `000` | 2026-11-05 在 henry-laptop 實測 |
-| 從 WSL 跑 `remote-access funnel` 整條（`TAILSCALE='powershell.exe …'`） | 未實測（上面是直接在 Windows 跑 tailscale） |
 | server 跑著時 `auth --force` 換 key | 2026-11-05 實測：舊 key 仍回 `200`，要先停 server 再換 |
 | 收掉時 `Stop-Process` 停得掉 server | 2026-11-05 在 henry-laptop 實測：聽 8000 的數變 `0` |
 | 用新 key 重起的 server 拒絕舊 key | 未實測 |
@@ -111,4 +107,4 @@ winget 裝完，當下的 PowerShell 找不到 `cloudflared`：重開 PowerShell
 | 同一台 WSL 的 client 經 `mcp.yaml` 帶起 mise 裝的 windows-mcp（shim） | 未實測（路徑照 2026-11-20 henry-desktop 實測的安裝位置） |
 
 server 本身的坑（`/mcp/` 307、log 在哪、`Host` 檢查、session 順序）見
-[`skills/windows-mcp/reference.md`](../../skills/windows-mcp/reference.md)。
+[`skills/windows-access/reference.md`](../../skills/windows-access/reference.md)。
