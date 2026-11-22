@@ -1,13 +1,12 @@
-#!/usr/bin/env python3
 """用 Tailscale Funnel 把本機 port 開到 tailnet 外：開、從公網驗證、收。
 
-  expose-port-funnel open --port 8000 --https 8443 --path /mcp \\
+  remote-access funnel open --port 8000 --https 8443 --path /mcp \\
       --expect-without 401 --expect-with 200 --auth-header-cmd '<印出驗證 header 的指令>' \\
       -- <兩次驗證都帶的 curl 參數>
-  expose-port-funnel verify --url https://<機器>.<tailnet>.ts.net:8443 --path /mcp \\
+  remote-access funnel verify --url https://<機器>.<tailnet>.ts.net:8443 --path /mcp \\
       --expect-without 401 --expect-with 200 --auth-header-cmd '…' -- <curl 參數>
-  expose-port-funnel check-closed --url https://<機器>.<tailnet>.ts.net:8443
-  expose-port-funnel close --https 8443
+  remote-access funnel check-closed --url https://<機器>.<tailnet>.ts.net:8443
+  remote-access funnel close --https 8443
 
 open 照 remote-access 的共通規則前景跑：Funnel 不加 --bg，驗證過了印出公開網址就停著，
 收到 Ctrl+C／SIGTERM 才撤掉 Funnel。驗證沒過也會撤掉再結束。
@@ -22,7 +21,7 @@ close 給上一輪沒收乾淨時用，重跑也安全。
   2. 從公網打公開網址連不上（000，或公開 DNS 查不到）
 
 驗證的 header 由 --auth-header-cmd 印出，寫進只有自己讀得到的暫存檔再用 `curl -H @檔案` 帶，
-不會出現在 curl 的參數裡（ps 看得到參數）。驗證、輸出這些跟 quick tunnel 共用的在 expose_port_common.py。
+不會出現在 curl 的參數裡（ps 看得到參數）。驗證、輸出這些跟 quick tunnel 共用的在 remote_access_common.py。
 
 環境變數：
   TAILSCALE                    叫 tailscale 的指令（照 shell 斷字）。沒設時用 tailscale，
@@ -38,12 +37,8 @@ import signal
 import subprocess
 import sys
 import time
-from pathlib import Path
 
-# 共用模組放在同目錄；skill 資料夾會 sync 到各 client，不留 __pycache__
-sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from expose_port_common import (  # noqa: E402
+from remote_access_common import (
     add_verify_args, cmd_check_closed, public_closed, public_state, run, say, split_curl_args, verify,
     wait_public_ip, windows_procs, windows_shell,
 )
@@ -123,7 +118,7 @@ def close_funnel(ts, https, host, child=None):
     else:
         closed = public_closed(public_url(host, https))
     ok = left == 0 and closed
-    say(f"Funnel :{https} 已收乾淨" if ok else f"Funnel :{https} 還沒收乾淨：照 expose-port 的 reference.md〈收掉後還在〉處理")
+    say(f"Funnel :{https} 已收乾淨" if ok else f"Funnel :{https} 還沒收乾淨：照 remote-access 的 reference.md〈收掉後還在〉處理")
     return ok
 
 
@@ -170,7 +165,7 @@ def cmd_open(args):
             say(f"公開 DNS 一直查不到 {host} 的 IP")
             finish(1)
         if not verify(args, f"https://{host}:{args.https}", ip):
-            say("驗證沒過，Funnel 已撤掉。看 expose-port 的 reference.md")
+            say("驗證沒過，Funnel 已撤掉。看 remote-access 的 reference.md")
             finish(1)
         say(f"公開網址：https://{host}:{args.https}{args.path}")
         say("停著直到 Ctrl+C／SIGTERM，收到就撤掉 Funnel")
@@ -209,9 +204,9 @@ def funnel_port(value):
     return port
 
 
-def main(argv):
+def main(argv, prog):
     argv, curl_args = split_curl_args(argv)
-    parser = argparse.ArgumentParser(prog="expose-port-funnel")
+    parser = argparse.ArgumentParser(prog=prog)
     sub = parser.add_subparsers(dest="cmd", required=True)
     op = sub.add_parser("open")
     op.add_argument("--port", type=int, required=True, help="本機 app 聽的 port")
@@ -229,6 +224,3 @@ def main(argv):
     sys.stdout.reconfigure(line_buffering=True)
     {"open": cmd_open, "verify": cmd_verify, "check-closed": cmd_check_closed, "close": cmd_close}[args.cmd](args)
 
-
-if __name__ == "__main__":
-    main(sys.argv[1:])

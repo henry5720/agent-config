@@ -1,4 +1,4 @@
-"""expose-port 的 Funnel 與 quick tunnel 腳本：開、公網驗證、收。
+"""remote-access 的 funnel 與 quick-tunnel 子命令：開、公網驗證、收。舊名 expose-port-funnel／expose-port-quick-tunnel 是 alias。
 
 tailscale、cloudflared、curl、sudo 都換成 PATH 上的假指令（見 FAKE_*），不會真的開公開網址或連外。
 假 tailscale 用檔案代表「Funnel 開著」：前景的 `funnel --https=N <target>` 在跑時 fg-funnel-N 在，
@@ -19,8 +19,13 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / "skills" / "expose-port" / "scripts" / "expose-port-funnel"
-QUICK_SCRIPT = ROOT / "skills" / "expose-port" / "scripts" / "expose-port-quick-tunnel"
+RA_SCRIPTS = ROOT / "skills" / "remote-access" / "scripts"
+ENTRY = RA_SCRIPTS / "remote-access"
+FUNNEL = [sys.executable, str(ENTRY), "funnel"]
+QUICK = [sys.executable, str(ENTRY), "quick-tunnel"]
+# 舊名 alias（dotfiles 換完由 agent-config#124 收）：直接執行，不經 python
+OLD_FUNNEL = [str(RA_SCRIPTS / "expose-port-funnel")]
+OLD_QUICK = [str(RA_SCRIPTS / "expose-port-quick-tunnel")]
 AUTH_HEADER_SCRIPT = ROOT / "skills" / "windows-mcp" / "scripts" / "windows-mcp-auth-header"
 SERVE_SCRIPT = ROOT / "skills" / "windows-mcp" / "scripts" / "windows-mcp-serve"
 STOP_SCRIPT = ROOT / "skills" / "windows-mcp" / "scripts" / "windows-mcp-stop"
@@ -186,7 +191,7 @@ class FakeBinTest(unittest.TestCase):
 
     def open_args(self, *extra, header_cmd=None):
         return [
-            sys.executable, str(SCRIPT), "open", "--port", "8000", "--https", "8443",
+            *FUNNEL, "open", "--port", "8000", "--https", "8443",
             "--path", "/mcp", "--expect-without", "401", "--expect-with", "200",
             "--auth-header-cmd", header_cmd or self.header_cmd, *extra,
             "--", "-X", "POST", "-d", "{}",
@@ -339,7 +344,7 @@ class FunnelTest(FakeBinTest):
     def test_close_turns_off_leftover_funnel(self):
         (self.state / "bg-funnel-8443").write_text("http://127.0.0.1:8000")
         result = subprocess.run(
-            [sys.executable, str(SCRIPT), "close", "--https", "8443"],
+            [*FUNNEL, "close", "--https", "8443"],
             env=self.env, capture_output=True, text=True, timeout=15,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -348,7 +353,7 @@ class FunnelTest(FakeBinTest):
 
     def test_close_is_safe_to_rerun(self):
         result = subprocess.run(
-            [sys.executable, str(SCRIPT), "close", "--https", "8443"],
+            [*FUNNEL, "close", "--https", "8443"],
             env=self.env, capture_output=True, text=True, timeout=15,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -359,7 +364,7 @@ class FunnelTest(FakeBinTest):
         self.env["FAKE_STATUS_HIDES_FG"] = "1"
         (self.state / "fg-funnel-8443").write_text("http://127.0.0.1:8000")
         result = subprocess.run(
-            [sys.executable, str(SCRIPT), "close", "--https", "8443"],
+            [*FUNNEL, "close", "--https", "8443"],
             env=self.env, capture_output=True, text=True, timeout=30,
         )
         self.assertNotEqual(result.returncode, 0, result.stdout)
@@ -395,7 +400,7 @@ class FunnelTest(FakeBinTest):
 
     def funnel_verify_args(self, url=f"https://{HOST}:8443", header_cmd=None):
         return [
-            sys.executable, str(SCRIPT), "verify", "--url", url, "--path", "/mcp",
+            *FUNNEL, "verify", "--url", url, "--path", "/mcp",
             "--expect-without", "401", "--expect-with", "200",
             "--auth-header-cmd", header_cmd or self.header_cmd, "--", "-X", "POST",
         ]
@@ -416,7 +421,7 @@ class FunnelTest(FakeBinTest):
         self.assertNotIn("curl", self.calls())
 
     def test_check_closed_passes_only_when_public_url_is_unreachable(self):
-        args = [sys.executable, str(SCRIPT), "check-closed", "--url", f"https://{HOST}:8443"]
+        args = [*FUNNEL, "check-closed", "--url", f"https://{HOST}:8443"]
         (self.state / "remote-up").touch()
         still = subprocess.run(args, env=self.env, capture_output=True, text=True, timeout=30)
         self.assertNotEqual(still.returncode, 0, still.stdout)
@@ -429,7 +434,7 @@ class FunnelTest(FakeBinTest):
 class QuickTunnelTest(FakeBinTest):
     def quick_args(self, *extra, header_cmd=None):
         return [
-            sys.executable, str(QUICK_SCRIPT), "open", "--port", "8000", "--host-header", "localhost",
+            *QUICK, "open", "--port", "8000", "--host-header", "localhost",
             "--path", "/mcp", "--expect-without", "401", "--expect-with", "200",
             "--auth-header-cmd", header_cmd or self.header_cmd, *extra,
             "--", "-X", "POST", "-d", "{}",
@@ -507,7 +512,7 @@ class QuickTunnelTest(FakeBinTest):
 
     def verify_args(self, url=f"https://{QUICK_HOST}", header_cmd=None):
         return [
-            sys.executable, str(QUICK_SCRIPT), "verify", "--url", url, "--path", "/mcp",
+            *QUICK, "verify", "--url", url, "--path", "/mcp",
             "--expect-without", "401", "--expect-with", "200",
             "--auth-header-cmd", header_cmd or self.header_cmd, "--", "-X", "POST",
         ]
@@ -548,7 +553,7 @@ class QuickTunnelTest(FakeBinTest):
 
     def test_check_closed_fails_while_quick_tunnel_still_answers(self):
         (self.state / "remote-up").touch()
-        result = subprocess.run([sys.executable, str(QUICK_SCRIPT), "check-closed", "--url", f"https://{QUICK_HOST}"],
+        result = subprocess.run([*QUICK, "check-closed", "--url", f"https://{QUICK_HOST}"],
                                 env=self.env, capture_output=True, text=True, timeout=30)
         self.assertNotEqual(result.returncode, 0, result.stdout)
 
@@ -566,7 +571,7 @@ class QuickTunnelTest(FakeBinTest):
         for p in (mine, other):
             self.addCleanup(p.wait)
             self.addCleanup(p.kill)
-        result = subprocess.run([sys.executable, str(QUICK_SCRIPT), "close", "--port", str(port)],
+        result = subprocess.run([*QUICK, "close", "--port", str(port)],
                                 env=self.env, capture_output=True, text=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn(f"cloudflared → :{port} 剩 0 個（要 0）", result.stdout)
@@ -574,14 +579,59 @@ class QuickTunnelTest(FakeBinTest):
         self.assertIsNone(other.poll())
 
     def test_close_is_safe_to_rerun(self):
-        result = subprocess.run([sys.executable, str(QUICK_SCRIPT), "close", "--port", "18765"],
+        result = subprocess.run([*QUICK, "close", "--port", "18765"],
                                 env=self.env, capture_output=True, text=True, timeout=15)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("剩 0 個", result.stdout)
 
 
+class EntryTest(FakeBinTest):
+    """remote-access 入口本身：--help，以及舊名 alias 跟新入口行為一樣。"""
+
+    def help_of(self, args):
+        result = subprocess.run([*args, "--help"], env=self.env, capture_output=True, text=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return result.stdout
+
+    def test_help_lists_subcommands(self):
+        out = self.help_of([sys.executable, str(ENTRY)])
+        self.assertIn("funnel", out)
+        self.assertIn("quick-tunnel", out)
+
+    def test_subcommand_help_shows_its_own_actions(self):
+        for args in (FUNNEL, QUICK, OLD_FUNNEL, OLD_QUICK):
+            with self.subTest(args=args[-1]):
+                out = self.help_of(args)
+                for action in ("open", "verify", "check-closed", "close"):
+                    self.assertIn(action, out)
+
+    def test_unknown_subcommand_fails(self):
+        result = subprocess.run([sys.executable, str(ENTRY), "ngrok"], env=self.env, capture_output=True, text=True,
+                                timeout=15)
+        self.assertNotEqual(result.returncode, 0)
+
+    def test_old_funnel_name_opens_verifies_and_closes_on_sigterm(self):
+        proc = self.start([*OLD_FUNNEL, *self.open_args()[len(FUNNEL):]])
+        out = self.read_until(proc, "公開網址")
+        self.assertTrue(self.funnel_open())
+        proc.send_signal(signal.SIGTERM)
+        rest, _ = proc.communicate(timeout=15)
+        self.assertEqual(proc.returncode, 0, out + rest)
+        self.assertFalse(self.funnel_open())
+        self.assertIn("Funnel :8443 已收乾淨", rest)
+
+    def test_old_quick_tunnel_name_verifies_like_new_entry(self):
+        (self.state / "remote-up").touch()
+        args = [f"https://{QUICK_HOST}", "--path", "/mcp", "--expect-without", "401", "--expect-with", "200",
+                "--auth-header-cmd", self.header_cmd, "--", "-X", "POST"]
+        result = subprocess.run([*OLD_QUICK, "verify", "--url", *args], env=self.env, capture_output=True,
+                                text=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(f"公開網址：https://{QUICK_HOST}/mcp", result.stdout)
+
+
 class WindowsMcpAuthHeaderTest(unittest.TestCase):
-    """windows-mcp 交給 expose-port 的 --auth-header-cmd：從 Windows 的 config.toml 讀 key。"""
+    """windows-mcp 交給 remote-access 的 --auth-header-cmd：從 Windows 的 config.toml 讀 key。"""
 
     def test_prints_bearer_header_from_windows_config(self):
         with tempfile.TemporaryDirectory() as tmp:

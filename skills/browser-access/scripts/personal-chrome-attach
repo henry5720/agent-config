@@ -99,7 +99,7 @@ running() {
   [ -n "$1" ] && [ -r "/proc/$1/status" ] && ! grep -q '^State:[[:space:]]*Z' "/proc/$1/status" 2>/dev/null
 }
 
-# 收掉 cloudflared:先 SIGTERM 等它自己收,5 秒還在就 SIGKILL。印剩幾個,判準跟 expose-port 一樣要 0。
+# 收掉 cloudflared:先 SIGTERM 等它自己收,5 秒還在就 SIGKILL。印剩幾個,判準跟 remote-access 一樣要 0。
 stop_tunnel() {
   [ -n "$tunnel_pid" ] || return 0
   local _

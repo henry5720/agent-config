@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 給別台 agent 用的 HTTP server：換新 key → 在 0.0.0.0:8000 起 server → key 複製到 Windows 剪貼簿。
-# 開到 tailnet 外交給 expose-port（Funnel 不能改寫 Host，server 才綁 0.0.0.0，見 windows-mcp 的 reference.md）。
+# 開到 tailnet 外交給 remote-access（Funnel 不能改寫 Host，server 才綁 0.0.0.0，見 windows-mcp 的 reference.md）。
 # 在桌機 WSL 跑：要靠 powershell.exe 操作 Windows 那邊。key 不印出來。
 set -euo pipefail
 . "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/windows-mcp-common.sh"

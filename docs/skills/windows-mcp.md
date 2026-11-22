@@ -100,14 +100,14 @@ winget 裝完，當下的 PowerShell 找不到 `cloudflared`：重開 PowerShell
 | 長時間開著的 SSE stream 經 quick tunnel | 未實測（單次請求的 SSE 回應收得到） |
 | Windows 原生 tailscale 開 Funnel：不帶 key `401`、帶 key `200` | 2026-11-05 在 henry-laptop 實測（server 綁 `0.0.0.0`，用 Interactive scheduled task 在桌面起；從 ssh 前景跑 `tailscale funnel --https=8443 8000`；用公開 DNS 查到的 IP 加 `--resolve` 打） |
 | Funnel 收掉：停掉呼叫端後 `tailscale.exe` 還在、公網仍 `401`，`funnel status` 卻是 `No serve config`；`Get-Process tailscale \| Stop-Process` 後公網 `000` | 2026-11-05 在 henry-laptop 實測 |
-| 從 WSL 跑 `expose-port-funnel` 整條（`TAILSCALE='powershell.exe …'`） | 未實測（上面是直接在 Windows 跑 tailscale） |
+| 從 WSL 跑 `remote-access funnel` 整條（`TAILSCALE='powershell.exe …'`） | 未實測（上面是直接在 Windows 跑 tailscale） |
 | server 跑著時 `auth --force` 換 key | 2026-11-05 實測：舊 key 仍回 `200`，要先停 server 再換 |
 | 收掉時 `Stop-Process` 停得掉 server | 2026-11-05 在 henry-laptop 實測：聽 8000 的數變 `0` |
 | 用新 key 重起的 server 拒絕舊 key | 未實測 |
 | server 從 ssh session 起 | 2026-11-05 實測起不來：`No active interactive desktop`，要在桌面起（終端機或 Interactive scheduled task） |
 | `auth --force` 每次寫入新 key | 2026-11-05 實測：config 的 key 雜湊每跑一次就不同 |
 | tailnet 內（ssh 轉發、tailscale serve） | 未實測 |
-| agent 跑在原生 Windows、自己用 PowerShell 起收 server、開收 Funnel／quick tunnel、用 `curl.exe` 驗（expose-port 的〈agent 就在那台 Windows〉） | 未實測 |
+| agent 跑在原生 Windows、自己用 PowerShell 起收 server、開收 Funnel／quick tunnel、用 `curl.exe` 驗（remote-access 的〈agent 就在那台 Windows〉） | 未實測 |
 | 同一台 WSL 的 client 經 `mcp.yaml` 帶起 mise 裝的 windows-mcp（shim） | 未實測（路徑照 2026-11-20 henry-desktop 實測的安裝位置） |
 
 server 本身的坑（`/mcp/` 307、log 在哪、`Host` 檢查、session 順序）見

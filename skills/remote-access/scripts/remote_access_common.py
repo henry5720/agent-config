@@ -1,4 +1,4 @@
-"""expose-port-funnel 與 expose-port-quick-tunnel 共用的部分：輸出、跑指令、參數、從公網驗證開著或收掉、
+"""remote-access funnel 與 quick-tunnel 共用的部分：輸出、跑指令、參數、從公網驗證開著或收掉、
 停 Windows 那邊的程式。
 
 不是可以直接跑的腳本。兩支腳本用 `Path(__file__).resolve().parent` 把這個目錄加進 sys.path 再 import，
@@ -103,7 +103,7 @@ def verify(args, base_url, ip=""):
     if header.returncode != 0 or not header.stdout.strip():
         say("--auth-header-cmd 沒印出 header")
         return False
-    fd, header_file = tempfile.mkstemp(prefix="expose-port-")
+    fd, header_file = tempfile.mkstemp(prefix="remote-access-")
     try:
         with os.fdopen(fd, "w") as f:
             f.write(header.stdout.strip().splitlines()[0] + "\n")
