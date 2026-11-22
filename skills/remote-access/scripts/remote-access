@@ -1,0 +1,32 @@
+#!/usr/bin/env python3
+"""把本機 port 開到 tailnet 外：開、從公網驗證、收。
+
+  remote-access funnel <open|verify|check-closed|close> …        Tailscale Funnel
+  remote-access quick-tunnel <open|verify|check-closed|close> …  Cloudflare quick tunnel
+
+各子命令的參數看 `remote-access funnel --help`、`remote-access quick-tunnel --help`。
+同一台、tailnet 內不用這支，做法在 remote-access skill。
+"""
+import importlib
+import sys
+from pathlib import Path
+
+# 子命令的模組放在同目錄；skill 資料夾會 sync 到各 client，不留 __pycache__
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+SUBCOMMANDS = {"funnel": "remote_access_funnel", "quick-tunnel": "remote_access_quick_tunnel"}
+
+
+def main(argv):
+    if argv[:1] in (["-h"], ["--help"]):
+        print(__doc__.strip())
+        sys.exit(0)
+    if not argv or argv[0] not in SUBCOMMANDS:
+        sys.stderr.write(__doc__.strip() + "\n")
+        sys.exit(2)
+    importlib.import_module(SUBCOMMANDS[argv[0]]).main(argv[1:], prog=f"remote-access {argv[0]}")
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

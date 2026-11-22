@@ -7,7 +7,7 @@
 #     `cloudflared access tcp --hostname <x>.trycloudflare.com --url 127.0.0.1:9555`。connect 網址就是鑰匙,只交給本人。
 # 怎麼用見同一個 skill 的 SKILL.md。
 #
-# 用法:personal-chrome-attach [-s=<session>] [--timeout=<秒>] [--tunnel]
+# 用法:playwright-extension-attach [-s=<session>] [--timeout=<秒>] [--tunnel]
 #   -s          playwright-cli 的 session 名(預設 personal-chrome),接上後用 playwright-cli -s=<session> 操作
 #   --timeout   等人連進來的秒數(預設 300;--tunnel 預設 600,人第一次要裝 cloudflared 和插件),
 #               時間到就收掉 attach 和轉發/tunnel、exit 1
@@ -77,12 +77,12 @@ port_owner() {
   done
 }
 
-# 1. 9555 被佔就失敗:多半是另一個 session 的 personal-chrome-attach 還開著,兩個搶同一個 relay 會互相蓋掉。
+# 1. 9555 被佔就失敗:多半是另一個 session 的 playwright-extension-attach 還開著,兩個搶同一個 relay 會互相蓋掉。
 #    --tunnel 不在這台聽 9555(9555 在人那台),不用查。
 if [ -z "$TUNNEL" ] && owner=$(port_owner "$PORT"); then
   echo "127.0.0.1:$PORT 已經有人在聽,不能再開一個 relay。佔著的是:" >&2
   printf '%s\n' "$owner" >&2
-  echo "是另一個 personal-chrome-attach 就先讓它 detach 或結束;不是就請使用者決定要不要關。" >&2
+  echo "是另一個 playwright-extension-attach 就先讓它 detach 或結束;不是就請使用者決定要不要關。" >&2
   exit 1
 fi
 
@@ -99,7 +99,7 @@ running() {
   [ -n "$1" ] && [ -r "/proc/$1/status" ] && ! grep -q '^State:[[:space:]]*Z' "/proc/$1/status" 2>/dev/null
 }
 
-# 收掉 cloudflared:先 SIGTERM 等它自己收,5 秒還在就 SIGKILL。印剩幾個,判準跟 expose-port 一樣要 0。
+# 收掉 cloudflared:先 SIGTERM 等它自己收,5 秒還在就 SIGKILL。印剩幾個,判準跟 remote-access 一樣要 0。
 stop_tunnel() {
   [ -n "$tunnel_pid" ] || return 0
   local _
@@ -218,7 +218,7 @@ const [port, host, target] = process.argv.slice(1);  // node -e 沒有腳本路�
 const url = process.env.PERSONAL_CHROME_ATTACH_CONNECT_URL;
 delete process.env.PERSONAL_CHROME_ATTACH_CONNECT_URL;
 const esc = (s) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
-const body = `<!doctype html><meta charset="utf-8"><title>personal-chrome-attach</title>
+const body = `<!doctype html><meta charset="utf-8"><title>playwright-extension-attach</title>
 <p>按「複製」,再把網址貼進<b>這個分頁</b>的網址列、按 Enter。agent 會直接改這個分頁的內容,也能另開新分頁。</p>
 <p><input id="u" readonly size="100" value="${esc(url)}" onfocus="this.select()"> <button id="b">複製</button></p>
 <script>b.onclick = () => navigator.clipboard.writeText(u.value).then(() => { b.textContent = "已複製"; });</script>
@@ -238,7 +238,7 @@ net.createServer((c) => {
   });
 }).on("error", (e) => { console.error(`轉發開不起來:${e.message}`); process.exit(1); })
   .listen(Number(port), "127.0.0.1");
-' "$PORT" "$relay_host" "$relay_port" personal-chrome-attach-forward &
+' "$PORT" "$relay_host" "$relay_port" playwright-extension-attach-forward &
   forward_pid=$!
   for _ in $(seq 1 50); do
     port_owner "$PORT" >/dev/null && break

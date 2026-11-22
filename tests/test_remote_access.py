@@ -1,4 +1,4 @@
-"""expose-port 的 Funnel 與 quick tunnel 腳本：開、公網驗證、收。
+"""remote-access 的 funnel 與 quick-tunnel 子命令：開、公網驗證、收。
 
 tailscale、cloudflared、curl、sudo 都換成 PATH 上的假指令（見 FAKE_*），不會真的開公開網址或連外。
 假 tailscale 用檔案代表「Funnel 開著」：前景的 `funnel --https=N <target>` 在跑時 fg-funnel-N 在，
@@ -19,12 +19,11 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / "skills" / "expose-port" / "scripts" / "expose-port-funnel"
-QUICK_SCRIPT = ROOT / "skills" / "expose-port" / "scripts" / "expose-port-quick-tunnel"
-AUTH_HEADER_SCRIPT = ROOT / "skills" / "windows-mcp" / "scripts" / "windows-mcp-auth-header"
-SERVE_SCRIPT = ROOT / "skills" / "windows-mcp" / "scripts" / "windows-mcp-serve"
-STOP_SCRIPT = ROOT / "skills" / "windows-mcp" / "scripts" / "windows-mcp-stop"
-STDIO_SCRIPT = ROOT / "skills" / "windows-mcp" / "scripts" / "windows-mcp-stdio"
+RA_SCRIPTS = ROOT / "skills" / "remote-access" / "scripts"
+ENTRY = RA_SCRIPTS / "remote-access"
+FUNNEL = [sys.executable, str(ENTRY), "funnel"]
+QUICK = [sys.executable, str(ENTRY), "quick-tunnel"]
+# 舊名 alias（dotfiles 換完由 agent-config#124 收）：直接執行，不經 python
 
 HOST = "box.tail123.ts.net"
 QUICK_HOST = "quiet-fox-123.trycloudflare.com"
@@ -186,7 +185,7 @@ class FakeBinTest(unittest.TestCase):
 
     def open_args(self, *extra, header_cmd=None):
         return [
-            sys.executable, str(SCRIPT), "open", "--port", "8000", "--https", "8443",
+            *FUNNEL, "open", "--port", "8000", "--https", "8443",
             "--path", "/mcp", "--expect-without", "401", "--expect-with", "200",
             "--auth-header-cmd", header_cmd or self.header_cmd, *extra,
             "--", "-X", "POST", "-d", "{}",
@@ -319,7 +318,7 @@ class FunnelTest(FakeBinTest):
         self.assertIn("sudo tailscale funnel --https=8443 http://127.0.0.1:8000", self.calls())
 
     def test_tailscale_command_can_be_overridden(self):
-        # windows-mcp 從 WSL 叫 Windows 的 tailscale 就靠這個
+        # 從 WSL 叫 Windows 的 tailscale 就靠這個
         wrapper = self.bin / "win-tailscale"
         wrapper.write_text('#!/usr/bin/env bash\necho "wrapper" >> "$FAKE_STATE/calls"\nexec tailscale "$@"\n')
         wrapper.chmod(0o755)
@@ -339,7 +338,7 @@ class FunnelTest(FakeBinTest):
     def test_close_turns_off_leftover_funnel(self):
         (self.state / "bg-funnel-8443").write_text("http://127.0.0.1:8000")
         result = subprocess.run(
-            [sys.executable, str(SCRIPT), "close", "--https", "8443"],
+            [*FUNNEL, "close", "--https", "8443"],
             env=self.env, capture_output=True, text=True, timeout=15,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -348,7 +347,7 @@ class FunnelTest(FakeBinTest):
 
     def test_close_is_safe_to_rerun(self):
         result = subprocess.run(
-            [sys.executable, str(SCRIPT), "close", "--https", "8443"],
+            [*FUNNEL, "close", "--https", "8443"],
             env=self.env, capture_output=True, text=True, timeout=15,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -359,7 +358,7 @@ class FunnelTest(FakeBinTest):
         self.env["FAKE_STATUS_HIDES_FG"] = "1"
         (self.state / "fg-funnel-8443").write_text("http://127.0.0.1:8000")
         result = subprocess.run(
-            [sys.executable, str(SCRIPT), "close", "--https", "8443"],
+            [*FUNNEL, "close", "--https", "8443"],
             env=self.env, capture_output=True, text=True, timeout=30,
         )
         self.assertNotEqual(result.returncode, 0, result.stdout)
@@ -395,7 +394,7 @@ class FunnelTest(FakeBinTest):
 
     def funnel_verify_args(self, url=f"https://{HOST}:8443", header_cmd=None):
         return [
-            sys.executable, str(SCRIPT), "verify", "--url", url, "--path", "/mcp",
+            *FUNNEL, "verify", "--url", url, "--path", "/mcp",
             "--expect-without", "401", "--expect-with", "200",
             "--auth-header-cmd", header_cmd or self.header_cmd, "--", "-X", "POST",
         ]
@@ -416,7 +415,7 @@ class FunnelTest(FakeBinTest):
         self.assertNotIn("curl", self.calls())
 
     def test_check_closed_passes_only_when_public_url_is_unreachable(self):
-        args = [sys.executable, str(SCRIPT), "check-closed", "--url", f"https://{HOST}:8443"]
+        args = [*FUNNEL, "check-closed", "--url", f"https://{HOST}:8443"]
         (self.state / "remote-up").touch()
         still = subprocess.run(args, env=self.env, capture_output=True, text=True, timeout=30)
         self.assertNotEqual(still.returncode, 0, still.stdout)
@@ -429,7 +428,7 @@ class FunnelTest(FakeBinTest):
 class QuickTunnelTest(FakeBinTest):
     def quick_args(self, *extra, header_cmd=None):
         return [
-            sys.executable, str(QUICK_SCRIPT), "open", "--port", "8000", "--host-header", "localhost",
+            *QUICK, "open", "--port", "8000", "--host-header", "localhost",
             "--path", "/mcp", "--expect-without", "401", "--expect-with", "200",
             "--auth-header-cmd", header_cmd or self.header_cmd, *extra,
             "--", "-X", "POST", "-d", "{}",
@@ -507,7 +506,7 @@ class QuickTunnelTest(FakeBinTest):
 
     def verify_args(self, url=f"https://{QUICK_HOST}", header_cmd=None):
         return [
-            sys.executable, str(QUICK_SCRIPT), "verify", "--url", url, "--path", "/mcp",
+            *QUICK, "verify", "--url", url, "--path", "/mcp",
             "--expect-without", "401", "--expect-with", "200",
             "--auth-header-cmd", header_cmd or self.header_cmd, "--", "-X", "POST",
         ]
@@ -548,7 +547,7 @@ class QuickTunnelTest(FakeBinTest):
 
     def test_check_closed_fails_while_quick_tunnel_still_answers(self):
         (self.state / "remote-up").touch()
-        result = subprocess.run([sys.executable, str(QUICK_SCRIPT), "check-closed", "--url", f"https://{QUICK_HOST}"],
+        result = subprocess.run([*QUICK, "check-closed", "--url", f"https://{QUICK_HOST}"],
                                 env=self.env, capture_output=True, text=True, timeout=30)
         self.assertNotEqual(result.returncode, 0, result.stdout)
 
@@ -566,7 +565,7 @@ class QuickTunnelTest(FakeBinTest):
         for p in (mine, other):
             self.addCleanup(p.wait)
             self.addCleanup(p.kill)
-        result = subprocess.run([sys.executable, str(QUICK_SCRIPT), "close", "--port", str(port)],
+        result = subprocess.run([*QUICK, "close", "--port", str(port)],
                                 env=self.env, capture_output=True, text=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn(f"cloudflared → :{port} 剩 0 個（要 0）", result.stdout)
@@ -574,152 +573,36 @@ class QuickTunnelTest(FakeBinTest):
         self.assertIsNone(other.poll())
 
     def test_close_is_safe_to_rerun(self):
-        result = subprocess.run([sys.executable, str(QUICK_SCRIPT), "close", "--port", "18765"],
+        result = subprocess.run([*QUICK, "close", "--port", "18765"],
                                 env=self.env, capture_output=True, text=True, timeout=15)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("剩 0 個", result.stdout)
 
 
-class WindowsMcpAuthHeaderTest(unittest.TestCase):
-    """windows-mcp 交給 expose-port 的 --auth-header-cmd：從 Windows 的 config.toml 讀 key。"""
+class EntryTest(FakeBinTest):
+    """remote-access 入口本身：--help，以及舊名 alias 跟新入口行為一樣。"""
 
-    def test_prints_bearer_header_from_windows_config(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            tmp = Path(tmp)
-            home = tmp / "winhome"
-            (home / ".windows-mcp").mkdir(parents=True)
-            (home / ".windows-mcp" / "config.toml").write_text(
-                f'transport = "streamable-http"\nauth_key = "{KEY}"\n'
-            )
-            bin_dir = tmp / "bin"
-            bin_dir.mkdir()
-            (bin_dir / "powershell.exe").write_text("#!/usr/bin/env bash\nprintf 'C:\\\\Users\\\\me\\r\\n'\n")
-            (bin_dir / "wslpath").write_text(f"#!/usr/bin/env bash\necho {home}\n")
-            for p in bin_dir.iterdir():
-                p.chmod(0o755)
-            env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"}
-            result = subprocess.run(["bash", str(AUTH_HEADER_SCRIPT)], env=env, capture_output=True, text=True, timeout=15)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, f"Authorization: Bearer {KEY}\n")
-
-
-# 只認 windows-mcp-serve／stop 會送的幾種 PowerShell 指令；server 起來後 listening 檔案在。
-# auth --force 改寫 config.toml 的 key；FAKE_AUTH_BROKEN=1 時什麼都不做（模擬換 key 失敗）
-FAKE_POWERSHELL = r"""#!/usr/bin/env bash
-cmd="$3"
-case "$cmd" in
-  *" auth --transport "*) [ -n "$FAKE_AUTH_BROKEN" ] || printf 'auth_key = "rotated-%s"\n' "$RANDOM" > "$FAKE_WINHOME/.windows-mcp/config.toml" ;;
-  '$env:USERPROFILE') printf 'C:\\Users\\me\r\n' ;;
-  '"$env:LOCALAPPDATA\mise\shims\windows-mcp.exe"') printf 'C:\\Users\\me\\AppData\\Local\\mise\\shims\\windows-mcp.exe\r\n' ;;
-  *Measure-Object\).Count*) [ -e "$FAKE_STATE/listening" ] && echo 1 || echo 0 ;;
-  *Start-Process*) touch "$FAKE_STATE/listening" ;;
-esac
-"""
-# C:\Users\me\... 換成假 Windows 家目錄底下的路徑
-FAKE_WSLPATH = r"""#!/usr/bin/env bash
-p=${1//\\//}
-echo "$FAKE_WINHOME${p#C:/Users/me}"
-"""
-MISE_SHIM = Path("AppData") / "Local" / "mise" / "shims" / "windows-mcp.exe"
-
-
-class WindowsMcpServeTest(unittest.TestCase):
-    """windows-mcp-serve／stop：換新 key、key 放進 Windows 剪貼簿不印出來；key 沒換掉就失敗。"""
-
-    def run_script(self, script, auth_broken=False):
-        """在假 Windows 環境跑 script，回 (結果, 剪貼簿內容, 跑完後 config 裡的 key)。"""
-        with tempfile.TemporaryDirectory() as tmp:
-            tmp = Path(tmp)
-            home = tmp / "winhome"
-            (home / ".windows-mcp").mkdir(parents=True)
-            config = home / ".windows-mcp" / "config.toml"
-            config.write_text(f'transport = "streamable-http"\nauth_key = "{KEY}"\n')
-            (home / MISE_SHIM).parent.mkdir(parents=True)
-            (home / MISE_SHIM).write_text("")
-            state = tmp / "state"
-            state.mkdir()
-            bin_dir = tmp / "bin"
-            bin_dir.mkdir()
-            (bin_dir / "powershell.exe").write_text(FAKE_POWERSHELL)
-            (bin_dir / "wslpath").write_text(FAKE_WSLPATH)
-            (bin_dir / "clip.exe").write_text(f'#!/usr/bin/env bash\ncat > {state}/clip\n')
-            for p in bin_dir.iterdir():
-                p.chmod(0o755)
-            env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "FAKE_STATE": str(state),
-                   "FAKE_WINHOME": str(home), "FAKE_AUTH_BROKEN": "1" if auth_broken else ""}
-            result = subprocess.run(["bash", str(script)], env=env, capture_output=True, text=True, timeout=30)
-            clip = (state / "clip").read_text() if (state / "clip").exists() else ""
-            key = config.read_text().split('auth_key = "')[1].split('"')[0]
-        return result, clip, key
-
-    def test_copies_new_key_to_clipboard_without_printing_it(self):
-        result, clip, key = self.run_script(SERVE_SCRIPT)
+    def help_of(self, args):
+        result = subprocess.run([*args, "--help"], env=self.env, capture_output=True, text=True, timeout=15)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertNotEqual(key, KEY)
-        self.assertEqual(clip, key)
-        self.assertNotIn(key, result.stdout + result.stderr)
-        self.assertIn("key 已複製到 Windows 剪貼簿", result.stdout)
+        return result.stdout
 
-    def test_serve_refuses_when_key_not_rotated(self):
-        result, clip, _ = self.run_script(SERVE_SCRIPT, auth_broken=True)
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertEqual(clip, "")
-        self.assertIn("key 沒換掉", result.stderr)
+    def test_help_lists_subcommands(self):
+        out = self.help_of([sys.executable, str(ENTRY)])
+        self.assertIn("funnel", out)
+        self.assertIn("quick-tunnel", out)
 
-    def test_stop_rotates_key(self):
-        result, _, key = self.run_script(STOP_SCRIPT)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertNotEqual(key, KEY)
+    def test_subcommand_help_shows_its_own_actions(self):
+        for args in (FUNNEL, QUICK):
+            with self.subTest(args=args[-1]):
+                out = self.help_of(args)
+                for action in ("open", "verify", "check-closed", "close"):
+                    self.assertIn(action, out)
 
-    def test_stop_fails_when_key_not_rotated(self):
-        result, _, _ = self.run_script(STOP_SCRIPT, auth_broken=True)
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertNotIn("已收掉", result.stdout)
-
-
-class WindowsMcpStdioTest(unittest.TestCase):
-    """windows-mcp-stdio：mcp.yaml 的進入點。找到 mise 裝的 shim 就 exec，找不到叫人去 apply，不是 WSL 就結束。"""
-
-    def run_stdio(self, wsl=True, installed=True):
-        with tempfile.TemporaryDirectory() as tmp:
-            tmp = Path(tmp)
-            home = tmp / "winhome"
-            calls = tmp / "exe-calls"
-            if installed:
-                (home / MISE_SHIM).parent.mkdir(parents=True)
-                (home / MISE_SHIM).write_text(f'#!/usr/bin/env bash\necho "$*" > {calls}\n')
-                (home / MISE_SHIM).chmod(0o755)
-            bin_dir = tmp / "bin"
-            bin_dir.mkdir()
-            if wsl:
-                (bin_dir / "powershell.exe").write_text(FAKE_POWERSHELL)
-                (bin_dir / "wslpath").write_text(FAKE_WSLPATH)
-            for p in bin_dir.iterdir():
-                p.chmod(0o755)
-            # 不接上真的 PATH：這台若真的有 powershell.exe 也不會被找到
-            env = {**os.environ, "PATH": f"{bin_dir}:/usr/bin:/bin", "FAKE_WINHOME": str(home)}
-            result = subprocess.run(["bash", str(STDIO_SCRIPT)], env=env, capture_output=True, text=True,
-                                    stdin=subprocess.DEVNULL, timeout=15)
-            args = calls.read_text() if calls.exists() else None
-        return result, args
-
-    def test_execs_mise_shim_with_stdio_transport(self):
-        result, args = self.run_stdio()
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(args, "serve --transport stdio\n")
-
-    def test_missing_exe_says_to_apply_on_windows_host(self):
-        result, args = self.run_stdio(installed=False)
-        self.assertEqual(result.returncode, 1)
-        self.assertIsNone(args)
-        self.assertIn("勾 windows-mcp", result.stderr)
-        self.assertIn("mise\\shims\\windows-mcp.exe", result.stderr)
-
-    def test_not_wsl_exits_with_reason(self):
-        result, args = self.run_stdio(wsl=False)
-        self.assertEqual(result.returncode, 1)
-        self.assertIsNone(args)
-        self.assertIn("不是 Windows 桌機的 WSL", result.stderr)
+    def test_unknown_subcommand_fails(self):
+        result = subprocess.run([sys.executable, str(ENTRY), "ngrok"], env=self.env, capture_output=True, text=True,
+                                timeout=15)
+        self.assertNotEqual(result.returncode, 0)
 
 
 if __name__ == "__main__":

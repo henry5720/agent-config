@@ -1,4 +1,4 @@
-"""browser-access 的 personal-chrome-attach --tunnel：印出使用者要做的事、接上、各種結束方式都收掉 cloudflared。
+"""browser-access 的 playwright-extension-attach --tunnel：印出使用者要做的事、接上、各種結束方式都收掉 cloudflared。
 
 playwright-cli、cloudflared 換成 PATH 上的假指令（見 FAKE_*），不連網、不開 Chrome、不開公開網址。
 假 playwright-cli 的 attach 照真的流程走：起一個 daemon 子行程（代表 relay），把 connect 網址交給
@@ -18,7 +18,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / "skills" / "browser-access" / "scripts" / "personal-chrome-attach"
+SCRIPT = ROOT / "skills" / "browser-access" / "scripts" / "playwright-extension-attach"
 
 QUICK_HOST = "quiet-fox-123.trycloudflare.com"
 RELAY_PORT = "45678"
@@ -215,6 +215,12 @@ class TunnelTest(unittest.TestCase):
     # ----------------------------------------------------------------------
     # 結束方式：cloudflared 都收掉
     # ----------------------------------------------------------------------
+
+    def test_help_prints_usage_and_exits_0(self):
+        result = subprocess.run([str(SCRIPT), "--help"], env=self.env, capture_output=True, text=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("用法:playwright-extension-attach", result.stdout)
+        self.assertIn("--tunnel", result.stdout)
 
     def test_detach_closes_tunnel_and_exits_0(self):
         proc = self.start()
