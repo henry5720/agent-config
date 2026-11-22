@@ -1,13 +1,12 @@
-#!/usr/bin/env python3
 """用 Cloudflare quick tunnel 把本機 port 開到 tailnet 外：開、從公網驗證、收。
 
-  expose-port-quick-tunnel open --port 8000 --host-header localhost --path /mcp \\
+  remote-access quick-tunnel open --port 8000 --host-header localhost --path /mcp \\
       --expect-without 401 --expect-with 200 --auth-header-cmd '<印出驗證 header 的指令>' \\
       -- <兩次驗證都帶的 curl 參數>
-  expose-port-quick-tunnel verify --url https://<隨機>.trycloudflare.com --path /mcp \\
+  remote-access quick-tunnel verify --url https://<隨機>.trycloudflare.com --path /mcp \\
       --expect-without 401 --expect-with 200 --auth-header-cmd '…' -- <curl 參數>
-  expose-port-quick-tunnel check-closed --url https://<隨機>.trycloudflare.com
-  expose-port-quick-tunnel close --port 8000 [--url https://<隨機>.trycloudflare.com]
+  remote-access quick-tunnel check-closed --url https://<隨機>.trycloudflare.com
+  remote-access quick-tunnel close --port 8000 [--url https://<隨機>.trycloudflare.com]
 
 open 在這台跑 cloudflared，照 remote-access 的共通規則前景跑：驗證過了印出公開網址就停著，
 收到 Ctrl+C／SIGTERM 才收。驗證沒過也會收掉再結束。
@@ -22,7 +21,7 @@ close 沒給 --url 時不知道網址，只看前一項。CLOUDFLARED 叫的是 
 --host-header 讓 cloudflared 改寫 Host（--http-host-header），app 綁 loopback 又檢查 Host 時給 localhost。
 
 驗證的 header 由 --auth-header-cmd 印出，寫進只有自己讀得到的暫存檔再用 `curl -H @檔案` 帶，
-不會出現在 curl 的參數裡（ps 看得到參數）。驗證、輸出這些跟 Funnel 共用的在 expose_port_common.py。
+不會出現在 curl 的參數裡（ps 看得到參數）。驗證、輸出這些跟 Funnel 共用的在 remote_access_common.py。
 
 環境變數（平常不用設）：
   CLOUDFLARED                  叫 cloudflared 的指令（照 shell 斷字），預設 cloudflared。
@@ -40,12 +39,8 @@ import subprocess
 import sys
 import tempfile
 import time
-from pathlib import Path
 
-# 共用模組放在同目錄；skill 資料夾會 sync 到各 client，不留 __pycache__
-sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from expose_port_common import (  # noqa: E402
+from remote_access_common import (
     add_verify_args, cmd_check_closed, public_closed, run, say, split_curl_args, verify, windows_procs, windows_shell,
 )
 
@@ -126,7 +121,7 @@ def cmd_open(args):
     cmd = cloudflared_cmd() + ["tunnel", "--url", f"http://127.0.0.1:{args.port}"]
     if args.host_header:
         cmd += ["--http-host-header", args.host_header]
-    log_fd, log_path = tempfile.mkstemp(prefix="expose-port-cloudflared-", suffix=".log")
+    log_fd, log_path = tempfile.mkstemp(prefix="remote-access-cloudflared-", suffix=".log")
     say(f"開 quick tunnel → 127.0.0.1:{args.port}（前景，收到 Ctrl+C／SIGTERM 就收）…")
     try:
         child = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=log_fd, stderr=log_fd)
@@ -163,7 +158,7 @@ def cmd_open(args):
             say("cloudflared 沒印出 trycloudflare.com 網址")
             finish(1)
         if not verify(args, url):
-            say("驗證沒過，quick tunnel 已收掉。看 expose-port 的 reference.md")
+            say("驗證沒過，quick tunnel 已收掉。看 remote-access 的 reference.md")
             finish(1)
         say(f"公開網址：{url}{args.path}")
         say("停著直到 Ctrl+C／SIGTERM，收到就收掉 quick tunnel")
@@ -188,9 +183,9 @@ def cmd_close(args):
     sys.exit(0 if report_closed(args.port, args.url) else 1)
 
 
-def main(argv):
+def main(argv, prog):
     argv, curl_args = split_curl_args(argv)
-    parser = argparse.ArgumentParser(prog="expose-port-quick-tunnel")
+    parser = argparse.ArgumentParser(prog=prog)
     sub = parser.add_subparsers(dest="cmd", required=True)
     op = sub.add_parser("open")
     op.add_argument("--port", type=int, required=True, help="本機 app 聽的 port")
@@ -209,6 +204,3 @@ def main(argv):
     sys.stdout.reconfigure(line_buffering=True)
     {"open": cmd_open, "verify": cmd_verify, "check-closed": cmd_check_closed, "close": cmd_close}[args.cmd](args)
 
-
-if __name__ == "__main__":
-    main(sys.argv[1:])

@@ -8,9 +8,9 @@ description: 把一台 Windows 桌面的 Windows-MCP 開給別台的 agent 操�
 Windows-MCP 要跑在 Windows 使用者登入的桌面 session 裡，才操作得到眼前這個桌面。HTTP server 一律從桌面 session 起：使用者在那台桌面開終端機（PowerShell 或 WSL）跑，或經使用者核准、用暫時的 Interactive scheduled task 起，用完刪掉（做法在 [reference.md](reference.md)〈從 ssh 起的 server 一啟動就結束〉）。從 ssh 起的沒有桌面，server 一啟動就結束。
 
 - **同一台的 agent**（WSL 裡的 Claude Code、Codex）：不用這個 skill，直接用 skillshare `mcp.yaml` 裡的 `windows-mcp` server（stdio，client 用時才帶起來）。
-- **別台的 agent**：照下面「別台的 agent」起 HTTP server、換 key，讓對方連 `/mcp`、帶 Bearer key，用完收掉並換 key。對方在使用者的 tailnet 內就直接連，不叫 `expose-port`；在 tailnet 外才交給 `expose-port` skill 開公開網址。
+- **別台的 agent**：照下面「別台的 agent」起 HTTP server、換 key，讓對方連 `/mcp`、帶 Bearer key，用完收掉並換 key。對方在使用者的 tailnet 內就直接連，不叫 `remote-access`；在 tailnet 外才交給 `remote-access` skill 開公開網址。
 
-server 本身的坑（400、307、session）看 [reference.md](reference.md)；經過 Funnel、quick tunnel 的坑看 `expose-port` 的 reference.md。給人看的版本（要在那台貼什麼、怎麼收）在 agent-config 的 `docs/skills/windows-mcp.md`。
+server 本身的坑（400、307、session）看 [reference.md](reference.md)；經過 Funnel、quick tunnel 的坑看 `remote-access` 的 reference.md。給人看的版本（要在那台貼什麼、怎麼收）在 agent-config 的 `docs/skills/windows-mcp.md`。
 
 ## 第一次安裝
 
@@ -32,16 +32,16 @@ Windows-MCP 是第三方開源專案（[CursorTouch/Windows-MCP](https://github.
 
 照 [remote-access 的判準](https://github.com/henry5720/dotfiles/blob/main/docs/how-to/remote-access/README.md#判準)，先看對方 agent 在哪：
 
-- **對方 agent 在使用者的 tailnet 內** → [tailnet 內](#tailnet-內)：ssh 轉發或 tailscale serve，不開公網、不叫 `expose-port`。
+- **對方 agent 在使用者的 tailnet 內** → [tailnet 內](#tailnet-內)：ssh 轉發或 tailscale serve，不開公網、不叫 `remote-access`。
 - **在 tailnet 外，那台 Windows 加進使用者的 tailnet**（WSL 裡的 tailscale、Windows 原生 tailscale 都算）→ [Funnel](#funnel)。
 - **在 tailnet 外，那台不加進使用者的 tailnet**（別人的機器、臨時借用）→ [quick tunnel](#quick-tunnel)。
 
-有沒有 WSL 不影響選哪條，只決定 server 由誰起：有 WSL 時 agent 在那台 WSL 跑 `~/.claude/skills/windows-mcp/scripts/` 的腳本（靠 `powershell.exe` 操作 Windows；這個 WSL 要是從使用者桌面開的）；沒有 WSL（或那台沒有 skillshare）時請使用者照[〈使用者在那台 PowerShell 貼〉](#使用者在那台-powershell-貼)貼。公開網址的開、驗、收都交給 `expose-port`，這裡只寫 server 那半和要給 `expose-port` 的輸入。
+有沒有 WSL 不影響選哪條，只決定 server 由誰起：有 WSL 時 agent 在那台 WSL 跑 `~/.claude/skills/windows-mcp/scripts/` 的腳本（靠 `powershell.exe` 操作 Windows；這個 WSL 要是從使用者桌面開的）；沒有 WSL（或那台沒有 skillshare）時請使用者照[〈使用者在那台 PowerShell 貼〉](#使用者在那台-powershell-貼)貼。公開網址的開、驗、收都交給 `remote-access`，這裡只寫 server 那半和要給 `remote-access` 的輸入。
 
-**agent 就在那台 Windows**（原生 Windows 的 Claude Code，不經 WSL）時，`scripts/` 跑不了（要 WSL 的 bash、`powershell.exe`、`wslpath`）。改成 agent 用 PowerShell tool 自己跑[〈使用者在那台 PowerShell 貼〉](#使用者在那台-powershell-貼)的起、收那幾段，不用請使用者貼；這個 agent 要是從使用者桌面開的，不然 server 一啟動就結束。起的完成條件改成 agent 自己查：過幾秒跑那節的計數那行（`Get-NetTCPConnection … | Measure-Object`）印的不是 `0`，再照那節交 key；收的完成條件同那節。公開網址照 `expose-port` 的〈agent 就在那台 Windows〉，驗證輸入如下（key 只寫進暫存檔，不印出來）：
+**agent 就在那台 Windows**（原生 Windows 的 Claude Code，不經 WSL）時，`scripts/` 跑不了（要 WSL 的 bash、`powershell.exe`、`wslpath`）。改成 agent 用 PowerShell tool 自己跑[〈使用者在那台 PowerShell 貼〉](#使用者在那台-powershell-貼)的起、收那幾段，不用請使用者貼；這個 agent 要是從使用者桌面開的，不然 server 一啟動就結束。起的完成條件改成 agent 自己查：過幾秒跑那節的計數那行（`Get-NetTCPConnection … | Measure-Object`）印的不是 `0`，再照那節交 key；收的完成條件同那節。公開網址照 `remote-access` 的〈agent 就在那台 Windows〉，驗證輸入如下（key 只寫進暫存檔，不印出來）：
 
 - `<印出 header 的 PowerShell>`：`"Authorization: Bearer $((Select-String "$HOME\.windows-mcp\config.toml" -Pattern 'auth_key\s*=\s*"([^"]+)"').Matches.Groups[1].Value)"`
-- `<curl 參數>`：先把 [Funnel](#funnel) 第 2 步 `-d` 後面的 JSON 寫進檔案，再填 `'-X', 'POST', '-H', 'Accept: application/json, text/event-stream', '-H', 'Content-Type: application/json', '-d', "@$body"`。寫檔那行 `$body = New-TemporaryFile; '<那串 JSON>' | Set-Content $body -Encoding ascii -NoNewline` 跟 `expose-port` 第 3 步那段放在同一次 PowerShell 呼叫（tool 不一定在兩次呼叫間保留變數），插在 `$hdr = New-TemporaryFile` 前一行，並把那段的 `finally` 改成 `finally { Remove-Item $hdr, $body }`。
+- `<curl 參數>`：先把 [Funnel](#funnel) 第 2 步 `-d` 後面的 JSON 寫進檔案，再填 `'-X', 'POST', '-H', 'Accept: application/json, text/event-stream', '-H', 'Content-Type: application/json', '-d', "@$body"`。寫檔那行 `$body = New-TemporaryFile; '<那串 JSON>' | Set-Content $body -Encoding ascii -NoNewline` 跟 `remote-access` 第 3 步那段放在同一次 PowerShell 呼叫（tool 不一定在兩次呼叫間保留變數），插在 `$hdr = New-TemporaryFile` 前一行，並把那段的 `finally` 改成 `finally { Remove-Item $hdr, $body }`。
 - 不帶／帶驗證：`401`／`200`；`<路徑>`：`/mcp`。
 
 ### 交 key 和交代 agent（每條都一樣）
@@ -103,27 +103,27 @@ Windows-MCP 是第三方開源專案（[CursorTouch/Windows-MCP](https://github.
 
 ### Funnel
 
-Funnel 不能改寫 `Host`，所以這條 server 綁 `0.0.0.0:8000`。2026-11-05 在 henry-laptop 實測過 Windows 原生 tailscale 開 Funnel：server 綁 `0.0.0.0`、用 Interactive scheduled task 在桌面 session 起，在 Windows 前景開 Funnel（對外 8443 → 本機 8000），公網不帶 key `401`、帶 key `200`。從 WSL 跑下面第 2 步整條**未實測**（那輪是直接在 Windows 跑 tailscale）。收的時候停掉呼叫端不會停掉 Windows 的 `tailscale.exe`，口子會一直開著；照 `expose-port` 收，看到 `已收乾淨` 才算收掉。
+Funnel 不能改寫 `Host`，所以這條 server 綁 `0.0.0.0:8000`。2026-11-05 在 henry-laptop 實測過 Windows 原生 tailscale 開 Funnel：server 綁 `0.0.0.0`、用 Interactive scheduled task 在桌面 session 起，在 Windows 前景開 Funnel（對外 8443 → 本機 8000），公網不帶 key `401`、帶 key `200`。從 WSL 跑下面第 2 步整條**未實測**（那輪是直接在 Windows 跑 tailscale）。收的時候停掉呼叫端不會停掉 Windows 的 `tailscale.exe`，口子會一直開著；照 `remote-access` 收，看到 `已收乾淨` 才算收掉。
 
-**那台沒有 WSL** 時下面的腳本用不了（agent 自己就在那台時照上面〈agent 就在那台 Windows〉）：server 照[〈使用者在那台 PowerShell 貼〉](#使用者在那台-powershell-貼)起（`<綁的位址>` 填 `0.0.0.0`），公開網址照 `expose-port` 的 Funnel 分支〈那台沒有這支腳本〉請使用者在那台 PowerShell 開，驗證用的 header 照 [quick tunnel](#quick-tunnel) 表裡的 `--auth-header-cmd`。收掉時先照 `expose-port` 收公開網址，再照上面那節收 server。下面 1–4 是有 WSL 的做法。
+**那台沒有 WSL** 時下面的腳本用不了（agent 自己就在那台時照上面〈agent 就在那台 Windows〉）：server 照[〈使用者在那台 PowerShell 貼〉](#使用者在那台-powershell-貼)起（`<綁的位址>` 填 `0.0.0.0`），公開網址照 `remote-access` 的 Funnel 分支〈那台沒有這支腳本〉請使用者在那台 PowerShell 開，驗證用的 header 照 [quick tunnel](#quick-tunnel) 表裡的 `--auth-header-cmd`。收掉時先照 `remote-access` 收公開網址，再照上面那節收 server。下面 1–4 是有 WSL 的做法。
 
 1. **起 server、換 key**：跑 `windows-mcp-serve`。它先確認防火牆沒放行 windows-mcp 的 inbound（區網直連 8000 只靠防火牆擋），換新 key，在 `0.0.0.0:8000` 起 server，再把 key 複製到 Windows 剪貼簿。
    完成條件：印出 `server 在 0.0.0.0:8000，key 已複製到 Windows 剪貼簿`。
-2. **開到 tailnet 外**：照 `expose-port` 的 Funnel 分支開，輸入如下。`TAILSCALE` 讓它叫 Windows 那邊的 tailscale。
+2. **開到 tailnet 外**：照 `remote-access` 的 Funnel 分支開，輸入如下。`TAILSCALE` 讓它叫 Windows 那邊的 tailscale。
 
    ```bash
    TAILSCALE='powershell.exe -NoProfile -Command tailscale' \
-   ~/.claude/skills/expose-port/scripts/expose-port-funnel open --port 8000 --https 8443 --path /mcp \
+   ~/.claude/skills/remote-access/scripts/remote-access funnel open --port 8000 --https 8443 --path /mcp \
      --expect-without 401 --expect-with 200 \
      --auth-header-cmd ~/.claude/skills/windows-mcp/scripts/windows-mcp-auth-header \
      -- -X POST -H 'Accept: application/json, text/event-stream' -H 'Content-Type: application/json' \
      -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"probe","version":"0"}}}'
    ```
 
-   完成條件：`expose-port` 印出 `公開網址`。驗證沒過時 `expose-port` 已經撤掉 Funnel；跑 `windows-mcp-stop` 收掉 server，再看 [reference.md](reference.md) 和 `expose-port` 的 reference.md。
+   完成條件：`remote-access` 印出 `公開網址`。驗證沒過時 `remote-access` 已經撤掉 Funnel；跑 `windows-mcp-stop` 收掉 server，再看 [reference.md](reference.md) 和 `remote-access` 的 reference.md。
 3. 照上面交 key、交代 agent，網址是 `公開網址`。
-4. **收掉**：先照 `expose-port` 收掉公開網址，再跑 `windows-mcp-stop`：停 server、換掉 key，交出去的那把就作廢了。
-   完成條件：`expose-port` 印出 `Funnel :8443 已收乾淨`，`windows-mcp-stop` 印出 `還在聽 8000 的程式：0` 和 `已收掉，key 已換新`。
+4. **收掉**：先照 `remote-access` 收掉公開網址，再跑 `windows-mcp-stop`：停 server、換掉 key，交出去的那把就作廢了。
+   完成條件：`remote-access` 印出 `Funnel :8443 已收乾淨`，`windows-mcp-stop` 印出 `還在聽 8000 的程式：0` 和 `已收掉，key 已換新`。
 
 ### quick tunnel
 
@@ -131,7 +131,7 @@ server 留在 loopback，`Host` 由 quick tunnel 改寫成 `localhost`，不用�
 
 1. **起 server、換 key**：照[〈使用者在那台 PowerShell 貼〉](#使用者在那台-powershell-貼)起，`<綁的位址>` 填 `127.0.0.1`。
    完成條件：同那節。
-2. **開到 tailnet 外**：照 `expose-port` 的 quick tunnel 分支開（那台沒有腳本，照「那台沒有這支腳本」那條請使用者貼），輸入：
+2. **開到 tailnet 外**：照 `remote-access` 的 quick tunnel 分支開（那台沒有腳本，照「那台沒有這支腳本」那條請使用者貼），輸入：
 
    | 輸入 | 值 |
    |---|---|
@@ -142,10 +142,10 @@ server 留在 loopback，`Host` 由 quick tunnel 改寫成 `localhost`，不用�
    | `--auth-header-cmd` | `printf 'Authorization: Bearer %s\n' "$WINDOWS_MCP_AUTH_KEY"`（key 設在環境變數，不印出來） |
    | curl 參數 | 跟 Funnel 第 2 步 `--` 後面那串一樣（POST `initialize`） |
 
-   完成條件：`expose-port` 印出 `公開網址`。2026-11-05 在 henry-laptop 實測過這條（cloudflared 2026.10.7，server 綁 `127.0.0.1`）：不帶 key `401`；帶 key 時 `initialize` `200`（`text/event-stream`，回 `Mcp-Session-Id`）、`notifications/initialized` `202`、`tools/list` `200`（SSE，21 個 tool）、`Snapshot` `200`。長時間開著的 SSE stream 未實測。手動打 `tools/list` 前先看 reference.md 的 session 那條。
+   完成條件：`remote-access` 印出 `公開網址`。2026-11-05 在 henry-laptop 實測過這條（cloudflared 2026.10.7，server 綁 `127.0.0.1`）：不帶 key `401`；帶 key 時 `initialize` `200`（`text/event-stream`，回 `Mcp-Session-Id`）、`notifications/initialized` `202`、`tools/list` `200`（SSE，21 個 tool）、`Snapshot` `200`。長時間開著的 SSE stream 未實測。手動打 `tools/list` 前先看 reference.md 的 session 那條。
 3. 照上面交代 agent，網址是 `公開網址`。
-4. **收掉**：先照 `expose-port` 收掉公開網址，再照[〈使用者在那台 PowerShell 貼〉](#使用者在那台-powershell-貼)收 server。
-   完成條件：`expose-port` 的收尾判準都成立（cloudflared `0` 個、公網 `530` 或查不到），加上那節的完成條件。停掉呼叫端不會停掉那台的 `cloudflared.exe`（2026-11-05 實測），一定要照 `expose-port` 確認。
+4. **收掉**：先照 `remote-access` 收掉公開網址，再照[〈使用者在那台 PowerShell 貼〉](#使用者在那台-powershell-貼)收 server。
+   完成條件：`remote-access` 的收尾判準都成立（cloudflared `0` 個、公網 `530` 或查不到），加上那節的完成條件。停掉呼叫端不會停掉那台的 `cloudflared.exe`（2026-11-05 實測），一定要照 `remote-access` 確認。
 
 ## 操作時
 

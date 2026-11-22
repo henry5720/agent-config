@@ -1,6 +1,6 @@
 # windows-mcp reference
 
-出問題時才讀。這份只寫 server 本身的坑，所有 HTTP 模式都會遇到；經過 Funnel、quick tunnel 的坑在 `expose-port` skill 的 reference.md。
+出問題時才讀。這份只寫 server 本身的坑，所有 HTTP 模式都會遇到；經過 Funnel、quick tunnel 的坑在 `remote-access` skill 的 reference.md。
 
 ## server 本身
 

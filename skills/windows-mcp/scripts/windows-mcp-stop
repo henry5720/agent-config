@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 收掉 HTTP server：停掉聽 8000 的程式 → 換掉 key（給出去的那把就作廢）。重跑也安全。
-# 公開網址（Funnel）先由 expose-port 收掉，再跑這支。在桌機 WSL 跑。
+# 公開網址（Funnel）先由 remote-access 收掉，再跑這支。在桌機 WSL 跑。
 set -euo pipefail
 . "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/windows-mcp-common.sh"
 
