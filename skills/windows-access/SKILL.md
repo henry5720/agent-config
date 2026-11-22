@@ -45,8 +45,8 @@ Invoke-WebRequest -UseBasicParsing https://raw.githubusercontent.com/henry5720/a
    powershell -NoProfile -ExecutionPolicy Bypass -File <script> start --host <綁的位址>
    ```
 
-   `<綁的位址>` 照連線選：ssh 轉發、quick tunnel 用 `127.0.0.1`；Funnel、tailscale serve 不改寫 `Host`，用 `0.0.0.0`（預設）。綁 `0.0.0.0` 時它先確認防火牆沒放行 windows-mcp 的 inbound，有就拒絕。
-   完成條件：印出 `server 在 <綁的位址>:8000，key 已複製到剪貼簿（沒有印出來）`。印 `8000 已經有程式在聽` 時先跑下面的 `stop` 再起。
+   `<綁的位址>` 照連線選：ssh 轉發、quick tunnel 用 `127.0.0.1`；Funnel、tailscale serve 不改寫 `Host`，用 `0.0.0.0`（預設）。綁 `0.0.0.0` 時它先確認防火牆沒有讓區網連到 8000 的 inbound 規則（哪幾種看 script 註解），有就拒絕。
+   完成條件：印出 `server 在 <綁的位址>:8000，key 已複製到剪貼簿（沒有印出來）`。印 `8000 已經有程式在聽` 時看它列的程式：是 windows-mcp 就先跑下面的 `stop` 再起；不是就停下來回報使用者，不要自己停它。
 2. **連線**：照 `remote-access` 的判準選，輸入照[〈給 remote-access 的輸入〉](#給-remote-access-的輸入)。
 3. **交 key、交代 agent**：照[〈交 key 和交代 agent〉](#交-key-和交代-agent)。
 4. **收**：先照 `remote-access` 收掉連線，再跑：
@@ -55,7 +55,7 @@ Invoke-WebRequest -UseBasicParsing https://raw.githubusercontent.com/henry5720/a
    powershell -NoProfile -ExecutionPolicy Bypass -File <script> stop
    ```
 
-   它停掉聽 8000 的程式，再換 key、設定改回 `127.0.0.1`，交出去的那把就作廢了。
+   它停掉聽 8000 的 windows-mcp，再換 key、設定改回 `127.0.0.1`，交出去的那把就作廢了。聽 8000 的不是 windows-mcp 時它不停那支，列出 PID 和程式名後 exit 1：照轉達給使用者，由他處理，不要自己停它。
    完成條件：印出 `還在聽 8000 的程式：0（要 0）` 和 `已收掉，key 已換新`。
 
 實測紀錄（2026-11-05，henry-laptop，當時是手動貼同樣的指令）：server 跑著時 `auth --force` 換的 key 不生效、舊 key 仍回 `200`，所以 script 一定先停再換；`Stop-Process` 停得掉 server，聽 8000 的數變 `0`。用新 key 重起的 server 拒絕舊 key（要 `401`）**未實測**；這支 script 本身在真的 Windows 上也還沒跑過。
@@ -73,7 +73,7 @@ Invoke-WebRequest -UseBasicParsing https://raw.githubusercontent.com/henry5720/a
 
 MCP streamable HTTP 用 SSE 回應（`initialize`、`tools/list` 回 `text/event-stream`）。走 quick tunnel 時某個操作卡住或斷線先懷疑它（`remote-access` 的 quick tunnel 那節有實測紀錄）。
 
-你就在那台 Windows 時，`remote-access`〈agent 就在那台 Windows〉第 3 步的 JSON 要寫進檔案用 `-d "@檔案"` 帶：寫檔那行 `$body = New-TemporaryFile; '<上面 -d 後面那串 JSON>' | Set-Content $body -Encoding ascii -NoNewline` 跟那段放在同一次 PowerShell 呼叫（tool 不一定在兩次呼叫間保留變數），插在 `$hdr = New-TemporaryFile` 前一行，並把那段的 `finally` 改成 `finally { Remove-Item $hdr, $body }`。
+你就在那台 Windows 時，`remote-access`〈agent 就在那台 Windows〉第 3 步那段的輸入：`<curl 參數>` 填 `'-X', 'POST', '-H', 'Accept: application/json, text/event-stream', '-H', 'Content-Type: application/json'`，`$json` 填上面 `-d` 後面那串 JSON。
 
 ### 交 key 和交代 agent
 

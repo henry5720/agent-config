@@ -13,7 +13,8 @@ $Usage = @'
 用法：windows-mcp-http.ps1 <start|stop|auth-header> [--host 127.0.0.1|0.0.0.0]
 
   start        確認 8000 沒有程式在聽 → 換 key → 起 server（最小化視窗）→ key 複製到剪貼簿，不印出來
-  stop         停掉聽 8000 的程式 → 換 key（交出去的那把作廢）、設定綁回 127.0.0.1 → 確認聽 8000 的是 0
+  stop         停掉聽 8000 的 windows-mcp → 換 key（交出去的那把作廢）、設定綁回 127.0.0.1 → 確認聽 8000 的是 0
+               聽 8000 的不是 windows-mcp 時不停它，列出 PID 和程式名、exit 1，交給使用者處理
   auth-header  印出 Authorization: Bearer <key>，給 remote-access 從公網驗證用
 
   --host       start 綁的位址，預設 0.0.0.0。ssh 轉發、quick tunnel 用 127.0.0.1；
@@ -24,6 +25,14 @@ $Usage = @'
 function Fail($msg) { [Console]::Error.WriteLine($msg); exit 1 }
 
 function Listening { @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue).Count }
+
+# 聽 8000 的行程，帶命令列：stop 只停命令列看得出是 windows-mcp 的，別人的程式不殺
+function Listeners {
+  @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue) | ForEach-Object { $_.OwningProcess } |
+    Select-Object -Unique | ForEach-Object { Get-CimInstance Win32_Process -Filter "ProcessId = $_" }
+}
+function IsWindowsMcp($proc) { $proc.CommandLine -match 'windows-mcp' }
+function DescribeListeners { (@(Listeners) | ForEach-Object { "PID $($_.ProcessId) $($_.Name)" }) -join '、' }
 
 function AuthKey {
   if (-not (Test-Path -LiteralPath $Config)) { return $null }
@@ -61,15 +70,22 @@ if ($bind -notin '127.0.0.1', '0.0.0.0') { Fail "--host 只能是 127.0.0.1 或 
 if ($cmd -eq 'start') {
   NeedExe
   # server 跑著時換 key 不生效、舊 key 照樣能用（2026-11-05 henry-laptop 實測），所以先確認沒有 server 再換
-  if ((Listening) -ne 0) { Fail "${Port} 已經有程式在聽，先跑 stop" }
+  if ((Listening) -ne 0) { Fail "${Port} 已經有程式在聽（$(DescribeListeners)）：是 windows-mcp 就先跑 stop，不是的話請自己處理" }
   if ($bind -eq '0.0.0.0') {
-    # server 綁 0.0.0.0 時區網能直連 8000，只剩 key 擋；查不到規則也當成沒擋住
+    # server 綁 0.0.0.0 時區網能直連 8000，只剩 key 擋；查不到規則也當成沒擋住。
+    # 擋三種：程式是 windows-mcp（或 uv 裝的）、TCP 放行 8000（不管程式）、不限程式也不限 port。
+    # 指定別的程式、不限 port 的不擋（Teams 這類每台都有），那條只放行那支程式
     try {
       $allow = Get-NetFirewallRule -Direction Inbound -Action Allow -Enabled True -ErrorAction Stop |
-        Where-Object { ($_ | Get-NetFirewallApplicationFilter).Program -match 'windows-mcp|\\uv\\' } |
-        ForEach-Object { $_.DisplayName }
+        Where-Object {
+          $prog = ($_ | Get-NetFirewallApplicationFilter).Program
+          $pf = $_ | Get-NetFirewallPortFilter
+          $ports = @($pf.LocalPort)
+          ($prog -match 'windows-mcp|\\uv\\') -or
+            (($pf.Protocol -in 'TCP', 'Any') -and (($ports -contains "$Port") -or ($ports -contains 'Any' -and $prog -eq 'Any')))
+        } | ForEach-Object { $_.DisplayName }
     } catch { Fail "查不到防火牆規則，不綁 0.0.0.0：$($_.Exception.Message)" }
-    if ($allow) { Fail "防火牆有放行 windows-mcp 的 inbound 規則，區網可直連 ${Port}：$(@($allow) -join '、')" }
+    if ($allow) { Fail "防火牆有放行 ${Port} 的 inbound 規則，區網可直連 ${Port}：$(@($allow) -join '、')" }
   }
   Rotate $bind
   Start-Process -WindowStyle Minimized -FilePath $Exe -ArgumentList 'serve', '--host', $bind
@@ -83,12 +99,11 @@ if ($cmd -eq 'start') {
 if ($cmd -eq 'stop') {
   NeedExe
   # 一定先停再換 key：server 跑著時 auth --force 只改 config.toml，跑著的 server 繼續收舊 key
-  Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue |
-    ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }
+  Listeners | Where-Object { IsWindowsMcp $_ } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
   Rotate '127.0.0.1'
   $left = Listening
   "還在聽 ${Port} 的程式：${left}（要 0）"
-  if ($left -ne 0) { Fail "還有程式在聽 ${Port}：重跑 stop（重跑也安全）" }
+  if ($left -ne 0) { Fail "還有程式在聽 ${Port}（$(DescribeListeners)）：是 windows-mcp 就重跑 stop（重跑也安全）；不是的話 stop 不會停它，請自己處理" }
   '已收掉，key 已換新'
   exit 0
 }

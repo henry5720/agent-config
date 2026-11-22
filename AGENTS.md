@@ -19,6 +19,8 @@
   引用這裡的 script 和指令，不抄步驟。這個 repo 給人看的照種類放：人要自己動手（跑 script、設定、排錯）的寫
   `docs/skills/<名字>.md`，MCP 的寫 `docs/mcp/`，hook 的寫 `docs/hooks/`，repo 結構和 `config.yaml`、extras 的來歷寫
   `docs/architecture.md`，一樣引用 skill 的指令、不抄。README 只當入口。通用概念連官方或高品質來源，不抄。
+  SKILL.md 只寫什麼時候走哪條、agent 要做的步驟和完成條件、只有 agent 要守的限制；坑和實測紀錄放同一支 skill 的
+  `reference.md`、參數看 script 的 `--help`、給人看的理由在 dotfiles，從 SKILL.md 直接連過去（只隔一層）。
 - **script 只包脆弱的操作。** 會漏秘密、會忘記收、順序錯就壞的才寫成 `scripts/`；一兩行標準指令寫在文件裡，
   讓人自己打、自己改參數。
 - **skill 資料夾裡不放 README。** skill 資料夾會被 sync 到各 client；給人看的照上面那條放。

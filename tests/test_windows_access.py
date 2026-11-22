@@ -1,8 +1,8 @@
 """windows-access 的 script：同一台用的 windows-mcp-stdio、別台用的 windows-mcp-http.ps1。
 
 windows-mcp-stdio 在假 WSL 跑：powershell.exe、wslpath 換成 PATH 上的假指令。
-windows-mcp-http.ps1 要 pwsh 才跑（沒有就 skip）：Get-NetTCPConnection、Stop-Process、Start-Process、Set-Clipboard、
-防火牆 cmdlet 換成同名的 PowerShell 函式（函式比 cmdlet 先被找到），windows-mcp.exe 換成假的 mise shim。
+windows-mcp-http.ps1 要 pwsh 才跑（沒有就 skip）：Get-NetTCPConnection、Get-CimInstance、Stop-Process、Start-Process、
+Set-Clipboard、防火牆 cmdlet 換成同名的 PowerShell 函式（函式比 cmdlet 先被找到），windows-mcp.exe 換成假的 mise shim。
 假 windows-mcp 把每次呼叫記進 calls、auth 時換 key 並把 key 印到 stdout／stderr，用來驗 script 有把它丟掉。
 """
 import os
@@ -97,16 +97,27 @@ class WindowsMcpHttpFileTest(unittest.TestCase):
 FAKES_PS1 = r"""
 function Get-NetTCPConnection { [CmdletBinding()] param($LocalPort, $State)
   if (Test-Path "$env:FAKE_STATE/listening") { [pscustomobject]@{ OwningProcess = 4242 } } }
+# 聽 8000 的那支行程：預設是 windows-mcp，FAKE_PROC_* 換成別的程式
+function Get-CimInstance { [CmdletBinding()] param($ClassName, $Filter)
+  $cmd = if ($env:FAKE_PROC_CMDLINE) { $env:FAKE_PROC_CMDLINE } else { 'C:\Users\me\AppData\Local\mise\shims\windows-mcp.exe serve --host 0.0.0.0' }
+  $name = if ($env:FAKE_PROC_NAME) { $env:FAKE_PROC_NAME } else { 'windows-mcp.exe' }
+  [pscustomobject]@{ ProcessId = 4242; Name = $name; CommandLine = $cmd } }
 function Stop-Process { [CmdletBinding()] param($Id, [switch]$Force)
   Add-Content "$env:FAKE_STATE/calls" "stop $Id"; Remove-Item "$env:FAKE_STATE/listening" -ErrorAction SilentlyContinue }
 function Start-Process { [CmdletBinding()] param($FilePath, $ArgumentList, $WindowStyle)
   & $FilePath @ArgumentList }
 function Set-Clipboard { [CmdletBinding()] param([Parameter(ValueFromPipeline)]$Value)
   process { Set-Content "$env:FAKE_STATE/clip" $Value -NoNewline } }
+# FAKE_FIREWALL_ALLOW 有值時有一條啟用中的 inbound 允許規則；FAKE_FW_* 換它的程式、通訊協定、port（預設放行 windows-mcp）
 function Get-NetFirewallRule { [CmdletBinding()] param($Direction, $Action, $Enabled)
-  if ($env:FAKE_FIREWALL_ALLOW) { [pscustomobject]@{ DisplayName = 'windows-mcp allow' } } }
+  if ($env:FAKE_FIREWALL_ALLOW) { [pscustomobject]@{ DisplayName = 'test allow' } } }
 function Get-NetFirewallApplicationFilter { [CmdletBinding()] param([Parameter(ValueFromPipeline)]$AssociatedNetFirewallRule)
-  process { [pscustomobject]@{ Program = 'C:\Users\me\AppData\Local\mise\installs\windows-mcp\windows-mcp.exe' } } }
+  process { $p = if ($env:FAKE_FW_PROGRAM) { $env:FAKE_FW_PROGRAM } else { 'C:\Users\me\AppData\Local\mise\installs\windows-mcp\windows-mcp.exe' }
+    [pscustomobject]@{ Program = $p } } }
+function Get-NetFirewallPortFilter { [CmdletBinding()] param([Parameter(ValueFromPipeline)]$AssociatedNetFirewallRule)
+  process { $proto = if ($env:FAKE_FW_PROTOCOL) { $env:FAKE_FW_PROTOCOL } else { 'TCP' }
+    $port = if ($env:FAKE_FW_PORT) { $env:FAKE_FW_PORT } else { 'Any' }
+    [pscustomobject]@{ Protocol = $proto; LocalPort = @($port -split ',') } } }
 """
 
 # 假 windows-mcp：auth 換 key 並把 key 印出來（真的 auth --force 也會印）；serve 開始「聽」後就結束
@@ -198,12 +209,32 @@ class WindowsMcpHttpTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.calls(), [])
         self.assertEqual(self.key(), KEY)
+        self.assertIn("4242", result.stderr)
 
     def test_start_on_all_interfaces_refuses_when_firewall_allows_inbound(self):
         result = self.run_ps("start", "--host", "0.0.0.0", FAKE_FIREWALL_ALLOW="1")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("防火牆", result.stderr)
         self.assertEqual(self.calls(), [])
+
+    def test_start_on_all_interfaces_refuses_when_firewall_allows_port_for_any_program(self):
+        # 規則沒寫 windows-mcp，但放行 8000 的 inbound：誰聽 8000 區網都連得到
+        result = self.run_ps("start", FAKE_FIREWALL_ALLOW="1", FAKE_FW_PROGRAM="C:\\Other\\app.exe", FAKE_FW_PORT="8000")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("test allow", result.stderr)
+        self.assertEqual(self.calls(), [])
+
+    def test_start_on_all_interfaces_refuses_when_firewall_allows_any_port_any_program(self):
+        result = self.run_ps("start", FAKE_FIREWALL_ALLOW="1", FAKE_FW_PROGRAM="Any", FAKE_FW_PORT="Any")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("test allow", result.stderr)
+        self.assertEqual(self.calls(), [])
+
+    def test_start_on_all_interfaces_ignores_rules_bound_to_other_programs(self):
+        # Teams 這類「指定程式、不限 port」的規則每台都有，擋了就永遠起不來
+        result = self.run_ps("start", FAKE_FIREWALL_ALLOW="1", FAKE_FW_PROGRAM="C:\\Other\\app.exe", FAKE_FW_PORT="Any")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.calls(), [auth_call("0.0.0.0"), "serve --host 0.0.0.0"])
 
     def test_start_refuses_when_key_not_rotated(self):
         result = self.run_ps("start", "--host", "127.0.0.1", FAKE_AUTH_BROKEN="1")
@@ -225,6 +256,17 @@ class WindowsMcpHttpTest(unittest.TestCase):
         self.assertNotEqual(self.key(), KEY)
         self.assertIn("還在聽 8000 的程式：0", result.stdout)
         self.assert_no_key(result)
+
+    def test_stop_leaves_other_programs_on_port_alone_and_names_them(self):
+        (self.state / "listening").touch()
+        result = self.run_ps("stop", FAKE_PROC_NAME="python.exe", FAKE_PROC_CMDLINE="python.exe -m http.server 8000")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("stop 4242", self.calls())
+        self.assertIn("4242", result.stderr)
+        self.assertIn("python.exe", result.stderr)
+        self.assertNotIn("已收掉", result.stdout)
+        # 交出去的 key 照樣作廢
+        self.assertNotEqual(self.key(), KEY)
 
     def test_stop_fails_when_key_not_rotated(self):
         result = self.run_ps("stop", FAKE_AUTH_BROKEN="1")
