@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-# 舊名 alias，等於 `playwright-extension-attach`。dotfiles 的 PATH symlink 換成新名（dotfiles#380）後收掉。
-exec "$(dirname "$(readlink -f "$0")")/playwright-extension-attach" "$@"

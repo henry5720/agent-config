@@ -39,7 +39,7 @@ description: 接瀏覽器：自己的 headless、使用者的獨立 profile（92
 
 tailnet 內只在獨立 profile 也登不進去時用；tailnet 外一律加 `--tunnel`。
 
-script 在這份 SKILL.md 所在資料夾的 `scripts/playwright-extension-attach`，用絕對路徑叫它：先 `ls` 確認你讀這份 SKILL.md 的那個資料夾底下有 `scripts/playwright-extension-attach`，再用 `<那個資料夾>/scripts/playwright-extension-attach` 跑，不要從目前工作目錄找。裝了 dotfiles 的機器另外有 `~/.local/bin/playwright-extension-attach`（較舊的 dotfiles 叫 `personal-chrome-attach`），是同一支。要 `playwright-cli` ≥ 0.1.23，`--tunnel` 另要 `cloudflared`；`command -v` 找得到就是裝好了，找不到才回報缺工具。
+script 在這份 SKILL.md 所在資料夾的 `scripts/playwright-extension-attach`，用絕對路徑叫它：先 `ls` 確認你讀這份 SKILL.md 的那個資料夾底下有 `scripts/playwright-extension-attach`，再用 `<那個資料夾>/scripts/playwright-extension-attach` 跑，不要從目前工作目錄找。裝了 dotfiles 的機器另外有 `~/.local/bin/playwright-extension-attach`，是同一支。要 `playwright-cli` ≥ 0.1.23，`--tunnel` 另要 `cloudflared`；`command -v` 找得到就是裝好了，找不到才回報缺工具。
 
 背景跑 `<那個資料夾>/scripts/playwright-extension-attach -s=<S> [--tunnel]`，它停在前景直到 session 結束；`--timeout=<秒>` 改等待時間（預設 300，`--tunnel` 預設 600）。`--tunnel` 印出的步驟裡已經建議使用者用獨立 profile、附各 OS 的開法；使用者選日常 profile 也照做。
 

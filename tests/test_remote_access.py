@@ -1,4 +1,4 @@
-"""remote-access 的 funnel 與 quick-tunnel 子命令：開、公網驗證、收。舊名 expose-port-funnel／expose-port-quick-tunnel 是 alias。
+"""remote-access 的 funnel 與 quick-tunnel 子命令：開、公網驗證、收。
 
 tailscale、cloudflared、curl、sudo 都換成 PATH 上的假指令（見 FAKE_*），不會真的開公開網址或連外。
 假 tailscale 用檔案代表「Funnel 開著」：前景的 `funnel --https=N <target>` 在跑時 fg-funnel-N 在，
@@ -24,8 +24,6 @@ ENTRY = RA_SCRIPTS / "remote-access"
 FUNNEL = [sys.executable, str(ENTRY), "funnel"]
 QUICK = [sys.executable, str(ENTRY), "quick-tunnel"]
 # 舊名 alias（dotfiles 換完由 agent-config#124 收）：直接執行，不經 python
-OLD_FUNNEL = [str(RA_SCRIPTS / "expose-port-funnel")]
-OLD_QUICK = [str(RA_SCRIPTS / "expose-port-quick-tunnel")]
 
 HOST = "box.tail123.ts.net"
 QUICK_HOST = "quiet-fox-123.trycloudflare.com"
@@ -595,7 +593,7 @@ class EntryTest(FakeBinTest):
         self.assertIn("quick-tunnel", out)
 
     def test_subcommand_help_shows_its_own_actions(self):
-        for args in (FUNNEL, QUICK, OLD_FUNNEL, OLD_QUICK):
+        for args in (FUNNEL, QUICK):
             with self.subTest(args=args[-1]):
                 out = self.help_of(args)
                 for action in ("open", "verify", "check-closed", "close"):
@@ -605,25 +603,6 @@ class EntryTest(FakeBinTest):
         result = subprocess.run([sys.executable, str(ENTRY), "ngrok"], env=self.env, capture_output=True, text=True,
                                 timeout=15)
         self.assertNotEqual(result.returncode, 0)
-
-    def test_old_funnel_name_opens_verifies_and_closes_on_sigterm(self):
-        proc = self.start([*OLD_FUNNEL, *self.open_args()[len(FUNNEL):]])
-        out = self.read_until(proc, "公開網址")
-        self.assertTrue(self.funnel_open())
-        proc.send_signal(signal.SIGTERM)
-        rest, _ = proc.communicate(timeout=15)
-        self.assertEqual(proc.returncode, 0, out + rest)
-        self.assertFalse(self.funnel_open())
-        self.assertIn("Funnel :8443 已收乾淨", rest)
-
-    def test_old_quick_tunnel_name_verifies_like_new_entry(self):
-        (self.state / "remote-up").touch()
-        args = [f"https://{QUICK_HOST}", "--path", "/mcp", "--expect-without", "401", "--expect-with", "200",
-                "--auth-header-cmd", self.header_cmd, "--", "-X", "POST"]
-        result = subprocess.run([*OLD_QUICK, "verify", "--url", *args], env=self.env, capture_output=True,
-                                text=True, timeout=15)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn(f"公開網址：https://{QUICK_HOST}/mcp", result.stdout)
 
 
 if __name__ == "__main__":

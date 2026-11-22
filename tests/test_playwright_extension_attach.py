@@ -19,8 +19,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "skills" / "browser-access" / "scripts" / "playwright-extension-attach"
-# 舊名 alias：dotfiles 的 PATH symlink 還指著它（dotfiles#380 換完再收）
-OLD_SCRIPT = SCRIPT.with_name("personal-chrome-attach")
 
 QUICK_HOST = "quiet-fox-123.trycloudflare.com"
 RELAY_PORT = "45678"
@@ -91,9 +89,9 @@ class TunnelTest(unittest.TestCase):
     # 小工具
     # ----------------------------------------------------------------------
 
-    def start(self, *args, script=SCRIPT):
+    def start(self, *args):
         proc = subprocess.Popen(
-            [str(script), "--tunnel", *args], env=self.env,
+            [str(SCRIPT), "--tunnel", *args], env=self.env,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True,
         )
         self.addCleanup(self.kill_group, proc)
@@ -219,19 +217,13 @@ class TunnelTest(unittest.TestCase):
     # ----------------------------------------------------------------------
 
     def test_help_prints_usage_and_exits_0(self):
-        for script in (SCRIPT, OLD_SCRIPT):
-            with self.subTest(script=script.name):
-                result = subprocess.run([str(script), "--help"], env=self.env, capture_output=True, text=True,
-                                        timeout=15)
-                self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertIn("用法:playwright-extension-attach", result.stdout)
-                self.assertIn("--tunnel", result.stdout)
+        result = subprocess.run([str(SCRIPT), "--help"], env=self.env, capture_output=True, text=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("用法:playwright-extension-attach", result.stdout)
+        self.assertIn("--tunnel", result.stdout)
 
-    def test_old_name_attaches_and_detaches_like_new_name(self):
-        self.test_detach_closes_tunnel_and_exits_0(script=OLD_SCRIPT)
-
-    def test_detach_closes_tunnel_and_exits_0(self, script=SCRIPT):
-        proc = self.start(script=script)
+    def test_detach_closes_tunnel_and_exits_0(self):
+        proc = self.start()
         self.read_until(proc, READY)
         (self.state / "connect").touch()
         self.read_until(proc, "已接上,session:personal-chrome")
