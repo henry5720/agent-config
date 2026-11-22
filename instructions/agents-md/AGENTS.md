@@ -39,7 +39,7 @@
 
 ## Commit 共同作者
 
-修改 Git repo、交接未提交工作、建立或 amend commit 前，讀 `~/.config/agent-commit/instructions.md`，累積並保留實際參與的 agent。
+建立或 amend commit 前，讀 `~/.config/agent-commit/instructions.md`：誰改的誰 commit，每顆 commit 標自己。
 
 ## Worktree
 
