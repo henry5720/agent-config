@@ -49,6 +49,16 @@ Windows-MCP 是第三方開源專案（[CursorTouch/Windows-MCP](https://github.
 - **交 key**：key 會先複製到那台的剪貼簿。請使用者交給對方 agent，最好設成它的環境變數 `WINDOWS_MCP_AUTH_KEY`。agent 自己讀 key、或把 key 傳到別的服務，都要先取得使用者明說同意。用聊天訊息交的話，用完一定要收掉並換 key。
 - **交代 agent**：endpoint 是各條給的網址（結尾 `/mcp`）；先跑 `tools/list` 和 `Screenshot`。`PowerShell`、`Registry`、`FileSystem` 寫入，要使用者同意才用。
 
+### 客戶端設定
+
+對方 agent 那端（例如 company-ec2）用 `mcp.yaml` 裡固定的 `windows-mcp-remote`：`http://127.0.0.1:18000/mcp`，Bearer key 讀環境變數 `WINDOWS_MCP_AUTH_KEY`。連哪台只由 ssh 轉發的目標決定，換一台不改設定。
+
+- **開 session 前**：使用者在啟動 agent 的 shell 裡 `export WINDOWS_MCP_AUTH_KEY=<key>`，再開 session。MCP 設定在 session 開始時就要存在；session 中途只做 ssh 轉發，轉發起來後用 `/mcp` 重連 `windows-mcp-remote`。
+- **換 key 要重開 session**：client 只在啟動時讀環境變數。
+- **本機 18000 被佔**（ssh 報 `Address already in use`、或 `ExitOnForwardFailure` 直接結束）：回報使用者是哪支程式佔著，port 維持 18000。換 port 會跟 MCP 設定對不上，可能連到錯的 server。
+- **同一時間只接一台**：要接另一台，先收掉現在這條轉發。
+- **收舊設定**：之前用 `claude mcp add` 自己加過的 local scope 設定（key 原文在裡面），等 `windows-mcp-remote` 驗證過（`/mcp` 看得到 tools）後，用 `claude mcp remove <名字> -s local` 收掉，再照[〈收掉〉](#使用者在那台-powershell-貼)換 key，讓舊設定裡那把作廢。
+
 ### 使用者在那台 PowerShell 貼
 
 那台沒有 WSL 或沒有 skillshare 時，server 由使用者起、收。`<綁的位址>` 照各條：要讓代理改寫 `Host` 或走 ssh 轉發時 `127.0.0.1`；Funnel、tailscale serve 不能改寫 `Host`，用 `0.0.0.0`。
@@ -74,7 +84,7 @@ Windows-MCP 是第三方開源專案（[CursorTouch/Windows-MCP](https://github.
 
 ### tailnet 內
 
-對方 agent 直接連那台，照 remote-access 的 [tailnet 內](https://github.com/henry5720/dotfiles/blob/main/docs/how-to/remote-access/README.md#tailnet-內)。這條**未實測**。
+對方 agent 直接連那台，照 remote-access 的 [tailnet 內](https://github.com/henry5720/dotfiles/blob/main/docs/how-to/remote-access/README.md#tailnet-內)。實測紀錄：ssh 轉發這條 2026-11-11 起 company-ec2 實際在用（本機 18000 → 那台 `127.0.0.1:8000`）；tailscale serve 那條未實測。
 
 1. **挑做法、起 server**：
    - **ssh 轉發**（預設；對方那台 ssh 得到一個接得到那台 Windows `127.0.0.1:8000` 的端點，例如 Windows 的 OpenSSH、或 mirrored networking 的 WSL）：server 綁 loopback，`Host` 是 `127.0.0.1`，過得了檢查，也不用放行防火牆。server 照[〈使用者在那台 PowerShell 貼〉](#使用者在那台-powershell-貼)起，`<綁的位址>` 填 `127.0.0.1`。
@@ -83,7 +93,7 @@ Windows-MCP 是第三方開源專案（[CursorTouch/Windows-MCP](https://github.
    直接連 `<tailnet IP>:8000` 要另外在防火牆放行 inbound，不走這種。
    完成條件：server 起好，key 在使用者手上。
 2. **接上**：
-   - ssh 轉發：在對方 agent 那台背景跑 `ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:8000:127.0.0.1:8000 <那台>`。網址是 `http://127.0.0.1:8000/mcp`。
+   - ssh 轉發：在對方 agent 那台背景跑 `ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:18000:127.0.0.1:8000 <那台>`。網址是 `http://127.0.0.1:18000/mcp`，對方那端的 MCP 設定照[〈客戶端設定〉](#客戶端設定)。本機用 18000 不用 8000：WSL mirrored networking 下對方那台自己的 8000 可能被它自己的 windows-mcp 佔走。
    - tailscale serve：在那台 Windows 前景跑 `tailscale serve --https=8443 8000`（不加 `--bg`；有 WSL 時用 `powershell.exe -NoProfile -Command tailscale serve --https=8443 8000` 背景跑）。網址是 `https://<機器>.<tailnet>.ts.net:8443/mcp`。8443 被佔就換 `10000`。
 
    完成條件：從對方那台打網址，不帶 key 回 `401`，帶 key 的 POST `initialize`（[Funnel](#funnel) 第 2 步 `--` 後面那串）回 `200`。
