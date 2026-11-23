@@ -46,6 +46,8 @@ Claude 有官方的 [channels](https://code.claude.com/docs/en/channels)，不�
    ```
 
 5. **重開 agent。** 從**新的 zsh** 開 Claude Code 或 Codex，舊 shell 沒有 `DISCORD_TOKEN`。
+   Codex 還要先重開背景 daemon，MCP 是 daemon 開的：`zsh -c 'codex app-server daemon restart'`
+   （原因見 dotfiles 的 [codex〈坑〉](https://github.com/henry5720/dotfiles/blob/main/docs/tools/codex.md#坑)）。
 
 ## 確認做好了
 
@@ -53,6 +55,22 @@ Claude 有官方的 [channels](https://code.claude.com/docs/en/channels)，不�
 - Claude Code：`/mcp` 看到 `discord` 是 connected。Codex：`codex mcp list` 有 `discord`。
 - 叫 agent「列出 bot 看得到的 Discord 伺服器和頻道」，有回清單就通了。
 - 連不上時先查步驟 1 的兩個 intent 有沒有開。
+
+## 給同事用
+
+每個人建自己的 bot（步驟 1、2），**不要共用 token**：拿到 token 的人就能完全控制那個 bot，大家發的訊息也分不出是誰。
+沒用這套 dotfiles 的人，把 token 放進自己的 shell 環境（例如 `~/.zshrc` 裡 `export DISCORD_TOKEN=...`），再直接加：
+
+```bash
+claude mcp add discord -s user -e 'DISCORD_TOKEN=${DISCORD_TOKEN}' -e DISCORD_MCP_TOOLSETS=discovery,messages \
+  -- npx -y @pasympa/discord-mcp@2.4.0
+codex mcp add discord --env DISCORD_MCP_TOOLSETS=discovery,messages -- npx -y @pasympa/discord-mcp@2.4.0
+```
+
+Codex 的 token 要從環境轉進去：在 `~/.codex/config.toml` 的 `[mcp_servers.discord]` 加 `env_vars = ["DISCORD_TOKEN"]`，
+改完照步驟 5 重開 daemon。
+
+公司的 agent-company bot（OpenAB）預設不理其他 bot 的訊息，所以這個 MCP 不能拿來 @它。
 
 ## 安全
 
