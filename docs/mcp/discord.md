@@ -56,9 +56,9 @@ Claude 有官方的 [channels](https://code.claude.com/docs/en/channels)，不�
 - 叫 agent「列出 bot 看得到的 Discord 伺服器和頻道」，有回清單就通了。
 - 連不上時先查步驟 1 的兩個 intent 有沒有開。
 
-## 給同事用
+## 給其他使用者
 
-同事共用維護者建的那個 MCP 專用 bot，不用各自建：token 私訊維護者拿，貼到頻道或 repo 就等於外洩。
+其他使用者共用維護者建的那個 MCP 專用 bot，不用各自建：token 私訊維護者拿，貼到頻道或 repo 就等於外洩。
 共用的代價是大家發的訊息都顯示成同一個 bot；有人離開就 **Reset Token**，再私訊發新的給其他人。
 
 沒用這套 dotfiles 的人，把 token 放進自己的 shell 環境（例如 `~/.zshrc` 裡 `export DISCORD_TOKEN=...`），開新 shell 再加：
