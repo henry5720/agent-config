@@ -58,8 +58,10 @@ Claude 有官方的 [channels](https://code.claude.com/docs/en/channels)，不�
 
 ## 給同事用
 
-每個人建自己的 bot（步驟 1、2），**不要共用 token**：拿到 token 的人就能完全控制那個 bot，大家發的訊息也分不出是誰。
-沒用這套 dotfiles 的人，把 token 放進自己的 shell 環境（例如 `~/.zshrc` 裡 `export DISCORD_TOKEN=...`），再直接加：
+同事共用維護者建的那個 MCP 專用 bot，不用各自建：token 私訊維護者拿，貼到頻道或 repo 就等於外洩。
+共用的代價是大家發的訊息都顯示成同一個 bot；有人離開就 **Reset Token**，再私訊發新的給其他人。
+
+沒用這套 dotfiles 的人，把 token 放進自己的 shell 環境（例如 `~/.zshrc` 裡 `export DISCORD_TOKEN=...`），開新 shell 再加：
 
 ```bash
 claude mcp add discord -s user -e 'DISCORD_TOKEN=${DISCORD_TOKEN}' -e DISCORD_MCP_TOOLSETS=discovery,messages \
@@ -70,7 +72,7 @@ codex mcp add discord --env DISCORD_MCP_TOOLSETS=discovery,messages -- npx -y @p
 Codex 的 token 要從環境轉進去：在 `~/.codex/config.toml` 的 `[mcp_servers.discord]` 加 `env_vars = ["DISCORD_TOKEN"]`，
 改完照步驟 5 重開 daemon。
 
-公司的 agent-company bot（OpenAB）預設不理其他 bot 的訊息，所以這個 MCP 不能拿來 @它。
+接好後叫 agent「列出 bot 看得到的頻道」確認。要試 @company agent 就到 `#bot-test`：它接受其他 bot 的訊息，但訊息裡要 @它才會回。
 
 ## 安全
 
