@@ -1,6 +1,6 @@
 ---
 name: pms-tracking
-description: 在 PMS 開、更新給 PM 看的追蹤單，讓 PM 不用看 GitHub 也能掌握進度。使用者說「PMS 開單／開追蹤單」「同步進度到 PMS」「問題轉工作」時使用；從 Slack 待辦或 GitHub map 開單、需要在 PMS 留一份給 PM 看時也用。
+description: 在 PMS 開、更新給 PM 看的追蹤單，讓 PM 不用看 GitHub 也能掌握進度。使用者說「PMS 開單／開追蹤單」「同步進度到 PMS」「問題轉工作」時使用；從 GitHub map 開單、需要在 PMS 留一份給 PM 看時也用。
 ---
 
 # PMS 追蹤單
