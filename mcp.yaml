@@ -22,6 +22,16 @@ servers:
       CONTEXT7_API_KEY:
         fromEnv: CONTEXT7_API_KEY
     targets: [claude, codex, opencode]
+  # 讓 agent 用自己的 Discord bot 讀、發訊息。設定步驟見 docs/mcp/discord.md。
+  # token 由 dotfiles export DISCORD_TOKEN，不進 repo。只開 discovery、messages（25 個工具），全開 100 個約吃 35k tokens。
+  # 沒加 opencode：用不到，要再加。
+  discord:
+    command: npx
+    args: ["-y", "@pasympa/discord-mcp@2.4.0"]
+    env:
+      DISCORD_TOKEN: {fromEnv: DISCORD_TOKEN}
+      DISCORD_MCP_TOOLSETS: discovery,messages
+    targets: [claude, codex]
   gh_grep:
     url: https://mcp.grep.app
     targets: [claude, codex, opencode]
