@@ -10,12 +10,13 @@ INSTRUCTIONS = Path(__file__).resolve().parents[1] / "instructions"
 AGENTS = INSTRUCTIONS / "agents-md" / "AGENTS.md"
 AGENT_COMMIT = INSTRUCTIONS / "agent-commit" / "instructions.md"
 OPENCODE_COMMIT = INSTRUCTIONS / "opencode-commit" / "commit-instructions.md"
+PSTACK_MODELS = INSTRUCTIONS / "pstack-models" / "pstack-models.md"
 AGENT_COMMIT_PATH = "~/.config/agent-commit/instructions.md"
 
 
 class InstructionsTest(unittest.TestCase):
     def test_sources_exist(self):
-        for path in (AGENTS, AGENT_COMMIT, OPENCODE_COMMIT):
+        for path in (AGENTS, AGENT_COMMIT, OPENCODE_COMMIT, PSTACK_MODELS):
             with self.subTest(path=path.relative_to(INSTRUCTIONS)):
                 self.assertTrue(path.is_file())
                 self.assertTrue(path.read_text(encoding="utf-8").strip())

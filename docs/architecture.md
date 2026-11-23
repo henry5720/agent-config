@@ -38,6 +38,7 @@ hook 和 plugin 也存在 `config.yaml`，所以每台要各自 add（hook 見 [
 | `agents-md`（全域規則） | `~/.claude/CLAUDE.md`、`~/.codex/AGENTS.md`、`~/.config/opencode/AGENTS.md` |
 | `agent-commit` | `~/.config/agent-commit/instructions.md` |
 | `opencode-commit` | `~/.config/opencode/commit-instructions.md` |
+| `pstack-models`（pstack 每個角色用哪個模型） | `~/.claude/rules/pstack-models.md`；只給 Claude，官方 pstack 只支援 Cursor 和 Claude Code。要改就重跑 `/pstack:setup-pstack`，它會寫回這個檔 |
 
 連到哪由 dotfiles 釘，照那台勾了哪些 client 產生，所以每次 `chezmoi apply` 都會把連結蓋回 dotfiles 寫的樣子；
 要加連結怎麼做見 [AGENTS.md〈放哪〉](../AGENTS.md#放哪)。
