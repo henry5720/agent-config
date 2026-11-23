@@ -19,13 +19,8 @@ Claude 有官方的 [channels](https://code.claude.com/docs/en/channels)，不�
 1. **建 bot。** 到 [Discord Developer Portal](https://discord.com/developers/applications) → New Application → **Bot**：
    - **Reset Token**，複製 token（只顯示一次）。
    - 同一頁打開 **Server Members Intent** 和 **Message Content Intent**。server 預設兩個都會要，沒開會連不上。
-2. **邀進伺服器。** 把 **General Information** 的 Application ID 填進網址再打開：
-
-   ```
-   https://discord.com/oauth2/authorize?client_id=<Application ID>&scope=bot&permissions=2270827458424055
-   ```
-
-   這串權限涵蓋所有工具。只用訊息的話，授權畫面只留 View Channels、Send Messages、Send Messages in Threads、Read Message History、Add Reactions、Attach Files，其他取消。
+2. **邀進伺服器。** 在 Developer Portal 的 **OAuth2 → URL Generator** 勾 `bot` scope 和要給的權限，用產生的網址邀請。
+   權限由維護者管；之後要改，在伺服器設定的身分組改，或用新的網址重新授權一次。
 3. **存 token。** 跑 `chezmoi edit-config`，在 `[data]` 加一行，存檔後套用：
 
    ```toml
@@ -76,7 +71,7 @@ Codex 的 token 要從環境轉進去：在 `~/.codex/config.toml` 的 `[mcp_ser
 
 ## 安全
 
-- bot 能做的 = 你在步驟 2 給的權限。agent 發錯訊息就是 bot 發的，別給管理權限。
+- bot 能做的 = 它在伺服器的身分組權限。token 共用時，每個拿到的人都有這些權限，別給管理者。
 - 只讀不寫：在 `mcp.yaml` 的 `env` 加 `DISCORD_MCP_READ_ONLY: "true"`，剩 11 個唯讀工具。
 - token 外洩：Developer Portal 按 **Reset Token**，再做一次步驟 3。
 
