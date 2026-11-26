@@ -4,8 +4,9 @@
 #
 # async 加 --background 兩個都要：
 # - async：服務關著時 voice-out-speak 要 0.5 秒才判斷完，async 讓 agent 連這 0.5 秒都不等
-# - --background：Codex 在 hook 結束、session 關掉時會砍掉 hook 的 process group，
-#   Claude Code 的 -p 結束也會砍掉沒跑完的 async hook；朗讀要等 TTS 加播完（約 9 秒），
+# - --background：Codex 的 hook 被取消、逾時，或 session 關掉時還沒跑完，會砍掉 hook 的整個 process group
+#   （正常結束不砍；codex 0.171.0 hooks/src/engine/command_runner.rs），
+#   Claude Code 的 -p 結束也會砍掉沒跑完的 async hook（官方 hooks 文件）；朗讀要等 TTS 加播完（約 9 秒），
 #   所以讓 voice-out-speak 自己脫離（setsid）在背景唸
 # 檢查路徑而不是靠 PATH：hook 的 PATH 不一定有 ~/.local/bin。
 #
