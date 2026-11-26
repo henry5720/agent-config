@@ -1,16 +1,21 @@
 ---
-name: herdr-worktree
-description: 開 git worktree 前使用（EnterWorktree、git worktree add、平行改碼）；HERDR_ENV=1 時改由 herdr 開，讓 Claude、Codex、opencode 的 worktree 都歸 herdr 管。收 worktree、決定子分支要不要 push 時也用。
+name: herdr-workflow
+description: herdr 的個人用法：開或收 git worktree（EnterWorktree、git worktree add、平行改碼），決定子分支要不要 push；HITL 操作（人會看或介入的操作，在已配置主機上跑）；起或重起已配置主機的 herdr server。
 ---
 
-# Worktree 走 herdr
+# herdr 的個人用法
 
-## 什麼時候開
+官方 `herdr` skill 管 CLI 怎麼用；這份只寫使用者的偏好和實際踩過的雷。
+
+- 要在已配置主機上跑 **HITL 操作**（改狀態、跑很久、含人工步驟）：讀 [hitl.md](hitl.md)。
+- 要起、停或重起 Windows 已配置主機的 herdr server，或 client 連上去回「存取被拒」、pane 的提示列是 Administrator：讀 [server.md](server.md)。
+
+## Worktree：什麼時候開
 
 一次做一件就在目前分支 commit。要平行改碼、AFK 跑、或手上改到一半要插急件時才開 worktree。
 `--bg` session 會被 harness 要求先進 worktree，照下面開。
 
-## 怎麼開
+## Worktree：怎麼開
 
 `HERDR_ENV=1` 時由 herdr 開，再進去：
 
@@ -31,10 +36,12 @@ git hook、lint、formatter 的 plugin 都載不到。repo 有 lockfile 就照�
 - 改用非預設位置前，先說明原因與完整目標路徑，取得使用者對該位置的明確同意後才加 `--path`。本次對話已取得的同意可沿用；同意開 worktree 不等於同意改位置。
 - Claude Code 進了一個 worktree 之後，`EnterWorktree --path` 只認 `<repo>/.claude/worktrees/` 底下的，
   換不到第二個 herdr worktree。要換基底就在**現在這個** worktree 裡 `git switch`。
+- `EnterWorktree` 不接受 session 啟動目錄以外的 repo（例如從 `~/code` 開、要改 `~/.config/skillshare`）。
+  這時不進去，直接用 herdr 回傳的絕對路徑讀寫檔、在那裡跑 git。
 
 沒有 herdr 就用內建的 `EnterWorktree`，它開在 `<repo>/.claude/worktrees/`。
 
-## 什麼時候收
+## Worktree：什麼時候收
 
 合併完、在**目標分支那份 checkout** 上驗過、確定不用回去改，就 `herdr worktree remove --workspace <id>`。
 一做完就收，worktree 和分支才不會越積越多。

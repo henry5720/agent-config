@@ -153,15 +153,15 @@
     "herdr": {
       "source": "https://github.com/herdrdev/herdr.git/skills/herdr",
       "type": "github-subdir",
-      "branch": "v0.9.2",
-      "installed_at": "2026-10-09T05:59:55.641261588Z",
+      "branch": "v0.9.5",
+      "installed_at": "2026-11-26T06:57:16.030414205Z",
       "repo_url": "https://github.com/herdrdev/herdr.git",
       "subdir": "skills/herdr",
-      "version": "48292af",
-      "tree_hash": "67042ed7910d4177a9000e0679e78b0346060927",
-      "commit": "48292af8e33a08c8030b7f1512c8d0da739f5ab1",
+      "version": "2ecf19a",
+      "tree_hash": "2be0d86d481d1bb29c62e11ef37b78d27d01b478",
+      "commit": "2ecf19a92fc3a7fff75b6ce3655ef04f4625ec01",
       "file_hashes": {
-        "SKILL.md": "sha256:b16ba0d9a22adbaf259d2022cd323801f8e51d530c94cb0cd23a69069292506b"
+        "SKILL.md": "sha256:fbd9d502767f7dff29c211505a0bd9ba34e980ed4cc456247e2adc1642883984"
       }
     },
     "humanizer-zh": {

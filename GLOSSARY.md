@@ -47,12 +47,28 @@ _Avoid_: 用來指 `AGENTS.md`（那是 **Instructions**）
 **Extras sync**:
 把 **Instructions** 以 symlink 連到各 client 讀的位置（`skillshare sync extras`），照 `config.yaml` 的 `extras` 段。dotfiles 的 `chezmoi apply` 改到 extras 段時會自動跑。
 
+**已配置主機**:
+裝好 dotfiles 工具、agent 在上面做事的那台；人坐在前面的那台叫**個人電腦**。定義以 dotfiles 的 [GLOSSARY〈操作已配置主機〉](https://github.com/henry5720/dotfiles/blob/main/GLOSSARY.md#操作已配置主機)為準。
+_Avoid_: 目標機器、遠端機器
+
+**HITL 操作**:
+人可能介入的操作：看、review、喊停、接手或親手做。與之相對的是 **AFK 操作**。
+_Avoid_: 看得到的操作、交棒
+
+**AFK 操作**:
+人不會介入的操作，例如唯讀的查詢與檢查。
+
+**人工步驟**:
+**HITL 操作**裡要人親手執行的那一步，例如被權限擋下的指令。
+_Avoid_: 交接（那是 issue 換手）
+
 ## Relationships
 
 - 一個 **Source** 會 **Sync** 到多個 **Target**
 - **Instructions** 的內容在 **Source** 裡，由 **Extras sync** 連到各 client；連到哪由 chezmoi 釘在 `config.yaml`；**Settings** 在 chezmoi
 - 一個 **Client** 可以讀多個 **Target**（OpenCode 同時讀兩個）
 - **Own skill** 和 **Third-party skill** 都在 **Source** 裡；**Local skill** 只在 **Target** 裡
+- 一個操作不是 **HITL 操作**就是 **AFK 操作**；**人工步驟**只出現在 **HITL 操作**裡
 
 ## Flagged ambiguities
 
