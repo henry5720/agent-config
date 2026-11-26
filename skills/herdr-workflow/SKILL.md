@@ -1,11 +1,11 @@
 ---
 name: herdr-workflow
-description: herdr 的個人用法：開或收 git worktree（EnterWorktree、git worktree add、平行改碼）；HITL 操作（人會看或介入的操作，在已配置主機上跑）；起或重起已配置主機的 herdr server。
+description: herdr 的個人用法：開或收 git worktree（EnterWorktree、git worktree add、平行改碼），決定子分支要不要 push；HITL 操作（人會看或介入的操作，在已配置主機上跑）；起或重起已配置主機的 herdr server。
 ---
 
 # herdr 的個人用法
 
-官方 `herdr` skill 管 CLI 怎麼用；這份只寫使用者的偏好和實際踩過的雷。兩份衝突時照這份。
+官方 `herdr` skill 管 CLI 怎麼用；這份只寫使用者的偏好和實際踩過的雷。
 
 - 要在已配置主機上跑 **HITL 操作**（改狀態、跑很久、含人工步驟）：讀 [hitl.md](hitl.md)。
 - 要起、停或重起 Windows 已配置主機的 herdr server，或 client 連上去回「存取被拒」、pane 的提示列是 Administrator：讀 [server.md](server.md)。

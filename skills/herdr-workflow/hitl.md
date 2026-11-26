@@ -1,7 +1,8 @@
 # HITL 操作走 herdr
 
-官方 `herdr` skill 說「只在使用者提到 Herdr 時用」「沒被要求不開 workspace」。這份是使用者給的明確要求，屬於那條規則本身允許的例外：
-**HITL 操作**一律在已配置主機的 herdr 裡跑，不用每次再提。
+官方 `herdr` skill 寫的是 "Use only when the user explicitly mentions Herdr" 和
+"Do not create a workspace, tab, worktree, or different cwd unless the user explicitly requests that topology"。
+使用者已經明確要求：**HITL 操作**一律在已配置主機的 herdr、有標籤的 workspace 裡跑。這是那兩條本身允許的情況，不用每次再提。
 
 ## 判準
 
@@ -37,9 +38,9 @@ PowerShell 的指令避免巢狀雙引號，否則會卡在 `∙` 續行提示�
    ```
    herdr --machine <label> pane send-text <pane> 'git reset --hard origin/main; echo ("X" + "_DONE")'
    ```
-   （bash 用 `echo X''_DONE`。）
+   bash 外框改用雙引號：`"git reset --hard origin/main; echo X''_DONE"`（單引號外框會讓本機 shell 先把 `''` 吃掉）。
 3. 告訴使用者哪台、哪個 workspace，請他到那個 pane 按 Enter。
-4. 背景等：`pane wait-output <pane> --regex '(?m)^X_DONE'`，到了再接手驗證後面的步驟。
+4. 背景等：`pane wait-output <pane> --regex '(?m)^X_DONE'`。標記只代表跑完、不代表成功，到了先 `pane read` 看結果，再接手後面的步驟。
 
 只把真正要人做的那一步交出去，前後能自己跑的都自己跑。
 
