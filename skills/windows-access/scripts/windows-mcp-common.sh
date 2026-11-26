@@ -8,7 +8,8 @@ command -v powershell.exe >/dev/null || { echo "找不到 powershell.exe：要�
 pwsh() { powershell.exe -NoProfile -Command "$1" </dev/null | tr -d '\r' || true; }
 
 # 印出 dotfiles 用 mise 裝的 windows-mcp.exe（shim）的 Windows 路徑；沒裝就說怎麼裝、回非 0。
-# 寫完整路徑不靠 PATH：-NoProfile 的 PowerShell 沒有 mise 的 shims（henry5720/dotfiles#343 實測）
+# 寫完整路徑不靠 PATH：從 WSL 叫的 powershell.exe，PATH 沒有 mise 的 shims（henry5720/dotfiles#343 實測；
+# 2026-11-26 henry-desktop 重測照樣沒有。ssh 進 Windows 開的 PowerShell 就有，那條路不用這招）
 win_exe() {
   local exe; exe=$(pwsh '"$env:LOCALAPPDATA\mise\shims\windows-mcp.exe"')
   [ -f "$(wslpath "$exe")" ] || { echo "windows-mcp：找不到 $exe。在 Windows 主機的 PowerShell 打 tools 勾 windows-mcp 再 apply（dotfiles）" >&2; return 1; }
