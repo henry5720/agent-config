@@ -27,7 +27,7 @@ Windows-MCP 是第三方開源專案（[CursorTouch/Windows-MCP](https://github.
 
 在 agent 這台照 `remote-access`〈服務定義（up／ps／down）〉跑 CLI。那台 Windows 只要有 windows-mcp、ssh、tailscale，不用有 skill 目錄。服務名是 `windows-mcp`；先問使用者的情況（第一次 `--create-task`、客戶機器）和報錯怎麼處理都在那裡。這支只補 windows-mcp 自己的：
 
-- **key**：agent 這台第一次用先跑 `remote-access key init`，再開新的 session（key 在 `~/.config/windows-mcp/auth.env`，shell 啟動時讀進環境變數）。key 由 CLI 產生、經 ssh 的 stdin 送過去，你和使用者都不用看到或搬它。客戶機器用另一個變數（`--key-env`），不跟自己的機器共用。
+- **key**：agent 這台第一次用先跑 `remote-access key init`，再開新的 session（key 在 `~/.config/windows-mcp/auth.env`，shell 啟動時讀進環境變數）。key 由 CLI 產生、經 sftp 送過去，你和使用者都不用看到或搬它。客戶機器用另一個變數（`--key-env`），不跟自己的機器共用。
 - **起好之後**：在 session 裡打 `/mcp` 重連 `up` 印的 MCP 名稱，先跑 `tools/list` 和 `Screenshot`。印的是 `mcp.yaml 沒有網址是 … 的條目` 時，照它說的用 `skillshare mcp add` 加一筆（以機器命名，例如 `windows-mcp-laptop`），sync 後重開 session。
 - **同時接幾台都可以**，每台一筆 MCP，`remote-access ps` 看接著哪幾台。
 - **key 要作廢**（用聊天訊息交過、懷疑外洩）：`remote-access key rotate`。

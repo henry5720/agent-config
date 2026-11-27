@@ -4,7 +4,7 @@
   remote-access key rotate [--key-env <變數>] [--dry-run]
 
 key 存在 agent 那台的 ~/.config/windows-mcp/auth.env（資料夾 700、檔案 600），一行一個
-`export <變數>='<key>'`，~/.zshenv 會 source 它。所有機器共用這把，`up` 時經 ssh 的 stdin 同步過去。
+`export <變數>='<key>'`，~/.zshenv 會 source 它。所有機器共用這把，`up` 時經 sftp 同步過去。
 
 init：產生一把新 key 存起來。那個變數已經有 key 就不覆蓋，要加 --force；檔案裡其他變數不動。
 rotate：懷疑外洩時換一把：先存新 key，再把已接上、而且用舊 key 的機器重起成新 key。

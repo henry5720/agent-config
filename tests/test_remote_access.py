@@ -622,8 +622,9 @@ SERVE_KEY = "fixed-key-0123456789"
 # 假 ssh：`ssh -G <host>` 印 hostname（<host>.tail123.ts.net）；送去 Windows 的 PowerShell 一律是 -EncodedCommand，
 # 解開後照第一行的 `# remote-access:<動作>` 模擬那台。每台的狀態放 $FAKE_STATE/<host>/，用檔案代表：
 #   desktop（有人登入桌面）、task（常駐 task 在）、listen（windows-mcp 聽著；內容 other:… 是別的程式）、
-#   serve（tailscale serve 開著；內容 other 是別人的）、config（server 讀的設定檔，內容是 stdin 收到的 key）
-# argv 記在 calls，解開的 script 記在 scripts，stdin 不記，方便檢查 key 沒進參數。
+#   serve（tailscale serve 開著；內容 other 是別人的）、config（server 讀的設定檔，內容是 key）、
+#   keyfile（sftp 放上來的 key 暫存檔，start 讀完就刪）
+# argv 記在 calls，解開的 script 記在 scripts。stdin 一律不讀：實機上 PowerShell 經 ssh 讀 stdin 偶爾收不到。
 FAKE_SSH = r"""#!/usr/bin/env python3
 import base64, os, sys
 from pathlib import Path
@@ -676,7 +677,11 @@ sys.stdout.flush()
 if action == "probe":
     probe()
 elif action == "start":
-    key = sys.stdin.readline().strip()
+    key = read("keyfile").strip()
+    if has("keyfile"):
+        (st / "keyfile").unlink()
+    if not key:
+        print("error=nokey"); sys.exit(1)
     if not has("task"):
         if "$create = $true" not in script:
             print("error=notask"); sys.exit(1)
@@ -694,11 +699,30 @@ elif action == "stop":
         (st / "listen").unlink(); was = 1
     if has("serve") and read("serve") != "other":
         (st / "serve").unlink(); was = 1
-    if has("config"):
-        (st / "config").unlink()
+    for n in ("config", "keyfile"):
+        if has(n):
+            (st / n).unlink()
     if "$keep = $false" in script and has("task"):
         (st / "task").unlink()
     print(f"was_running={was}")
+"""
+
+# 假 sftp：`sftp -b - <host>` 從 stdin 讀批次指令，put 的檔案內容放到那台的 keyfile；argv 記在 calls
+FAKE_SFTP = r"""#!/usr/bin/env python3
+import os, shlex, sys
+from pathlib import Path
+host = sys.argv[-1]
+st = Path(os.environ["FAKE_STATE"]) / host
+st.mkdir(exist_ok=True)
+with open(st / "calls", "a") as f:
+    f.write("sftp " + " ".join(sys.argv[1:]) + "\n")
+if os.environ.get("FAKE_SFTP_FAIL"):
+    sys.exit(1)
+for line in sys.stdin:
+    words = shlex.split(line)
+    if words[:1] == ["put"]:
+        (st / "keyfile").write_text(Path(words[1]).read_text())
+        (st / "putfrom").write_text(words[1])
 """
 
 FAKE_SERVE_TAILSCALE = r"""#!/usr/bin/env bash
@@ -743,7 +767,8 @@ class ServeFixture(unittest.TestCase):
         self.mcp_file.write_text(
             "servers:\n  windows-mcp-box:\n    url: https://box.tail123.ts.net/mcp\n"
             "  windows-mcp-laptop:\n    url: https://laptop.tail123.ts.net/mcp\n")
-        for name, body in (("ssh", FAKE_SSH), ("tailscale", FAKE_SERVE_TAILSCALE), ("curl", FAKE_SERVE_CURL)):
+        for name, body in (("ssh", FAKE_SSH), ("sftp", FAKE_SFTP), ("tailscale", FAKE_SERVE_TAILSCALE),
+                           ("curl", FAKE_SERVE_CURL)):
             path = self.bin / name
             path.write_text(body)
             path.chmod(0o755)
@@ -784,8 +809,9 @@ class ServeTest(ServeFixture):
         self.assertIn(f"https://{WIN_HOST}/mcp", out)
         self.assertIn("/mcp 重連", out)
         self.assertIn("windows-mcp-box", out)
-        # key 經 stdin 到那台的設定檔；allowlist 是 company-ec2 的 tailnet IP
+        # key 經 sftp 到那台、寫進設定檔，暫存檔讀完就刪；allowlist 是 company-ec2 的 tailnet IP
         self.assertEqual(self.read("config"), SERVE_KEY)
+        self.assertFalse(self.has("keyfile"))
         self.assertIn(EC2_IP, self.read("scripts"))
         self.assertTrue(self.has("task") and self.has("listen") and self.has("serve"))
 
@@ -798,6 +824,28 @@ class ServeTest(ServeFixture):
         # calls 有 ssh／curl／tailscale 的參數，scripts 有送去那台的 PowerShell（含 task 定義）
         for where in (out, out2, self.read("calls"), self.read("scripts"), (self.base / "calls").read_text()):
             self.assertNotIn(SERVE_KEY, where)
+
+    def test_key_goes_by_sftp_and_local_copy_is_removed(self):
+        code, out = self.run_cli([*UP, "windows-mcp", "box", "--create-task"])
+        self.assertEqual(code, 0, out)
+        self.assertIn("sftp ", self.read("calls"))
+        self.assertFalse(Path(self.read("putfrom")).exists())
+
+    def test_up_stops_when_key_upload_fails(self):
+        self.env["FAKE_SFTP_FAIL"] = "1"
+        code, out = self.run_cli([*UP, "windows-mcp", "box", "--create-task"])
+        self.assertEqual(code, 1, out)
+        self.assertIn("sftp", out)
+        self.assertNotIn(SERVE_KEY, out)
+        self.assertFalse(self.has("task") or self.has("listen") or self.has("serve") or self.has("config"))
+
+    def test_ours_is_always_wrapped_in_an_array(self):
+        # PowerShell 函式回傳會攤開陣列，只剩一個時 5.1 的 CimInstance 沒有 .Count（實機上 up 因此一直等不到 server）
+        self.run_cli([*UP, "windows-mcp", "box", "--create-task"])
+        self.run_cli([*DOWN, "windows-mcp", "box"])
+        scripts = self.read("scripts")
+        self.assertIn("@(Ours)", scripts)
+        self.assertNotRegex(scripts, r"(?<!@)\(Ours\)|=\s*Ours\b")
 
     def test_windows_commands_are_encoded(self):
         self.run_cli([*UP, "windows-mcp", "box", "--create-task"])

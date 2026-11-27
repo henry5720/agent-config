@@ -35,11 +35,15 @@
 - **`--config FILE` 可以放 key**：
   - `serve --config <檔案>` 讀 TOML，支援 `[server]` 的 `transport`、`host`、`port`、`auth_key`，和 `[security]` 的 `ip_allowlist`（[config.py](https://github.com/CursorTouch/Windows-MCP/blob/ccbe664616e3ce62dc65b3bf98fd0a6b2e12c63e/src/windows_mcp/infrastructure/config.py)）。
   - 指令列參數和環境變數優先，都沒給才用設定檔（`__main__.py` 的 `_choose_value`、`_param_explicit`）。所以那台的使用者環境變數裡有 `WINDOWS_MCP_AUTH_KEY` 或 `WINDOWS_MCP_IP_ALLOWLIST` 時，會蓋過設定檔：key 不對時 `up` 驗證會失敗並收掉；allowlist 被蓋掉驗證不一定看得出來，那台不要設這兩個變數。
-  - 所以不用包裝腳本：`up` 經 ssh 的 stdin 把 key 寫進那台的 `~\.windows-mcp\remote-access.toml`，task 的參數只有 `serve --config <那個檔>`；`down` 會刪掉這個檔。
+  - 所以不用包裝腳本：`up` 經 sftp 把 key 放到那台的 `~\.windows-mcp\remote-access.key`，PowerShell 讀完就刪、寫進 `~\.windows-mcp\remote-access.toml`，task 的參數只有 `serve --config <那個檔>`；`down` 會刪掉這個檔。
 - **不加 `--allow-insecure-remote`**：
   - prototype 有加。照 `__main__.py`，有 `auth_key` 時綁 `0.0.0.0` 本來就不會被拒絕。
   - `0.0.0.0` 也不做 Host 檢查，加不加行為一樣。
   - 只在實機驗收時確認。
+- **key 走 sftp，不走 PowerShell 的 stdin**（2026-11-27 henry-desktop 實測）：
+  - `ssh <host> powershell -EncodedCommand …` 讀 `[Console]::In.ReadLine()`，8 次裡有 2 次一直收不到、卡到逾時，長短腳本都會。
+  - 改成 `sftp -b -` 把 key 放到那台的 `~\.windows-mcp\remote-access.key`，同一台連傳 5 次都成功。那台的 sshd 要開 sftp subsystem（Windows OpenSSH 預設有）。
+- **mise shim 起的 windows-mcp 有 4 層行程**（shim → python → python → 聽 port 的 python）：只殺聽 port 的那個，port 可能還被佔著。`down` 會把命令列帶 `remote-access.toml` 的行程都收掉。
 - **常駐 task 不再用時手動刪**：`keep: true` 的 task 在 `down` 之後也留著（在那台的「工作排程器」根目錄看得到 `remote-access-windows-mcp`）。
   先 `remote-access down`，再在那台跑 `Unregister-ScheduledTask -TaskName remote-access-windows-mcp -Confirm:$false`；之後要再用就重新 `up --create-task`。
 

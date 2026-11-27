@@ -6,7 +6,7 @@
 
 <服務> 是 skill 資料夾 services.yaml 的 services 底下的名稱；<host> 是 ssh config 的 Host。
 
-up（serve 模式）：經 ssh 確認那台有人登入桌面（needs_desktop）→ key 經 ssh 的 stdin 寫到那台的設定檔 →
+up（serve 模式）：經 ssh 確認那台有人登入桌面（needs_desktop）→ key 經 sftp 放到那台、寫進設定檔 →
 `schtasks /run` 常駐的 Interactive task 起 server → `tailscale serve --bg` → 從這邊打 ts.net 網址驗證
 （不帶 key、帶 key 各回 verify 寫的碼）。驗證不過就收掉起了一半的東西、exit 1。已經起好而且驗證過就只回報。
 成功時印 mcp.yaml 裡網址對得上的 MCP 名稱。
@@ -131,10 +131,12 @@ $Port = @PORT@
 $Task = '@TASK@'
 $Match = '@MATCH@'
 $Cfg = Join-Path $HOME '.windows-mcp\remote-access.toml'
+$KeyFile = Join-Path $HOME '.windows-mcp\remote-access.key'
 function Listeners {
   @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue) | ForEach-Object { $_.OwningProcess } |
     Select-Object -Unique | ForEach-Object { Get-CimInstance Win32_Process -Filter "ProcessId = $_" }
 }
+# 呼叫端一律寫 @(Ours)：函式回傳會把陣列攤開，只剩一個時 5.1 的 CimInstance 沒有 .Count（2026-11-27 實測）
 function Ours { @(Listeners | Where-Object { $_.CommandLine -match $Match }) }
 # 轉到這個 port 的 serve 是我們的；shortcut: 有別的 serve 設定就當成衝突，不細分 port、路徑
 function ServeState {
@@ -157,11 +159,12 @@ else { 'listen=ours' }
 "serve=$(ServeState)"
 """
 
-# key 從 stdin 讀，寫進只有 server 讀的設定檔；task 的參數只有設定檔路徑
+# key 從 sftp 放上來的暫存檔讀、讀完就刪，寫進只有 server 讀的設定檔；task 的參數只有設定檔路徑
 PS_START = r"""
 $create = @CREATE@
 $serve = @SERVE@
-$key = [Console]::In.ReadLine()
+$key = if (Test-Path -LiteralPath $KeyFile) { (Get-Content -LiteralPath $KeyFile -Raw).Trim() } else { '' }
+Remove-Item -LiteralPath $KeyFile -Force -ErrorAction SilentlyContinue
 if (-not $key) { 'error=nokey'; exit 1 }
 New-Item -ItemType Directory -Force -Path (Split-Path $Cfg) | Out-Null
 $toml = "[server]`ntransport = `"streamable-http`"`nhost = `"@BIND@`"`nport = $Port`nauth_key = `"$key`"`n" + @SECURITY@
@@ -179,8 +182,8 @@ if (-not (Get-ScheduledTask -TaskName $Task -ErrorAction SilentlyContinue)) {
   if (-not (Get-ScheduledTask -TaskName $Task -ErrorAction SilentlyContinue)) { 'error=taskcreate'; exit 1 }
 }
 schtasks /run /tn $Task *> $null
-for ($i = 0; $i -lt 30 -and -not (Ours).Count; $i++) { Start-Sleep -Seconds 1 }
-if (-not (Ours).Count) { 'error=nolisten'; exit 1 }
+for ($i = 0; $i -lt 30 -and -not @(Ours).Count; $i++) { Start-Sleep -Seconds 1 }
+if (-not @(Ours).Count) { 'error=nolisten'; exit 1 }
 if ($serve) {
   tailscale serve --bg "http://127.0.0.1:$Port" *> $null
   if ((ServeState) -ne 'ours') { 'error=serve'; exit 1 }
@@ -192,11 +195,13 @@ PS_STOP = r"""
 $keep = @KEEP@
 $was = 0
 if (Get-ScheduledTask -TaskName $Task -ErrorAction SilentlyContinue) { Stop-ScheduledTask -TaskName $Task -ErrorAction SilentlyContinue }
-$l = Ours
+$l = @(Ours)
 if ($l.Count) { $was = 1; $l | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue } }
-for ($i = 0; $i -lt 10 -and (Ours).Count; $i++) { Start-Sleep -Seconds 1 }
+# mise shim 起的 windows-mcp 有好幾層行程，只殺聽 port 的那個不一定放掉 port；命令列帶這份設定檔的都收
+Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and $_.CommandLine.Contains($Cfg) } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+for ($i = 0; $i -lt 10 -and @(Ours).Count; $i++) { Start-Sleep -Seconds 1 }
 if ((ServeState) -eq 'ours') { $was = 1; tailscale serve --https=443 off *> $null }
-Remove-Item -LiteralPath $Cfg -Force -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath $Cfg, $KeyFile -Force -ErrorAction SilentlyContinue
 if (-not $keep) { Unregister-ScheduledTask -TaskName $Task -Confirm:$false -ErrorAction SilentlyContinue }
 "was_running=$was"
 """
@@ -210,12 +215,12 @@ def ps_script(action, body, svc, **extra):
     return script
 
 
-def win(host, script, stdin=None):
+def win(host, script):
     """經 ssh 在那台跑 PowerShell，回 (exit code, {key: value})。只認 ASCII 的 key=value 行，其他（CLIXML、中文）略過。"""
     encoded = base64.b64encode(script.encode("utf-16-le")).decode()
     p = subprocess.run(
         ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", host, "powershell", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
-        input=(stdin + "\n") if stdin else "", capture_output=True, text=True, errors="replace",
+        stdin=subprocess.DEVNULL, capture_output=True, text=True, errors="replace",
     )
     out = {}
     for line in p.stdout.splitlines():
@@ -223,6 +228,21 @@ def win(host, script, stdin=None):
         if m:
             out[m.group(1)] = m.group(2)
     return p.returncode, out
+
+
+def put_key(host, key):
+    """經 sftp 把 key 放到那台的 ~/.windows-mcp/remote-access.key，PS_START 讀完就刪。
+
+    不走 PowerShell 的 stdin：2026-11-27 henry-desktop 實測，經 ssh 讀 [Console]::In 約四次卡一次。"""
+    with tempfile.TemporaryDirectory() as d:  # 目錄 700，離開就刪
+        local = Path(d) / "key"
+        local.write_text(key)
+        p = subprocess.run(
+            ["sftp", "-q", "-b", "-", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", host],
+            input=f'-mkdir .windows-mcp\nput "{local}" .windows-mcp/remote-access.key\n',
+            capture_output=True, text=True, errors="replace",
+        )
+    return p.returncode == 0
 
 
 # ==========================================================================
@@ -401,11 +421,12 @@ def cmd_up(args):
     # forward 只有 ssh 轉進來的 127.0.0.1 連得到，不用 allowlist
     security = "''" if forward else (
         '"`n[security]`nip_allowlist = [' + ", ".join(f"'{ip}'" for ip in allow) + ']`n"')
+    if not put_key(args.host, key):
+        die(f"經 sftp 把 key 放到 {args.host} 失敗：確認 sftp {args.host} 連得上（那台 sshd 要開 sftp subsystem）")
     code, out = win(args.host, ps_script("start", PS_START, svc, BIND="127.0.0.1" if forward else "0.0.0.0",
                                          SECURITY=security, SERVE="$false" if forward else "$true",
                                          # keep: false 的 task 每次 up 建、down 刪，不用問
-                                         CREATE="$true" if args.create_task or not svc["task"]["keep"] else "$false"),
-                 stdin=key)
+                                         CREATE="$true" if args.create_task or not svc["task"]["keep"] else "$false"))
     if code != 0 or out.get("started") != "1":
         reason = {
             "notask": "task 不在（加 --create-task 建）",
