@@ -43,9 +43,10 @@ def var_re(name):
 
 def saved_key(lines, name):
     for line in lines:
-        m = re.fullmatch(rf"\s*(?:export\s+)?{name}='([^']*)'\s*", line)
+        # 引號可有可無：key init 寫單引號，手寫的常沒加或用雙引號（#154）
+        m = re.fullmatch(rf"""\s*(?:export\s+)?{name}=(['"]?)([^'"\s]*)\1\s*""", line)
         if m:
-            return m.group(1)
+            return m.group(2)
     return ""
 
 
