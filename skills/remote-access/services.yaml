@@ -26,3 +26,8 @@ services:
     # 允許連進來的 agent 機器（tailnet 名稱），CLI 用 tailscale ip -4 換成 IP 填 --ip-allowlist。
     # serve 轉進來時 server 看到的是呼叫端的 tailnet IP，寫 127.0.0.1 會全部 403（#137 prototype）
     allow: [company-ec2]
+    # 個別 host 的覆寫（key 是 ssh config 的 Host）：底下的欄位整個蓋掉上面同名的。
+    # 客戶機器不留 task：up 建、down 刪，不用 --create-task。
+    # hosts:
+    #   <客戶的 Host>:
+    #     start: [{task: {name: remote-access-windows-mcp, keep: false}}]

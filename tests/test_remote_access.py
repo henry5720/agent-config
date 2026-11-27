@@ -9,6 +9,7 @@ tailscale、cloudflared、curl、sudo 都換成 PATH 上的假指令（見 FAKE_
 """
 import os
 import select
+import shutil
 import signal
 import subprocess
 import sys
@@ -855,6 +856,28 @@ class ServeTest(unittest.TestCase):
         self.assertEqual(code, 0, out)
         self.assertIn("已收乾淨", out)
         self.assertFalse(self.has("listen") or self.has("serve") or self.has("config"))
+        self.assertTrue(self.has("task"))
+
+    def test_client_host_with_keep_false_leaves_no_task(self):
+        # 客戶機器：在 services.yaml 用 hosts 覆寫那台的 start，task 用完就刪
+        skill = Path(self.tmp.name) / "remote-access"
+        shutil.copytree(RA_SCRIPTS.parent, skill)
+        with open(skill / "services.yaml", "a") as f:
+            f.write("    hosts:\n      client-box:\n"
+                    "        start: [{task: {name: remote-access-windows-mcp, keep: false}}]\n")
+        with open(Path(self.env["HOME"]) / ".ssh" / "config", "a") as f:
+            f.write("\nHost client-box\n  HostName client-box.tail123.ts.net\n")
+        entry = [sys.executable, str(skill / "scripts" / "remote-access")]
+        # 不用 --create-task：task 不會留在那台
+        code, out = self.run_cli([*entry, "up", "windows-mcp", "client-box"])
+        self.assertEqual(code, 0, out)
+        self.assertTrue(self.has("task") and self.has("listen"))
+        code, out = self.run_cli([*entry, "down", "windows-mcp", "client-box"])
+        self.assertEqual(code, 0, out)
+        self.assertFalse(self.has("task") or self.has("listen") or self.has("serve") or self.has("config"))
+        # 其他 host 照服務定義 keep: true
+        self.run_cli([*entry, "up", "windows-mcp", "box", "--create-task"])
+        self.run_cli([*entry, "down", "windows-mcp", "box"])
         self.assertTrue(self.has("task"))
 
     def test_down_when_not_running(self):
