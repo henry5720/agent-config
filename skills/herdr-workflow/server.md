@@ -3,18 +3,23 @@
 Linux 已配置主機：`herdr machine add` 或 `--machine` 經 ssh 把遠端 server 拉起來是官方設計，不用處理。
 下面只講 Windows。
 
-## Windows：預設是經 ssh 起的完整管理員 server
+## Windows：預設由登入排程起，session 0 的是例外
 
 使用者的 Windows 帳號在 Administrators 群組。從 OpenSSH 登入的 Administrators 帳號拿到的是完整（elevated）權限、跑在 session 0。
-重開機後沒有 server，第一個開 herdr 的決定它的權限：從別台 `--machine` 或 TUI 點那台，server 和每個 pane 都是 elevated、session 0。
+重開機後沒有 server，第一個開 herdr 的決定它的權限：
 
-**這是使用者選的預設，維持它。** shell、agent、git、裝東西都能用，不跳 UAC。只有下面這些情況才改那一台（改法見下一節）：
+- **預設**：勾了 herdr 的 Windows 由 dotfiles 註冊排程 `herdr-server`，使用者登入時以一般權限把 server 起在登入的 session。
+  pane 能用桌面：GUI、定位、剪貼簿。要管理員權限的操作改走自己的 ssh。
+- **例外**：重開機後還沒登入，就有人從別台 `--machine` 或 TUI 點那台：server 和每個 pane 都是 elevated、session 0。
 
-- 使用者要在那台桌面用一般 terminal 連 herdr：elevated server 拒絕 unelevated client（存取被拒）
-- 要在 pane 裡操作桌面：GUI 程式桌面上看不到、windows-mcp 從 pane 起抓不到畫面、剪貼簿是分開的
+session 0 的 server 看得出來的症狀：
+
+- 使用者在那台桌面用一般 terminal 連 herdr：elevated server 拒絕 unelevated client（存取被拒）
+- pane 裡開的 GUI 程式桌面上看不到、windows-mcp 從 pane 起抓不到畫面、剪貼簿是分開的
+- pane 裡跑定位（PMS 打卡的 `gps.ps1`）只拿到 IP 推估，沒有 Wi‑Fi 定位
 - pane 裡走 junction 回「未受信任的掛接點」
 
-只是要在 pane 開一次 GUI，不必改 server：用一次性的 Interactive 排程開那個程式（同下面第 4 步，動作換成那個程式）。
+看到這些就照下一節換回來；要在 pane 用桌面、server 卻是 session 0 時，先跟使用者說，不在 session 0 的 pane 裡繞路。
 
 檢查（自己的 ssh，AFK 操作）：
 
@@ -26,7 +31,7 @@ Get-CimInstance Win32_Process | Where-Object Name -like herdr* | Select-Object P
 `([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole('Administrators')` 是最終判準
 （session 1 也可能是使用者用系統管理員身分開的 terminal 起的）。
 
-## 改成桌面起（使用者要求時才做）
+## 換回登入的 session（使用者同意後做）
 
 順序不能換：停用 profile 之後 `--machine` 就連不到那台。
 
@@ -35,6 +40,8 @@ Get-CimInstance Win32_Process | Where-Object Name -like herdr* | Select-Object P
    `herdr machine disable <id>`（label 無效）。不先停用，停掉的 server 會被重連拉回 session 0。
 3. 請使用者到那個 pane 按 Enter（人工步驟：會關掉那台所有 pane，先講）。
 4. 那台有人登入時（ssh 跑 `query user` 看得到 console），用自己的 ssh 註冊排程、以一般權限把 server 起在登入的 session：
+
+   有 dotfiles 註冊的 `herdr-server` 排程（`Get-ScheduledTask herdr-server`）就直接 `Start-ScheduledTask herdr-server`；沒有才註冊一個：
 
    ```powershell
    $u = [Security.Principal.WindowsIdentity]::GetCurrent().Name   # ssh 的 USERDOMAIN 是 WORKGROUP，不能拿來拼
@@ -45,10 +52,10 @@ Get-CimInstance Win32_Process | Where-Object Name -like herdr* | Select-Object P
    Start-ScheduledTask herdr-server
    ```
 
-   排程沒有觸發條件，只在 `Start-ScheduledTask` 時跑；留著下次重用，不刪（刪掉正在跑的排程會不會連 server 一起停，沒驗過）。
+   這個排程沒有觸發條件，只在 `Start-ScheduledTask` 時跑；留著下次重用，不刪（刪掉正在跑的排程會不會連 server 一起停，沒驗過）。
    `ExecutionTimeLimit` 一定要設 0，預設 72 小時後會停掉 server。沒人登入就等使用者登入，或請他在桌面一般 terminal 跑 `herdr`。
 5. 各 client `herdr machine enable <id>`，再檢查：只剩一個 server、`SessionId` ≥ 1、pane 的 `IsInRole` 是 `False`。
 
-之後那台重開機，又先從別台點它，就會回到預設；要再改就重做一次。
+之後那台重開機，要使用者先登入，排程才會在別台連進來前起好 server。
 
 `[server] allow_unelevated_clients` 不採用：它只讓一般權限的 client 連得上，pane 仍是 elevated、session 0。
