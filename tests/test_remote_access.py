@@ -630,6 +630,9 @@ import base64, os, sys
 from pathlib import Path
 argv = sys.argv[1:]
 host = argv[1] if argv[0] == "-G" else argv[argv.index("powershell") - 1] if "powershell" in argv else argv[-1]
+# FAKE_ALIASES="別名=本名,…"：同一行 Host 的另一個名字，連到同一台
+aliases = dict(a.split("=") for a in os.environ.get("FAKE_ALIASES", "").split(",") if a)
+host = aliases.get(host, host)
 st = Path(os.environ["FAKE_STATE"]) / host
 st.mkdir(exist_ok=True)
 with open(st / "calls", "a") as f:
@@ -637,7 +640,8 @@ with open(st / "calls", "a") as f:
 if argv[0] == "-G":
     print("hostname " + os.environ.get("FAKE_HOSTNAME", host + ".tail123.ts.net"))
     sys.exit(0)
-host = argv[argv.index("powershell") - 1] if "powershell" in argv else ""
+host = aliases.get(argv[argv.index("powershell") - 1], "") if "powershell" in argv else ""
+host = host or (argv[argv.index("powershell") - 1] if "powershell" in argv else "")
 if host and os.environ.get("FAKE_ONLY_HOST") and host != os.environ["FAKE_ONLY_HOST"]:
     sys.exit(255)
 # ControlMaster：master 檔代表開著，內容是 -L 的參數；-O check／exit 看它
@@ -712,7 +716,8 @@ FAKE_SFTP = r"""#!/usr/bin/env python3
 import os, shlex, sys
 from pathlib import Path
 host = sys.argv[-1]
-st = Path(os.environ["FAKE_STATE"]) / host
+aliases = dict(a.split("=") for a in os.environ.get("FAKE_ALIASES", "").split(",") if a)
+st = Path(os.environ["FAKE_STATE"]) / aliases.get(host, host)
 st.mkdir(exist_ok=True)
 with open(st / "calls", "a") as f:
     f.write("sftp " + " ".join(sys.argv[1:]) + "\n")
@@ -846,6 +851,16 @@ class ServeTest(ServeFixture):
         scripts = self.read("scripts")
         self.assertIn("@(Ours)", scripts)
         self.assertNotRegex(scripts, r"(?<!@)\(Ours\)|=\s*Ours\b")
+
+    def test_ps_lists_a_machine_with_two_host_names_once(self):
+        # `Host box box-alias`：兩個名字都能用，但 ps、key rotate 只算一台
+        cfg = Path(self.env["HOME"]) / ".ssh" / "config"
+        cfg.write_text(cfg.read_text().replace("Host box\n", "Host box box-alias\n"))
+        self.env["FAKE_ALIASES"] = "box-alias=box"
+        code, out = self.run_cli([*UP, "windows-mcp", "box-alias", "--create-task"])
+        self.assertEqual(code, 0, out)
+        rows, out = self.ps_rows()
+        self.assertEqual(len(rows), 1, out)
 
     def test_windows_commands_are_encoded(self):
         self.run_cli([*UP, "windows-mcp", "box", "--create-task"])

@@ -498,8 +498,17 @@ PS_BY_MODE = {"serve": ps_serve, "forward": ps_forward}
 def running(service=None, host=None):
     """逐台查在跑的服務，回 [(服務, host, 整理好的服務定義, 驗證打的網址, 驗不了的原因)]。用查的，不動那台。"""
     found = []
+    hosts = [host]
+    if not host:
+        # `Host desktop henry-desktop` 是同一台：照 ssh -G 的 hostname 只查一次
+        seen, hosts = set(), []
+        for h in ssh_hosts():
+            hn = ssh_hostname(h) or h
+            if hn not in seen:
+                seen.add(hn)
+                hosts.append(h)
     for name in [service] if service else load_services():
-        for h in [host] if host else ssh_hosts():
+        for h in hosts:
             # mode 看 resolve 之後的（含 hosts.<host> 覆寫）
             svc = resolve(SimpleNamespace(service=name, host=h))
             hit = PS_BY_MODE[svc["mode"]](svc, h)
