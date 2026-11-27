@@ -1,19 +1,20 @@
 ---
 name: remote-access
-description: 連線：agent 跟服務不在同一台時怎麼連過去。同一台直接連；tailnet 內用 ssh `-L`／`-R`、tailscale serve；tailnet 外用 Funnel、quick tunnel 開公開網址（開、從公網驗證、收）。要連別台的服務、把這台的 port 借給別台、開給 tailnet 外、挑本機轉發的 port、收掉公開網址時使用。
+description: 連線：agent 跟服務不在同一台時怎麼連過去。同一台直接連；tailnet 內的服務定義用 `remote-access up|ps|down|key` 在別台起、查、收，其他用 ssh `-L`／`-R`、tailscale serve；tailnet 外用 Funnel、quick tunnel 開公開網址（開、從公網驗證、收）。要連別台的服務、把這台的 port 借給別台、開給 tailnet 外、挑本機轉發的 port、收掉公開網址時使用。
 ---
 
 # remote-access
 
-服務和連線分兩層。服務（瀏覽器、Windows-MCP、ttyd…）由各自的 skill 起、收、帶驗證；這支只管連過去，跟服務是什麼無關。給人看的情境和理由在 dotfiles 的 [remote-access](https://github.com/henry5720/dotfiles/blob/main/docs/how-to/remote-access/README.md)。
+服務和連線分兩層。服務（瀏覽器、Windows-MCP、ttyd…）的安裝、驗證由各自的 skill 管；這支管連過去。寫在 `services.yaml` 的服務例外，由這支的 CLI 在別台起、收、驗證。給人看的情境和理由在 dotfiles 的 [remote-access](https://github.com/henry5720/dotfiles/blob/main/docs/how-to/remote-access/README.md)。
 
 ## 判準
 
 先看連的那一方（人或 agent）跟服務的位置，照順序第一個符合的就是：
 
 1. 跟服務在同一台 → [同一台](#同一台)
-2. 在使用者的 tailnet 內 → [tailnet 內](#tailnet-內)，不開公網
-3. 在 tailnet 外 → [tailnet 外](#tailnet-外)：開出去的那台**跑得到登入使用者 tailnet 的 tailscale** → [Funnel](#funnel)；那台不加進使用者的 tailnet（別人的機器、臨時借用）→ [quick tunnel](#quick-tunnel)。差異看 [比較表](https://github.com/henry5720/dotfiles/blob/main/docs/how-to/remote-access/README.md#比較表)。
+2. 在使用者的 tailnet 內，服務在 `services.yaml` 裡 → [服務定義（up／ps／down）](#服務定義uppsdown)
+3. 在使用者的 tailnet 內，其他服務 → [tailnet 內](#tailnet-內)，不開公網
+4. 在 tailnet 外 → [tailnet 外](#tailnet-外)：開出去的那台**跑得到登入使用者 tailnet 的 tailscale** → [Funnel](#funnel)；那台不加進使用者的 tailnet（別人的機器、臨時借用）→ [quick tunnel](#quick-tunnel)。差異看 [比較表](https://github.com/henry5720/dotfiles/blob/main/docs/how-to/remote-access/README.md#比較表)。
 
 你自己就跑在服務那台 Windows（原生 Windows，不經 WSL）時，選完照 [agent 就在那台 Windows](#agent-就在那台-windows) 做。
 
@@ -28,9 +29,9 @@ description: 連線：agent 跟服務不在同一台時怎麼連過去。同一�
 | 9555 | Playwright 插件的 relay（接使用者日常的 Chrome） | `browser-access` skill（`playwright-extension-attach`） | 只經 `playwright-extension-attach --tunnel` |
 | 1080 | 反向 SOCKS（`ssh -R`，借使用者的網路） | `browser-access` skill | 不行，沒有驗證 |
 | 7681 | ttyd 網頁 shell | dotfiles 的 [ttyd-serve](https://github.com/henry5720/dotfiles/blob/main/docs/how-to/remote-access/ttyd-serve.md) | 可以，ttyd 帶隨機密碼 |
-| 8000→18000 | Windows-MCP 的 HTTP server：那台 Windows 聽 8000，agent 這台用 18000 接 | `windows-access` skill | 可以，帶 Bearer key |
+| `services.yaml` 的 `local_port` | 服務定義走 forward 模式時 agent 這台接的 port（現在只有 windows-mcp）；serve 模式不佔本機 port | `remote-access up` | 照服務 |
 
-8000→18000：agent 那台在 WSL mirrored networking 下，自己的 8000 可能被自己的 windows-mcp 佔走，所以本機用 18000。要同時接第二台時用 18001。
+服務定義的 port 以 `services.yaml` 為準，這張不抄數字。agent 那台在 WSL mirrored networking 下跟 Windows 共用 port，`local_port` 不要跟服務本身的 `port` 一樣。兩台都走 forward 時，第二台在 `hosts.<host>` 另給 `local_port`。
 
 **port 被佔就回報，不換 port。** 換了會接到錯的 server，或跟寫死 port 的 MCP 設定對不上。用 `ss -ltnp | grep <port>` 找出是誰（Windows 用 `Get-NetTCPConnection -State Listen -LocalPort <port> -ErrorAction SilentlyContinue | ForEach-Object { Get-Process -Id $_.OwningProcess }`，沒印東西就是沒人在聽），告訴使用者，由他決定。
 
@@ -39,6 +40,23 @@ description: 連線：agent 跟服務不在同一台時怎麼連過去。同一�
 直接連 `127.0.0.1:<port>`，不開轉發、不開公網。WSL 開 mirrored networking 時跟它的 Windows 共用 port，也算同一台。服務有不用網路的接法（例如 Windows-MCP 的 stdio）時照服務的 skill 用那條。
 
 完成條件：在連的那一端 `curl -sI http://127.0.0.1:<port>` 有回應（或服務 skill 寫的驗證通過）。
+
+## 服務定義（up／ps／down）
+
+服務寫在這支 skill 的 `services.yaml`（現在有 windows-mcp）時，一律用 CLI `~/.claude/skills/remote-access/scripts/remote-access`，不手動開 ssh、serve，參數看 `remote-access <子命令> --help`。`<host>` 是 ssh config 的 Host。CLI 經 ssh 送 PowerShell 到那台做事，那台不用有 skill 目錄（沒勾 agent-config 的 Windows 也行）。服務自己要的前置（安裝、key、MCP 設定）看服務的 skill。
+
+1. **先問使用者**，說好才跑：
+   - 那台第一次 `up` 要加 `--create-task`：常駐 task 會一直留在那台。
+   - 客戶的機器：`up`、`down` 都會在那台跑 PowerShell，每次都先問。客戶機器在 `services.yaml` 的 `hosts.<host>` 設 `keep: false`（範例在檔案註解），task 由 `up` 建、`down` 刪。
+2. **起**：`remote-access up <服務> <host>`。已經起好而且驗證過時只回報，重跑安全。
+   完成條件：印出 `網址：…`（或 `已經起好：…`）和 `MCP：<名稱>`。
+3. **查**：`remote-access ps` 列出接著哪幾台、網址或本機 port、MCP 名稱、驗證過沒。
+4. **收**：`remote-access down <服務> <host>`。
+   完成條件：印 `已收乾淨` 或 `本來就沒開`。
+5. **換 key**：`remote-access key init` 第一次產生，`remote-access key rotate` 換新並重起已接上的機器；兩個都要重開 session 才讀得到。
+   完成條件：`rotate` 沒有印 `這幾台沒同步到`；有的話照它印的 `up` 在新 session 重跑。
+
+`up` 失敗時已經收掉起了一半的東西，照 [reference.md〈`up` 的錯誤訊息〉](reference.md#up-的錯誤訊息) 處理。
 
 ## tailnet 內
 
@@ -51,7 +69,7 @@ ssh -N -o ExitOnForwardFailure=yes -R 127.0.0.1:1080 <host>                     
 tailscale serve --bg --https=443 <port>                                                    # tailnet 內帶憑證的 https://<機器>.<tailnet>.ts.net
 ```
 
-- **ssh 轉發是預設。** 2026-11-11 起 company-ec2 的 agent 用 `ssh -L` 接別台 Windows 的 Windows-MCP（本機 18000 → 那台 8000），是最常用的一條。
+- **ssh 轉發是預設。** 服務在 `services.yaml` 裡的照[服務定義](#服務定義uppsdown)，不手動開。
 - **兩端都綁 `127.0.0.1`。** 被轉發的服務多半沒有驗證，綁 `0.0.0.0` 等於開給整個網路。
 - **你自己跑 ssh 時背景跑**（Claude Code 的 Bash `run_in_background`），用完停掉它。要使用者在他那台跑時，把指令交給他，請他開著別關。
 - **tailscale serve** 在 ssh 不到那台時用。它不改寫 `Host`，服務綁 loopback 又檢查 `Host` 時要改綁 `0.0.0.0`，並確認防火牆沒放行那個 port 的 inbound。listener 不能跟服務同一個 port（WSL mirrored 下會互搶）。收：`tailscale serve --https=443 off`，`tailscale serve status` 沒有那個 port 才算收掉。
@@ -80,7 +98,7 @@ tailscale serve --bg --https=443 <port>                                         
 
 腳本：`~/.claude/skills/remote-access/scripts/remote-access funnel`（`remote-access funnel --help` 看參數）。它照[共通規則](https://github.com/henry5720/dotfiles/blob/main/docs/how-to/remote-access/README.md#共通規則)前景跑：不加 `--bg`，停著直到收到 Ctrl+C／SIGTERM 才撤掉 Funnel。
 
-**收乾淨的判準**（這支和下面手動的做法都一樣）：那個對外 port 的 tailscale CLI 行程剩 0 個，**而且**從公網打公開網址連不上（`000`，或公開 DNS 查不到）。`tailscale funnel status` 不算數：前景 Funnel 不會列成 serve config，印 `No serve config` 時公網照樣回 `401`（2026-11-05 在 henry-laptop 實測）。停掉叫 tailscale 的那一端（ssh、WSL 的 `powershell.exe`）也不會停掉 Windows 上的 `tailscale.exe`，口子會一直開著。
+**收乾淨的判準**（這支和下面手動的做法都一樣）：那個對外 port 的 tailscale CLI 行程剩 0 個，**而且**從公網打公開網址連不上（`000`，或公開 DNS 查不到）。`tailscale funnel status` 不算數：前景 Funnel 不會列成 serve config，印 `No serve config` 時公網照樣回 `401`。停掉叫 tailscale 的那一端（ssh、WSL 的 `powershell.exe`）也不會停掉 Windows 上的 `tailscale.exe`，口子會一直開著。
 
 1. **對好 `Host`**：Funnel 不能改寫 `Host`，轉進來的 `Host` 是公開網址。app 綁 loopback 又檢查 `Host` 時，請 app 改綁 `0.0.0.0`，並確認防火牆沒放行那個 port 的 inbound（不然區網能直連）。
    完成條件：app 綁的位址接受公開網址當 `Host`。
@@ -131,7 +149,7 @@ tailscale funnel --https=<對外 port> <app port>    # Linux 沒設 operator 要
 
 開之前對一次 app 的需求和這四項限制（[Cloudflare 官方文件](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/)），app 撐不住就停下來回報使用者：
 
-- **不支援 SSE**：app 靠 SSE 推資料時可能會壞。2026-11-05 在 henry-laptop 實測，單次請求用 SSE 回的（MCP `initialize`、`tools/list`）收得到；長時間開著的 SSE stream **未實測**。
+- **不支援 SSE**：app 靠 SSE 推資料時可能會壞（單次請求收得到，長時間開著的 stream 未實測，見 [reference.md](reference.md)〈quick tunnel 專屬〉）。
 - **每條最多 200 個並行請求**，超過的回 `429`。
 - **網址每次都變**：每開一次是新網址，重開就要重交。
 - **官方只給測試、開發用**：用完就收，不長駐。
@@ -163,7 +181,7 @@ tailscale funnel --https=<對外 port> <app port>    # Linux 沒設 operator 要
    完成條件：輸出出現 `公網驗證：不帶驗證=<碼>（要 <碼>），帶驗證=<碼>（要 <碼>）` 兩邊相符，接著 `公開網址：https://…`。驗證沒過時 `open` 已經停掉 cloudflared、exit 1；`verify` 沒過就照第 4 步請使用者收掉。原因照 [reference.md](reference.md) 查。
 3. **交網址**：把 `公開網址` 那行交給 app skill 或使用者。
 4. **收掉**：
-   收乾淨的判準：轉那個 port 的 cloudflared 剩 0 個，**而且**從公網打網址連不上（Cloudflare 回 `530`，或公開 DNS 查不到）。停掉叫 cloudflared 的那一端（ssh、WSL）不會停掉 Windows 上的 `cloudflared.exe`（2026-11-05 在 henry-laptop 實測），要另外停。
+   收乾淨的判準：轉那個 port 的 cloudflared 剩 0 個，**而且**從公網打網址連不上（Cloudflare 回 `530`，或公開 DNS 查不到）。停掉叫 cloudflared 的那一端（ssh、WSL）不會停掉 Windows 上的 `cloudflared.exe`，要另外停。
    - **這台**：對背景那支送 SIGTERM。它停掉 cloudflared（`CLOUDFLARED` 叫 Windows 的時候也從 PowerShell 停 `cloudflared.exe`），再從公網確認。完成條件：輸出有 `cloudflared → :<port> 剩 0 個（要 0）` 和 `公網 https://…：530`（或公開 DNS 查不到），exit 0。背景那支已經不在時，跑 `remote-access quick-tunnel close --port <app port> --url <公開網址>`，完成條件相同（沒有網址時不帶 `--url`，只確認行程數）。
    - **那台**：請使用者在 cloudflared 視窗按 Ctrl+C，再貼下面這行；接著從你這邊跑 `remote-access quick-tunnel check-closed --url <公開網址>`。
 

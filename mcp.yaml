@@ -53,10 +53,16 @@ servers:
     command: sh
     args: [-c, 'exec "$HOME/.claude/skills/windows-access/scripts/windows-mcp-stdio"']
     targets: [claude, codex, opencode]
-  # 連別台 Windows 的 Windows-MCP HTTP server。url 寫死本機 18000，連哪台由 ssh -L 轉發決定；
-  # key 由使用者在啟動 agent 的 shell export WINDOWS_MCP_AUTH_KEY，不進 repo、不進 chezmoi。
-  windows-mcp-remote:
-    url: http://127.0.0.1:18000/mcp
+  # 連別台 Windows 的 Windows-MCP，每台一筆、以機器命名。那台用 `remote-access up windows-mcp <host>` 起，
+  # 走 tailscale serve，url 是那台的 ts.net 網址（只有 tailnet 內連得到）；up 照 url 印出要用哪一筆。
+  # key 由 agent 那台的 shell 讀 ~/.config/windows-mcp/auth.env export WINDOWS_MCP_AUTH_KEY，不進 repo、不進 chezmoi。
+  windows-mcp-desktop:
+    url: https://henry-desktop.tail0fed08.ts.net/mcp
+    bearerToken:
+      fromEnv: WINDOWS_MCP_AUTH_KEY
+    targets: [claude, codex, opencode]
+  windows-mcp-laptop:
+    url: https://henry-laptop.tail0fed08.ts.net/mcp
     bearerToken:
       fromEnv: WINDOWS_MCP_AUTH_KEY
     targets: [claude, codex, opencode]

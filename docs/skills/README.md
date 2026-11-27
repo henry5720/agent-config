@@ -172,6 +172,6 @@ done
 | [browser-access](https://github.com/henry5720/dotfiles/blob/main/docs/how-to/remote-access/browser.md)（人看的在 dotfiles） | agent 接瀏覽器：自己的 headless、你的獨立 profile（9222，多分頁）、你日常的 Chrome（插件）；擋機房 IP 時借你的對外 IP |
 | [verify-in-browser](verify-in-browser.md) | 選瀏覽器工具（playwright-cli、Claude in Chrome、Codex）、裝 ffmpeg 轉影片、升級 playwright-cli 後跟上官方 skill |
 | [daily-worklog](daily-worklog.md) | 兩種用法：裝成 skill，或整份貼給其他 agent |
-| [windows-access](https://github.com/henry5720/dotfiles/blob/main/docs/how-to/remote-access/windows-mcp.md)（人看的在 dotfiles） | 讓別台的 agent 操作某台 Windows：在那台起 server、交 key、用完怎麼收 |
+| [windows-access](https://github.com/henry5720/dotfiles/blob/main/docs/how-to/remote-access/windows-mcp.md)（人看的在 dotfiles） | 讓別台的 agent 操作某台 Windows：`remote-access up` 起 server、接 MCP，用完 `down` |
 
 其他 skill 只要叫 agent 照做，看它的 `SKILL.md` 就好。

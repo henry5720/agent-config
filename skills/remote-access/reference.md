@@ -1,12 +1,51 @@
 # remote-access reference
 
-公網驗證沒過、或連得上但 app 回錯誤時才讀。坑照原因分層：先看經過代理的（每種方式都會遇到），再看 Funnel、quick tunnel 各自專屬的。app 本身的坑看 app 自己的文件（例如 windows-access 的 reference.md）。
+`remote-access up` 失敗、公網驗證沒過、或連得上但 app 回錯誤時才讀。坑照原因分層：先看經過代理的（每種方式都會遇到），再看 Funnel、quick tunnel 各自專屬的。app 本身的坑看 app 自己的文件（例如 windows-access 的 reference.md）。
 
 ## 經過本機代理或 tunnel（Funnel、quick tunnel）
 
 - **`Host` 是公開網址**：代理預設把對外網址當成 `Host` 轉進來。app 綁 loopback 又檢查 `Host` 時會回 400（windows-mcp 是 Invalid host header）。解法二選一：app 綁 `0.0.0.0`（Funnel 只能這樣做），或讓代理改寫成 `localhost`（cloudflared 用 `--http-host-header localhost`）。
 - **用來源 IP 擋人的設定不能用**：請求是代理從 127.0.0.1 轉進來的。uvicorn 這類 server 預設信任 127.0.0.1 帶的 `X-Forwarded-For`，會把來源 IP 改成真正的外部 IP；allowlist 填 `127.0.0.1` 就會連代理的請求一起擋掉（windows-mcp 的 `--ip-allowlist` 回 `403 … not in the IP allowlist`）。
 - **app 綁 `0.0.0.0` 時**，區網直連那個 port 只靠防火牆擋。開之前確認沒有放行它的 inbound 規則。
+
+## `up` 的錯誤訊息
+
+起了一半的東西 `up` 已經收掉，照訊息處理：
+
+| 訊息 | 代表什麼、怎麼做 |
+|---|---|
+| `沒有人登入桌面` | 服務要桌面 session。請使用者登入那台桌面（ssh 的那個帳號）再跑 |
+| `HostName 要是 ts.net 名稱` | serve 網址從 ssh config 的 HostName 來。ssh config 由 dotfiles 管，回報使用者改；serve 真的連不到才在 `hosts.<host>` 改 `mode: forward` |
+| `還沒有常駐 task` | 照 SKILL.md〈服務定義〉第 1 步問，說好再加 `--create-task` |
+| `被別的程式佔著` | 照[本機 port 總表](SKILL.md#本機-port-總表)回報，不換 port、不停別人的程式 |
+| `已經有別的 tailscale serve 設定` | 那台的 serve 有別人的設定，回報使用者，不要蓋掉 |
+| `ssh … 跑 PowerShell 沒有回應` | 先確認 `ssh <host>` 連得上、那台是 Windows |
+| `驗證沒過`、`起不來` | 看下面〈serve 模式〉和服務 skill 的 reference.md |
+
+## serve 模式（`remote-access up`／`down`）
+
+查證日期 2026-11-27，看的是 Windows-MCP `main`（commit `ccbe664`，鎖 fastmcp 4.2.5、uvicorn 0.54.0）的原始碼。
+
+- **windows-mcp 只在直接連線來自 `127.0.0.1`／`::1` 時才信 `X-Forwarded-For`**：
+  - windows-mcp 的 `IPAllowlistMiddleware` 看的是 ASGI 的 `request.client`（[security.py](https://github.com/CursorTouch/Windows-MCP/blob/ccbe664616e3ce62dc65b3bf98fd0a6b2e12c63e/src/windows_mcp/infrastructure/security.py#L266-L293)）。
+  - fastmcp 建 `uvicorn.Config` 時沒改 proxy 設定（fastmcp-slim 4.2.5 的 `server/mixins/transport.py`）。
+  - 所以用 uvicorn 的預設：`proxy_headers=True`，`forwarded_allow_ips` 取環境變數 `FORWARDED_ALLOW_IPS`，沒設時是 `127.0.0.1,::1`（uvicorn 0.54.0 的 `config.py`、`middleware/proxy_headers.py`）。只有直接連線來自這兩個位址時，才用 `X-Forwarded-For` 改寫 `request.client`。
+  - 影響：`tailscale serve` 從 127.0.0.1 轉進來，帶呼叫端的 tailnet IP，所以 allowlist 要填 agent 機器的 tailnet IP（#137 prototype 看到的 `100.100.7.68` 就是這樣來的）。區網直連 8000 的人來源不是 loopback，偽造 `X-Forwarded-For` 沒用，繞不過 allowlist。
+  - 前提：那台沒把 `FORWARDED_ALLOW_IPS` 設成 `*`。那台本機的程式本來就能從 127.0.0.1 偽造，allowlist 擋不了它們，只能靠 key 擋。
+- **`--config FILE` 可以放 key**：
+  - `serve --config <檔案>` 讀 TOML，支援 `[server]` 的 `transport`、`host`、`port`、`auth_key`，和 `[security]` 的 `ip_allowlist`（[config.py](https://github.com/CursorTouch/Windows-MCP/blob/ccbe664616e3ce62dc65b3bf98fd0a6b2e12c63e/src/windows_mcp/infrastructure/config.py)）。
+  - 指令列參數和環境變數優先，都沒給才用設定檔（`__main__.py` 的 `_choose_value`、`_param_explicit`）。所以那台的使用者環境變數裡有 `WINDOWS_MCP_AUTH_KEY` 或 `WINDOWS_MCP_IP_ALLOWLIST` 時，會蓋過設定檔：key 不對時 `up` 驗證會失敗並收掉；allowlist 被蓋掉驗證不一定看得出來，那台不要設這兩個變數。
+  - 所以不用包裝腳本：`up` 經 sftp 把 key 放到那台的 `~\.windows-mcp\remote-access.key`，PowerShell 讀完就刪、寫進 `~\.windows-mcp\remote-access.toml`，task 的參數只有 `serve --config <那個檔>`；`down` 會刪掉這個檔。
+- **不加 `--allow-insecure-remote`**：
+  - prototype 有加。照 `__main__.py`，有 `auth_key` 時綁 `0.0.0.0` 本來就不會被拒絕。
+  - `0.0.0.0` 也不做 Host 檢查，加不加行為一樣。
+  - 只在實機驗收時確認。
+- **key 走 sftp，不走 PowerShell 的 stdin**（2026-11-27 henry-desktop 實測）：
+  - `ssh <host> powershell -EncodedCommand …` 讀 `[Console]::In.ReadLine()`，8 次裡有 2 次一直收不到、卡到逾時，長短腳本都會。
+  - 改成 `sftp -b -` 把 key 放到那台的 `~\.windows-mcp\remote-access.key`，同一台連傳 5 次都成功。那台的 sshd 要開 sftp subsystem（Windows OpenSSH 預設有）。
+- **mise shim 起的 windows-mcp 有 4 層行程**（shim → python → python → 聽 port 的 python）：只殺聽 port 的那個，port 可能還被佔著。`down` 會把命令列帶 `remote-access.toml` 的行程都收掉。
+- **常駐 task 不再用時手動刪**：`keep: true` 的 task 在 `down` 之後也留著（在那台的「工作排程器」根目錄看得到 `remote-access-windows-mcp`）。
+  先 `remote-access down`，再在那台跑 `Unregister-ScheduledTask -TaskName remote-access-windows-mcp -Confirm:$false`；之後要再用就重新 `up --create-task`。
 
 ## Funnel 專屬
 

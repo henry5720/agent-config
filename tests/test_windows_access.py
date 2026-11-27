@@ -151,7 +151,8 @@ def auth_call(host):
 
 @unittest.skipUnless(PWSH, "沒有 PowerShell")
 class WindowsMcpHttpTest(unittest.TestCase):
-    """windows-mcp-http.ps1 start|stop|auth-header：key 不印出來、先停再換 key、--host 傳到 auth 和 serve。"""
+    """windows-mcp-http.ps1 start|stop|rotate|auth-header：key 不印出來、rotate 先停再換 key、stop 不換、
+    --host 傳到 auth 和 serve、有 --ip-allowlist 時不查防火牆。"""
 
     def setUp(self):
         tmp = tempfile.TemporaryDirectory()
@@ -208,7 +209,7 @@ class WindowsMcpHttpTest(unittest.TestCase):
     def test_help(self):
         result = self.run_ps("--help")
         self.assertEqual(result.returncode, 0, result.stderr)
-        for word in ("start", "stop", "auth-header", "--host"):
+        for word in ("start", "stop", "rotate", "auth-header", "--host", "--ip-allowlist"):
             self.assertIn(word, result.stdout)
         self.assertEqual(self.calls(), [])
 
@@ -271,12 +272,12 @@ class WindowsMcpHttpTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.calls(), [])
 
-    def test_stop_stops_server_before_rotating_key_back_to_loopback(self):
+    def test_stop_stops_server_and_keeps_key(self):
         (self.state / "listening").touch()
         result = self.run_ps("stop")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.calls(), ["stop 4242", auth_call("127.0.0.1")])
-        self.assertNotEqual(self.key(), KEY)
+        self.assertEqual(self.calls(), ["stop 4242"])
+        self.assertEqual(self.key(), KEY)
         self.assertIn("還在聽 8000 的程式：0", result.stdout)
         self.assert_no_key(result)
 
@@ -288,13 +289,42 @@ class WindowsMcpHttpTest(unittest.TestCase):
         self.assertIn("4242", result.stderr)
         self.assertIn("python.exe", result.stderr)
         self.assertNotIn("已收掉", result.stdout)
+        self.assertEqual(self.key(), KEY)
+
+    def test_rotate_stops_server_before_rotating_key_back_to_loopback(self):
+        (self.state / "listening").touch()
+        result = self.run_ps("rotate")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.calls(), ["stop 4242", auth_call("127.0.0.1")])
+        self.assertNotEqual(self.key(), KEY)
+        self.assertIn("key 已換新", result.stdout)
+        self.assert_no_key(result)
+
+    def test_rotate_still_rotates_when_another_program_holds_the_port(self):
+        (self.state / "listening").touch()
+        result = self.run_ps("rotate", FAKE_PROC_NAME="python.exe", FAKE_PROC_CMDLINE="python.exe -m http.server 8000")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("stop 4242", self.calls())
         # 交出去的 key 照樣作廢
         self.assertNotEqual(self.key(), KEY)
 
-    def test_stop_fails_when_key_not_rotated(self):
-        result = self.run_ps("stop", FAKE_AUTH_BROKEN="1")
+    def test_rotate_fails_when_key_not_rotated(self):
+        result = self.run_ps("rotate", FAKE_AUTH_BROKEN="1")
         self.assertNotEqual(result.returncode, 0)
         self.assertNotIn("已收掉", result.stdout)
+
+    def test_start_with_allowlist_skips_firewall_check_and_passes_it_to_serve(self):
+        result = self.run_ps("start", "--ip-allowlist", "100.100.7.68,100.64.0.2", FAKE_FIREWALL_ALLOW="1",
+                             FAKE_FW_PROGRAM="Any", FAKE_FW_PORT="Any")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.calls(), [auth_call("0.0.0.0"),
+                                        "serve --host 0.0.0.0 --ip-allowlist 100.100.7.68,100.64.0.2"])
+        self.assert_no_key(result)
+
+    def test_start_rejects_allowlist_that_is_not_ips(self):
+        result = self.run_ps("start", "--ip-allowlist", "'1.2.3.4;calc'")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.calls(), [])
 
     def test_auth_header_prints_bearer_line(self):
         result = self.run_ps("auth-header")
