@@ -8,7 +8,7 @@ description: herdr 的個人用法：開或收 git worktree（EnterWorktree、gi
 官方 `herdr` skill 管 CLI 怎麼用；這份只寫使用者的偏好和實際踩過的雷。
 
 - 要在已配置主機上跑 **HITL 操作**（改狀態、跑很久、含人工步驟）：讀 [hitl.md](hitl.md)。
-- 要起、停或重起 Windows 已配置主機的 herdr server，或 client 連上去回「存取被拒」、pane 的提示列是 Administrator：讀 [server.md](server.md)。
+- Windows 已配置主機的 herdr server：要在 pane 裡操作桌面（GUI、截圖）、桌面 terminal 連 herdr 回「存取被拒」、要起或重起 server：讀 [server.md](server.md)。
 
 ## Worktree：什麼時候開
 
