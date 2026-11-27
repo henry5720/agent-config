@@ -8,6 +8,7 @@ tailscale、cloudflared、curl、sudo 都換成 PATH 上的假指令（見 FAKE_
 假 powershell.exe 模擬從 WSL 叫 Windows 的程式：它開的 tailscale／cloudflared 在 powershell.exe 被停掉後還在跑。
 """
 import os
+import re
 import select
 import signal
 import subprocess
@@ -630,6 +631,9 @@ with open(st / "calls", "a") as f:
 if argv[0] == "-G":
     print("hostname " + os.environ.get("FAKE_HOSTNAME", "__WIN_HOST__"))
     sys.exit(0)
+host = argv[argv.index("powershell") - 1] if "powershell" in argv else ""
+if os.environ.get("FAKE_ONLY_HOST") and host != os.environ["FAKE_ONLY_HOST"]:
+    sys.exit(255)
 if "-EncodedCommand" not in argv:
     sys.exit("fake ssh: 只認 -EncodedCommand")
 script = base64.b64decode(argv[argv.index("-EncodedCommand") + 1]).decode("utf-16-le")
@@ -695,7 +699,7 @@ if [ "$header" = "Authorization: Bearer $(cat "$state/config")" ]; then printf 2
 """
 
 
-class ServeTest(unittest.TestCase):
+class ServeFakes(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
@@ -730,6 +734,8 @@ class ServeTest(unittest.TestCase):
     def has(self, name):
         return (self.state / name).exists()
 
+
+class ServeTest(ServeFakes):
     def test_up_starts_server_opens_serve_and_verifies(self):
         code, out = self.run_cli([*UP, "windows-mcp", "box", "--create-task"])
         self.assertEqual(code, 0, out)
@@ -878,6 +884,127 @@ class ServeTest(unittest.TestCase):
         code, out = self.run_cli([sys.executable, str(ENTRY), "--help"])
         self.assertIn("up", out)
         self.assertIn("down", out)
+
+
+# ==========================================================================
+# key init／rotate：agent 那台的固定 key（HOME 指到暫存目錄，不碰真的 auth.env）
+# ==========================================================================
+
+KEY_CMD = [sys.executable, str(ENTRY), "key"]
+
+
+class KeyTest(ServeFakes):
+    def setUp(self):
+        super().setUp()
+        self.auth_env = Path(self.env["HOME"]) / ".config" / "windows-mcp" / "auth.env"
+        # 只有 box 是 Windows；其他 host 的 ssh 連不上
+        self.env["FAKE_ONLY_HOST"] = "box"
+
+    def saved(self, name="WINDOWS_MCP_AUTH_KEY"):
+        m = re.search(rf"^export {name}='([^']+)'$", self.auth_env.read_text(), re.M)
+        return m.group(1) if m else None
+
+    def test_init_writes_private_auth_env_without_printing_key(self):
+        code, out = self.run_cli([*KEY_CMD, "init"])
+        self.assertEqual(code, 0, out)
+        key = self.saved()
+        self.assertRegex(key, r"^[A-Za-z0-9_-]{32,}$")
+        self.assertEqual(self.auth_env.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(self.auth_env.parent.stat().st_mode & 0o777, 0o700)
+        self.assertNotIn(key, out)
+        self.assertIn("重開 session", out)
+
+    def test_init_does_not_overwrite_without_force(self):
+        self.run_cli([*KEY_CMD, "init"])
+        first = self.saved()
+        code, out = self.run_cli([*KEY_CMD, "init"])
+        self.assertEqual(code, 1, out)
+        self.assertIn("--force", out)
+        self.assertEqual(self.saved(), first)
+        code, out = self.run_cli([*KEY_CMD, "init", "--force"])
+        self.assertEqual(code, 0, out)
+        self.assertNotEqual(self.saved(), first)
+
+    def test_init_key_env_adds_another_variable_and_keeps_the_rest(self):
+        self.run_cli([*KEY_CMD, "init"])
+        first = self.saved()
+        code, out = self.run_cli([*KEY_CMD, "init", "--key-env", "CLIENT_KEY"])
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.saved(), first)
+        self.assertRegex(self.saved("CLIENT_KEY"), r"^[A-Za-z0-9_-]{32,}$")
+        self.assertNotEqual(self.saved("CLIENT_KEY"), first)
+
+    def test_key_cannot_be_given_on_the_command_line(self):
+        for action in ("init", "rotate"):
+            code, out = self.run_cli([*KEY_CMD, action, "--key", "typed-key-0123456789"])
+            self.assertNotEqual(code, 0, out)
+        self.assertFalse(self.auth_env.exists())
+        code, out = self.run_cli([*KEY_CMD, "init", "--key-env", "not a name"])
+        self.assertEqual(code, 1, out)
+
+    def test_rotate_without_key_says_to_init(self):
+        code, out = self.run_cli([*KEY_CMD, "rotate"])
+        self.assertEqual(code, 1, out)
+        self.assertIn("key init", out)
+
+    def up_with_saved_key(self, name="WINDOWS_MCP_AUTH_KEY"):
+        self.run_cli([*KEY_CMD, "init", "--key-env", name])
+        self.env[name] = self.saved(name)
+        code, out = self.run_cli([*UP, "windows-mcp", "box", "--create-task", "--key-env", name])
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.read("config"), self.saved(name))
+
+    def test_rotate_saves_new_key_and_syncs_connected_machines(self):
+        self.up_with_saved_key()
+        old = self.saved()
+        code, out = self.run_cli([*KEY_CMD, "rotate"])
+        self.assertEqual(code, 0, out)
+        new = self.saved()
+        self.assertNotEqual(new, old)
+        self.assertEqual(self.read("config"), new)
+        self.assertIn("box", out)
+        self.assertIn("重開 session", out)
+        self.assertEqual(self.auth_env.stat().st_mode & 0o777, 0o600)
+        for where in (out, self.read("calls"), self.read("scripts")):
+            self.assertNotIn(new, where)
+            self.assertNotIn(old, where)
+
+    def test_rotate_leaves_machines_using_another_key_alone(self):
+        self.up_with_saved_key("CLIENT_KEY")
+        client = self.saved("CLIENT_KEY")
+        self.run_cli([*KEY_CMD, "init"])
+        code, out = self.run_cli([*KEY_CMD, "rotate"])
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.read("config"), client)
+        self.assertEqual(self.read("scripts").count("# remote-access:start"), 1)
+
+    def test_rotate_key_env_rotates_that_variable_only(self):
+        self.run_cli([*KEY_CMD, "init"])
+        main = self.saved()
+        self.up_with_saved_key("CLIENT_KEY")
+        client = self.saved("CLIENT_KEY")
+        code, out = self.run_cli([*KEY_CMD, "rotate", "--key-env", "CLIENT_KEY"])
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.saved(), main)
+        self.assertNotEqual(self.saved("CLIENT_KEY"), client)
+        self.assertEqual(self.read("config"), self.saved("CLIENT_KEY"))
+
+    def test_rotate_dry_run_changes_nothing(self):
+        self.up_with_saved_key()
+        old = self.saved()
+        code, out = self.run_cli([*KEY_CMD, "rotate", "--dry-run"])
+        self.assertEqual(code, 0, out)
+        self.assertIn("box", out)
+        self.assertEqual(self.saved(), old)
+        self.assertEqual(self.read("config"), old)
+
+    def test_rotate_fails_when_a_machine_cannot_be_synced(self):
+        self.up_with_saved_key()
+        self.env["FAKE_NO_LISTEN"] = "1"
+        code, out = self.run_cli([*KEY_CMD, "rotate"])
+        self.assertEqual(code, 1, out)
+        # 新 key 已經存下來：重跑 up 就能補
+        self.assertIn("up windows-mcp box", out)
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@
 
   remote-access up <服務> <host> …                                 在那台起服務、開 serve、驗證
   remote-access down <服務> <host>                                 收掉那台的服務和 serve
+  remote-access key <init|rotate>                                  agent 這台的固定 key：產生、換新並同步
   remote-access funnel <open|verify|check-closed|close> …        Tailscale Funnel
   remote-access quick-tunnel <open|verify|check-closed|close> …  Cloudflare quick tunnel
 
@@ -20,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 SUBCOMMANDS = {
     "funnel": "remote_access_funnel", "quick-tunnel": "remote_access_quick_tunnel",
-    "up": "remote_access_service", "down": "remote_access_service",
+    "up": "remote_access_service", "down": "remote_access_service", "key": "remote_access_key",
 }
 
 

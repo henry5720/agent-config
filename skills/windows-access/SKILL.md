@@ -1,6 +1,6 @@
 ---
 name: windows-access
-description: 讓 agent 操作一台 Windows 桌面（截圖、點擊、打字）：同一台用 stdio 的 windows-mcp；別台起 Windows-MCP 的 HTTP server、換 key、交 key，用完收掉並換 key。要操作某台 Windows 的 GUI app、在那台起或收 windows-mcp server、設定接別台 Windows 的 MCP 時使用。
+description: 讓 agent 操作一台 Windows 桌面（截圖、點擊、打字）：同一台用 stdio 的 windows-mcp；別台起 Windows-MCP 的 HTTP server、換 key、交 key，用完收掉，交出去的 key 要作廢時 rotate。要操作某台 Windows 的 GUI app、在那台起或收 windows-mcp server、設定接別台 Windows 的 MCP 時使用。
 ---
 
 # windows-access
@@ -55,8 +55,8 @@ Invoke-WebRequest -UseBasicParsing https://raw.githubusercontent.com/henry5720/a
    powershell -NoProfile -ExecutionPolicy Bypass -File <script> stop
    ```
 
-   它停掉聽 8000 的 windows-mcp，再換 key、設定改回 `127.0.0.1`，交出去的那把就作廢了。聽 8000 的不是 windows-mcp 時它不停那支，列出 PID 和程式名後 exit 1：照轉達給使用者，由他處理，不要自己停它。
-   完成條件：印出 `還在聽 8000 的程式：0（要 0）` 和 `已收掉，key 已換新`。
+   它停掉聽 8000 的 windows-mcp，key 不換。交出去的 key 要作廢（用聊天訊息交過、懷疑外洩）時改跑 `rotate`：先停，再換 key、設定改回 `127.0.0.1`。聽 8000 的不是 windows-mcp 時它不停那支，列出 PID 和程式名後 exit 1：照轉達給使用者，由他處理，不要自己停它。
+   完成條件：印出 `還在聽 8000 的程式：0（要 0）` 和 `已收掉（key 沒換）`；`rotate` 是 `已收掉，key 已換新`。
 
 實測紀錄：2026-11-05 在 henry-laptop 手動貼同樣的指令，server 跑著時 `auth --force` 換的 key 不生效、舊 key 仍回 `200`，所以 script 一定先停再換。2026-11-22 在一台客戶的 Windows 主機（PowerShell 5.1，windows-mcp 用 uv tool 裝、經 PATH 找到）跑這支 script：`stop`、`auth-header` 從 ssh 跑可以，`start` 照上面要在桌面 session 跑；經 ssh 轉發不帶 key `401`、帶 key `200`，`windows-mcp-remote` 連得上、看得到 tools；`stop` 換 key 後重起，舊 key `401`、新 key `200`。
 
@@ -77,7 +77,7 @@ MCP streamable HTTP 用 SSE 回應（`initialize`、`tools/list` 回 `text/event
 
 ### 交 key 和交代 agent
 
-- **交 key**：`start` 已經把 key 複製到那台的剪貼簿。請使用者交給對方 agent 的使用者，設成啟動 agent 的 shell 的環境變數 `WINDOWS_MCP_AUTH_KEY`（見下面〈客戶端設定〉）。agent 自己讀 key、或把 key 傳到別的服務，都要先取得使用者明說同意。用聊天訊息交的話，用完一定要 `stop` 換 key。`config.toml` 開在畫面上時 key 會被 `Screenshot` 拍進去，真的用記事本開過就立刻關掉。
+- **交 key**：`start` 已經把 key 複製到那台的剪貼簿。請使用者交給對方 agent 的使用者，設成啟動 agent 的 shell 的環境變數 `WINDOWS_MCP_AUTH_KEY`（見下面〈客戶端設定〉）。agent 自己讀 key、或把 key 傳到別的服務，都要先取得使用者明說同意。用聊天訊息交的話，用完一定要 `rotate` 換 key。`config.toml` 開在畫面上時 key 會被 `Screenshot` 拍進去，真的用記事本開過就立刻關掉。
 - **交代 agent**：endpoint 是連線給的網址（結尾 `/mcp`）；先跑 `tools/list` 和 `Screenshot`。`PowerShell`、`Registry`、`FileSystem` 寫入，要使用者同意才用。
 
 ### 客戶端設定
@@ -88,7 +88,7 @@ MCP streamable HTTP 用 SSE 回應（`initialize`、`tools/list` 回 `text/event
 - **換 key 要重開 session**：client 只在啟動時讀環境變數。
 - **本機 18000 被佔**（ssh 報 `Address already in use`、或 `ExitOnForwardFailure` 直接結束）：回報使用者是哪支程式佔著，port 維持 18000。換 port 會跟 MCP 設定對不上，可能連到錯的 server。
 - **同一時間只接一台**：要接另一台，先收掉現在這條轉發。
-- **收舊設定**：之前用 `claude mcp add` 自己加過的 local scope 設定（key 原文在裡面），等 `windows-mcp-remote` 驗證過（`/mcp` 看得到 tools）後，用 `claude mcp remove <名字> -s local` 收掉，再在那台跑 `stop` 換 key，讓舊設定裡那把作廢。
+- **收舊設定**：之前用 `claude mcp add` 自己加過的 local scope 設定（key 原文在裡面），等 `windows-mcp-remote` 驗證過（`/mcp` 看得到 tools）後，用 `claude mcp remove <名字> -s local` 收掉，再在那台跑 `rotate` 換 key，讓舊設定裡那把作廢。
 
 ## 操作時
 

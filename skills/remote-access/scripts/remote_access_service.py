@@ -170,7 +170,7 @@ def win(host, script, stdin=None):
     """經 ssh 在那台跑 PowerShell，回 (exit code, {key: value})。只認 ASCII 的 key=value 行，其他（CLIXML、中文）略過。"""
     encoded = base64.b64encode(script.encode("utf-16-le")).decode()
     p = subprocess.run(
-        ["ssh", "-o", "BatchMode=yes", host, "powershell", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
+        ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", host, "powershell", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
         input=(stdin + "\n") if stdin else "", capture_output=True, text=True, errors="replace",
     )
     out = {}
@@ -217,6 +217,19 @@ def resolve(args):
     return svc
 
 
+def serve_check(svc, key_env):
+    """給 verify 的參數：照服務定義的 verify，key 從環境變數 key_env 讀。"""
+    v = svc["verify"]
+    curl_args = [a for h in v.get("headers", []) for a in ("-H", h)]
+    if "body" in v:
+        curl_args += ["-X", "POST", "--data-raw", v["body"]]
+    return SimpleNamespace(
+        path=v.get("path", "/"), expect_without=str(v["expect_without"]), expect_with=str(v["expect_with"]),
+        # header 指令只引用變數名稱，key 不進參數
+        auth_header_cmd=f'printf "Authorization: Bearer %s\\n" "${key_env}"', curl_args=curl_args,
+    )
+
+
 def cmd_up(args):
     svc = resolve(args)
     key_env = args.key_env or svc["key"]["env"]
@@ -239,15 +252,7 @@ def cmd_up(args):
     if not allow:
         die(f"{args.service} 的 allow 是空的：serve 模式要列允許連進來的 agent 機器")
     url = f"https://{hostname}"
-    v = svc["verify"]
-    curl_args = [a for h in v.get("headers", []) for a in ("-H", h)]
-    if "body" in v:
-        curl_args += ["-X", "POST", "--data-raw", v["body"]]
-    check = SimpleNamespace(
-        path=v.get("path", "/"), expect_without=str(v["expect_without"]), expect_with=str(v["expect_with"]),
-        # header 指令只引用變數名稱，key 不進參數
-        auth_header_cmd=f'printf "Authorization: Bearer %s\\n" "${key_env}"', curl_args=curl_args,
-    )
+    check = serve_check(svc, key_env)
     if args.dry_run:
         say(f"[dry-run] {args.host}：{svc['task']['name']} task 起 {args.service}（0.0.0.0:{svc['port']}，"
             f"allowlist {','.join(allow)}），tailscale serve → {url}{check.path}，key 從 {key_env}")
