@@ -40,6 +40,8 @@
   - prototype 有加。照 `__main__.py`，有 `auth_key` 時綁 `0.0.0.0` 本來就不會被拒絕。
   - `0.0.0.0` 也不做 Host 檢查，加不加行為一樣。
   - 只在實機驗收時確認。
+- **常駐 task 不再用時手動刪**：`keep: true` 的 task 在 `down` 之後也留著（在那台的「工作排程器」根目錄看得到 `remote-access-windows-mcp`）。
+  先 `remote-access down`，再在那台跑 `Unregister-ScheduledTask -TaskName remote-access-windows-mcp -Confirm:$false`；之後要再用就重新 `up --create-task`。
 
 ## Funnel 專屬
 
