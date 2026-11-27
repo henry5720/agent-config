@@ -1,28 +1,10 @@
----
-name: pms-tracking
-description: 在 PMS 開、更新給 PM 看的追蹤單，讓 PM 不用看 GitHub 也能掌握進度。使用者說「PMS 開單／開追蹤單」「同步進度到 PMS」「問題轉工作」時使用；從 GitHub map 開單、需要在 PMS 留一份給 PM 看時也用。
----
-
 # PMS 追蹤單
 
 **追蹤單**是 PM 在 PMS 上看進度的那一張：用白話列出大項目，完成一項就打勾。內容的權威在 GitHub（map 或 issue），PMS 只放給 PM 看的摘要，並附上 GitHub 連結。
 
-## 連線
-
-- 用 `pms` MCP；專案追蹤、自己的子任務與工時共用這個連線。
-- 這個 session 載不到 PMS 工具時（`ToolSearch` 找不到），就用 headless 跑：
-
-  ```bash
-  claude -p --allowedTools 'mcp__pms' < prompt.txt
-  ```
-
-  - prompt 從 stdin 傳。`--allowedTools` 會把後面的參數全部吃掉，所以 prompt 不能直接接在後面。
-  - 寫入的 prompt 要寫死 `clientMutationId`（UUIDv4），並要求它讀回驗證、回報 id 和 version。
-  - 先跑一次唯讀的，確認專案、權限和現有的單。
-
 ## 步驟
 
-1. **找專案與權限**：用 `get_my_context` 確認身分與 capabilities，再用專案名稱找到 `projectId`。名稱對不上時列出候選，不要自己猜 ID。
+1. **找專案與權限**：用 `get_my_context` 確認身分與 capabilities，再照 SKILL.md〈找目標〉找到 `projectId`。
 2. **找現有追蹤單**：先看 GitHub 端有沒有「PM 追蹤」那行連結（map 寫在 Notes）。沒有的話，在專案裡依標題找。找到就走步驟 4，否則走步驟 3。
 3. **建立**，依權限擇一：
    - 有 `project:work.create`：建**工作**，大項目放 checklist（`set_checklist`）。
