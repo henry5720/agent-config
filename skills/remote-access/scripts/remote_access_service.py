@@ -1,17 +1,23 @@
-"""照 services.yaml 在別台起、收服務：up、down。
+"""照 services.yaml 在別台起、收、查服務：up、down、ps。
 
   remote-access up <服務> <host> [--create-task] [--key-env <變數>] [--dry-run]
   remote-access down <服務> <host> [--dry-run]
+  remote-access ps [<服務> [<host>]]
 
 <服務> 是 skill 資料夾 services.yaml 的 services 底下的名稱；<host> 是 ssh config 的 Host。
 
 up（serve 模式）：經 ssh 確認那台有人登入桌面（needs_desktop）→ key 經 ssh 的 stdin 寫到那台的設定檔 →
 `schtasks /run` 常駐的 Interactive task 起 server → `tailscale serve --bg` → 從這邊打 ts.net 網址驗證
 （不帶 key、帶 key 各回 verify 寫的碼）。驗證不過就收掉起了一半的東西、exit 1。已經起好而且驗證過就只回報。
+成功時印 mcp.yaml 裡網址對得上的 MCP 名稱。
 第一次在那台建常駐 task 要加 --create-task（它會一直留在那台，先問使用者）。
 
 down：停 task 和聽那個 port 的服務行程、關掉轉到那個 port 的 serve、刪掉那台的設定檔（裡面有 key）；
 task 照 keep 留著或刪掉。本來就沒開也 exit 0。
+
+ps：對 ssh config 裡 HostName 是 ts.net 的 host 逐台查（serve 狀態、port 有沒有在聽），列出在跑的服務、host、
+mode、網址、MCP 名稱、驗證結果。用查的，不記狀態檔；只查不動那台。key 的環境變數沒設就不驗證。
+ssh 連不上的 host 不列。
 
 key 從環境變數讀（services.yaml 的 key.env，--key-env 可以改讀別的變數），不接受從參數輸入；
 不出現在任何指令參數、task 定義、輸出裡。送去 Windows 的 PowerShell 一律用 -EncodedCommand，
@@ -19,14 +25,18 @@ key 從環境變數讀（services.yaml 的 key.env，--key-env 可以改讀別�
 
 環境變數：
   EXPOSE_PORT_PROBE_INTERVAL   驗證時每次重試間隔秒數，預設 3（測試設 0）
+  REMOTE_ACCESS_MCP_FILE       找 MCP 名稱用的 mcp.yaml，預設 ~/.config/skillshare/mcp.yaml
 """
 import argparse
 import base64
+import contextlib
+import io
 import ipaddress
 import os
 import re
 import subprocess
 import sys
+import unicodedata
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -50,6 +60,26 @@ def load_services():
     except ImportError:
         die("讀 services.yaml 要 PyYAML：python3 -m pip install --user PyYAML（或用系統套件 python3-yaml）")
     return yaml.safe_load(SERVICES_FILE.read_text())["services"]
+
+
+def mcp_name(url):
+    """mcp.yaml 裡 url 是這個網址的條目名稱；沒有回空字串。"""
+    import yaml
+    path = Path(os.environ.get("REMOTE_ACCESS_MCP_FILE") or Path.home() / ".config" / "skillshare" / "mcp.yaml")
+    try:
+        servers = yaml.safe_load(path.read_text())["servers"] or {}
+    except (OSError, KeyError, TypeError, yaml.YAMLError):
+        return ""
+    return next((name for name, s in servers.items() if (s or {}).get("url") == url), "")
+
+
+def say_mcp(url, key_env):
+    name = mcp_name(url)
+    if name:
+        say(f"MCP：{name}（key 用 {key_env}），在 session 裡打 /mcp 重連")
+    else:
+        say(f"mcp.yaml 沒有網址是 {url} 的條目：用 skillshare mcp add 加一筆（bearerToken fromEnv {key_env}），"
+            "sync 後在 session 裡打 /mcp 重連")
 
 
 def ssh_hosts():
@@ -170,7 +200,7 @@ def win(host, script, stdin=None):
     """經 ssh 在那台跑 PowerShell，回 (exit code, {key: value})。只認 ASCII 的 key=value 行，其他（CLIXML、中文）略過。"""
     encoded = base64.b64encode(script.encode("utf-16-le")).decode()
     p = subprocess.run(
-        ["ssh", "-o", "BatchMode=yes", host, "powershell", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
+        ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", host, "powershell", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
         input=(stdin + "\n") if stdin else "", capture_output=True, text=True, errors="replace",
     )
     out = {}
@@ -217,6 +247,18 @@ def resolve(args):
     return svc
 
 
+def verify_check(svc, key_env):
+    v = svc["verify"]
+    curl_args = [a for h in v.get("headers", []) for a in ("-H", h)]
+    if "body" in v:
+        curl_args += ["-X", "POST", "--data-raw", v["body"]]
+    return SimpleNamespace(
+        path=v.get("path", "/"), expect_without=str(v["expect_without"]), expect_with=str(v["expect_with"]),
+        # header 指令只引用變數名稱，key 不進參數
+        auth_header_cmd=f'printf "Authorization: Bearer %s\\n" "${key_env}"', curl_args=curl_args,
+    )
+
+
 def cmd_up(args):
     svc = resolve(args)
     key_env = args.key_env or svc["key"]["env"]
@@ -239,15 +281,7 @@ def cmd_up(args):
     if not allow:
         die(f"{args.service} 的 allow 是空的：serve 模式要列允許連進來的 agent 機器")
     url = f"https://{hostname}"
-    v = svc["verify"]
-    curl_args = [a for h in v.get("headers", []) for a in ("-H", h)]
-    if "body" in v:
-        curl_args += ["-X", "POST", "--data-raw", v["body"]]
-    check = SimpleNamespace(
-        path=v.get("path", "/"), expect_without=str(v["expect_without"]), expect_with=str(v["expect_with"]),
-        # header 指令只引用變數名稱，key 不進參數
-        auth_header_cmd=f'printf "Authorization: Bearer %s\\n" "${key_env}"', curl_args=curl_args,
-    )
+    check = verify_check(svc, key_env)
     if args.dry_run:
         say(f"[dry-run] {args.host}：{svc['task']['name']} task 起 {args.service}（0.0.0.0:{svc['port']}，"
             f"allowlist {','.join(allow)}），tailscale serve → {url}{check.path}，key 從 {key_env}")
@@ -265,6 +299,7 @@ def cmd_up(args):
     if state.get("listen") == "ours" or state.get("serve") == "ours":
         if verify(check, url, public_dns=False):
             say(f"{args.service} 在 {args.host} 已經起好：{url}{check.path}")
+            say_mcp(url + check.path, key_env)
             return
         say("上一輪起的沒通過驗證，收掉重起")
         stop(args.host, svc)
@@ -288,8 +323,8 @@ def cmd_up(args):
     if not verify(check, url, public_dns=False):
         stop(args.host, svc)
         die("驗證沒過，起了一半的已收掉。看 remote-access 的 reference.md")
-    say(f"網址：{url}{check.path}（MCP 的 key 用 {key_env}）")
-    say("MCP 設定指到這個網址後，在 session 裡打 /mcp 重連")
+    say(f"網址：{url}{check.path}")
+    say_mcp(url + check.path, key_env)
 
 
 def cmd_down(args):
@@ -304,9 +339,59 @@ def cmd_down(args):
     say(f"{args.service} 在 {args.host} 已收乾淨" if was else f"{args.service} 在 {args.host} 本來就沒開")
 
 
+def ps_serve(svc, host):
+    """serve 模式的一列：(網址, MCP 名稱, 驗證)；那台沒在跑或連不上回 None。"""
+    hostname = ssh_hostname(host)
+    if not hostname.endswith(".ts.net"):
+        return None
+    state = probe(host, svc)
+    if state.get("listen") != "ours" and state.get("serve") != "ours":
+        return None
+    key_env = svc["key"]["env"]
+    check = verify_check(svc, key_env)
+    url = f"https://{hostname}{check.path}"
+    if not os.environ.get(key_env):
+        result = f"沒驗證（{key_env} 沒設）"
+    else:
+        with contextlib.redirect_stdout(io.StringIO()):  # verify 的過程訊息不混進表格
+            result = "通過" if verify(check, f"https://{hostname}", public_dns=False) else "沒通過"
+    return url, mcp_name(url), result
+
+
+# 每種 mode 怎麼查；forward 由 #145 加（查 ssh -O check、本機 port）
+PS_BY_MODE = {"serve": ps_serve}
+
+
+def cmd_ps(args):
+    services = load_services()
+    names = [args.service] if args.service else [n for n, s in services.items() if s.get("mode") in PS_BY_MODE]
+    rows = []
+    for name in names:
+        for host in [args.host] if args.host else ssh_hosts():
+            svc = resolve(SimpleNamespace(service=name, host=host))
+            row = PS_BY_MODE[svc["mode"]](svc, host)
+            if row:
+                rows.append((name, host, svc["mode"], *row))
+    if not rows:
+        say("沒有在跑的服務（ssh 連不上的 host 不列）")
+        return
+    rows.insert(0, ("服務", "host", "mode", "網址或本機 port", "MCP", "驗證"))
+    # 中文字在終端機佔兩格
+    width = lambda c: sum(2 if unicodedata.east_asian_width(ch) in "WF" else 1 for ch in c)
+    widths = [max(width(r[i]) for r in rows) for i in range(len(rows[0]))]
+    for r in rows:
+        say("  ".join(c + " " * (w - width(c)) for c, w in zip(r, widths)).rstrip())
+
+
 def main(argv, prog):
     cmd = prog.split()[-1]
     parser = argparse.ArgumentParser(prog=prog, description=__doc__.split("\n\n")[0])
+    if cmd == "ps":
+        parser.add_argument("service", nargs="?", help="只查這個服務（預設全部）")
+        parser.add_argument("host", nargs="?", help="只查這台（預設 ssh config 裡 HostName 是 ts.net 的全部）")
+        args = parser.parse_args(argv)
+        sys.stdout.reconfigure(line_buffering=True)
+        return cmd_ps(args)
     parser.add_argument("service", help="services.yaml 裡的服務名稱")
     parser.add_argument("host", help="ssh config 的 Host")
     parser.add_argument("--dry-run", action="store_true", help="只印要做什麼，不連那台")
