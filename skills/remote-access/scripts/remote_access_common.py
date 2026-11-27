@@ -1,4 +1,4 @@
-"""remote-access funnel 與 quick-tunnel 共用的部分：輸出、跑指令、參數、從公網驗證開著或收掉、
+"""remote-access 各子命令（funnel、quick-tunnel、up）共用的部分：輸出、跑指令、參數、驗證開著或收掉、
 停 Windows 那邊的程式。
 
 不是可以直接跑的腳本。兩支腳本用 `Path(__file__).resolve().parent` 把這個目錄加進 sys.path 再 import，
@@ -90,11 +90,12 @@ def probe(url, ip, curl_args, header_file=None):
     return run(cmd).stdout.strip() or "000"
 
 
-def verify(args, base_url, ip=""):
+def verify(args, base_url, ip="", public_dns=True):
     """從公網打 base_url + args.path：不帶驗證要回 args.expect_without，帶了要回 args.expect_with。
 
     驗證 header 由 args.auth_header_cmd 印出，寫進只有自己讀得到的暫存檔再用 `curl -H @檔案` 帶，
-    不會出現在 curl 的參數裡。沒給 ip 時每次重試前再查一次公開 DNS。
+    不會出現在 curl 的參數裡。沒給 ip 時每次重試前再查一次公開 DNS；public_dns=False（tailnet 內的
+    serve 網址）就照本機 DNS 打。
     """
     host = urlsplit(base_url).hostname
     url = base_url.rstrip("/") + args.path
@@ -109,7 +110,7 @@ def verify(args, base_url, ip=""):
             f.write(header.stdout.strip().splitlines()[0] + "\n")
         # 公開網址剛開要幾秒才通，等到不帶驗證的回應符合預期
         for i in range(PROBE_TRIES):
-            ip = ip or public_ip(host)
+            ip = ip or (public_ip(host) if public_dns else "")
             without = probe(url, ip, args.curl_args)
             if without == args.expect_without:
                 break
@@ -118,7 +119,7 @@ def verify(args, base_url, ip=""):
         with_auth = probe(url, ip, args.curl_args, header_file)
     finally:
         os.unlink(header_file)
-    say(f"公網驗證：不帶驗證={without}（要 {args.expect_without}），帶驗證={with_auth}（要 {args.expect_with}）")
+    say(f"{'公網驗證' if public_dns else '驗證'}：不帶驗證={without}（要 {args.expect_without}），帶驗證={with_auth}（要 {args.expect_with}）")
     return without == args.expect_without and with_auth == args.expect_with
 
 

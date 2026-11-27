@@ -605,5 +605,280 @@ class EntryTest(FakeBinTest):
         self.assertNotEqual(result.returncode, 0)
 
 
+# ==========================================================================
+# up／down：serve 模式接一台 windows-mcp
+# ==========================================================================
+
+UP = [sys.executable, str(ENTRY), "up"]
+DOWN = [sys.executable, str(ENTRY), "down"]
+WIN_HOST = "box.tail123.ts.net"
+EC2_IP = "100.100.7.68"
+SERVE_KEY = "fixed-key-0123456789"
+
+# 假 ssh：`ssh -G <host>` 印 hostname；送去 Windows 的 PowerShell 一律是 -EncodedCommand，
+# 解開後照第一行的 `# remote-access:<動作>` 模擬那台。那台的狀態用檔案代表：
+#   desktop（有人登入桌面）、task（常駐 task 在）、listen（windows-mcp 聽著；內容 other:… 是別的程式）、
+#   serve（tailscale serve 開著；內容 other 是別人的）、config（server 讀的設定檔，內容是 stdin 收到的 key）
+# argv 記在 calls，解開的 script 記在 scripts，stdin 不記，方便檢查 key 沒進參數。
+FAKE_SSH = r"""#!/usr/bin/env python3
+import base64, os, sys
+from pathlib import Path
+st = Path(os.environ["FAKE_STATE"])
+argv = sys.argv[1:]
+with open(st / "calls", "a") as f:
+    f.write("ssh " + " ".join(argv) + "\n")
+if argv[0] == "-G":
+    print("hostname " + os.environ.get("FAKE_HOSTNAME", "__WIN_HOST__"))
+    sys.exit(0)
+if "-EncodedCommand" not in argv:
+    sys.exit("fake ssh: 只認 -EncodedCommand")
+script = base64.b64decode(argv[argv.index("-EncodedCommand") + 1]).decode("utf-16-le")
+with open(st / "scripts", "a") as f:
+    f.write(script + "\n=====\n")
+action = script.split("# remote-access:", 1)[1].split()[0]
+has = lambda n: (st / n).exists()
+read = lambda n: (st / n).read_text() if has(n) else ""
+def probe():
+    print("desktop=" + ("1" if has("desktop") else "0"))
+    print("task=" + ("1" if has("task") else "0"))
+    listen = read("listen")
+    print("listen=" + ("none" if not has("listen") else listen if listen.startswith("other") else "ours"))
+    print("serve=" + ("none" if not has("serve") else "other" if read("serve") == "other" else "ours"))
+# 模擬 PowerShell 5.1 經 ssh 的雜訊：CLIXML 進度訊息、Big5 中文
+sys.stdout.buffer.write("#< CLIXML\n準備中\n".encode("big5"))
+sys.stdout.flush()
+if action == "probe":
+    probe()
+elif action == "start":
+    key = sys.stdin.readline().strip()
+    if not has("task"):
+        if "$create = $true" not in script:
+            print("error=notask"); sys.exit(1)
+        (st / "task").write_text("")
+    (st / "config").write_text(key)
+    if os.environ.get("FAKE_NO_LISTEN"):
+        print("error=nolisten"); sys.exit(1)
+    (st / "listen").write_text("ours")
+    (st / "serve").write_text("ours")
+    print("started=1")
+elif action == "stop":
+    was = 0
+    if has("listen") and not read("listen").startswith("other"):
+        (st / "listen").unlink(); was = 1
+    if has("serve") and read("serve") != "other":
+        (st / "serve").unlink(); was = 1
+    if has("config"):
+        (st / "config").unlink()
+    if "$keep = $false" in script and has("task"):
+        (st / "task").unlink()
+    print(f"was_running={was}")
+""".replace("__WIN_HOST__", WIN_HOST)
+
+FAKE_SERVE_TAILSCALE = r"""#!/usr/bin/env bash
+echo "tailscale $*" >> "$FAKE_STATE/calls"
+if [ "$1 $2 $3" = "ip -4 company-ec2" ]; then echo "__EC2_IP__"; exit 0; fi
+exit 1
+""".replace("__EC2_IP__", EC2_IP)
+
+# 假 curl 打 serve 網址：windows-mcp 聽著、serve 開著時，帶的 key 跟那台 config 一樣回 200，否則 401；沒開回 000
+FAKE_SERVE_CURL = r"""#!/usr/bin/env bash
+state="$FAKE_STATE"
+printf 'curl' >> "$state/calls"; printf ' %q' "$@" >> "$state/calls"; echo >> "$state/calls"
+header=""
+while [ $# -gt 0 ]; do
+  if [ "$1" = -H ] && [ "${2:0:1}" = @ ]; then header=$(cat "${2:1}"); fi
+  shift
+done
+if [ -n "$FAKE_VERIFY_500" ]; then printf 500; exit 0; fi
+if [ ! -e "$state/serve" ] || [ "$(cat "$state/listen" 2>/dev/null)" != ours ]; then printf 000; exit 7; fi
+if [ "$header" = "Authorization: Bearer $(cat "$state/config")" ]; then printf 200; else printf 401; fi
+"""
+
+
+class ServeTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        root = Path(self.tmp.name)
+        self.state, self.bin, home = root / "state", root / "bin", root / "home"
+        for d in (self.state, self.bin, home / ".ssh"):
+            d.mkdir(parents=True)
+        (home / ".ssh" / "config").write_text(
+            "Host *\n  ServerAliveInterval 30\n\nHost box\n  HostName box.tail123.ts.net\n\nhost other-box\n")
+        for name, body in (("ssh", FAKE_SSH), ("tailscale", FAKE_SERVE_TAILSCALE), ("curl", FAKE_SERVE_CURL)):
+            path = self.bin / name
+            path.write_text(body)
+            path.chmod(0o755)
+        (self.state / "desktop").write_text("")
+        self.env = {
+            **os.environ,
+            "HOME": str(home),
+            "PATH": f"{self.bin}:{os.environ['PATH']}",
+            "FAKE_STATE": str(self.state),
+            "EXPOSE_PORT_PROBE_INTERVAL": "0",
+            "WINDOWS_MCP_AUTH_KEY": SERVE_KEY,
+        }
+
+    def run_cli(self, args):
+        result = subprocess.run(args, env=self.env, capture_output=True, text=True, timeout=30)
+        return result.returncode, result.stdout + result.stderr
+
+    def read(self, name):
+        path = self.state / name
+        return path.read_text() if path.exists() else ""
+
+    def has(self, name):
+        return (self.state / name).exists()
+
+    def test_up_starts_server_opens_serve_and_verifies(self):
+        code, out = self.run_cli([*UP, "windows-mcp", "box", "--create-task"])
+        self.assertEqual(code, 0, out)
+        self.assertIn("不帶驗證=401（要 401）", out)
+        self.assertIn("帶驗證=200（要 200）", out)
+        self.assertIn(f"https://{WIN_HOST}/mcp", out)
+        self.assertIn("/mcp 重連", out)
+        # key 經 stdin 到那台的設定檔；allowlist 是 company-ec2 的 tailnet IP
+        self.assertEqual(self.read("config"), SERVE_KEY)
+        self.assertIn(EC2_IP, self.read("scripts"))
+        self.assertTrue(self.has("task") and self.has("listen") and self.has("serve"))
+
+
+    def test_key_stays_out_of_argv_scripts_and_output(self):
+        code, out = self.run_cli([*UP, "windows-mcp", "box", "--create-task"])
+        self.assertEqual(code, 0, out)
+        code2, out2 = self.run_cli([*DOWN, "windows-mcp", "box"])
+        self.assertEqual(code2, 0, out2)
+        # calls 有 ssh／curl／tailscale 的參數，scripts 有送去那台的 PowerShell（含 task 定義）
+        for where in (out, out2, self.read("calls"), self.read("scripts")):
+            self.assertNotIn(SERVE_KEY, where)
+
+    def test_windows_commands_are_encoded(self):
+        self.run_cli([*UP, "windows-mcp", "box", "--create-task"])
+        ssh_calls = [c for c in self.read("calls").splitlines() if c.startswith("ssh ") and " -G " not in c]
+        self.assertTrue(ssh_calls)
+        for c in ssh_calls:
+            self.assertIn("-EncodedCommand", c)
+
+    def test_up_refuses_without_desktop_session(self):
+        (self.state / "desktop").unlink()
+        code, out = self.run_cli([*UP, "windows-mcp", "box", "--create-task"])
+        self.assertEqual(code, 1, out)
+        self.assertIn("請先登入 box 的桌面", out)
+        self.assertFalse(self.has("task") or self.has("listen") or self.has("config"))
+
+    def test_up_asks_before_creating_resident_task(self):
+        code, out = self.run_cli([*UP, "windows-mcp", "box"])
+        self.assertEqual(code, 1, out)
+        self.assertIn("--create-task", out)
+        self.assertFalse(self.has("task") or self.has("listen") or self.has("config"))
+        # task 已經在的機器不用再加
+        (self.state / "task").write_text("")
+        code, out = self.run_cli([*UP, "windows-mcp", "box"])
+        self.assertEqual(code, 0, out)
+
+    def test_up_tears_down_when_verification_fails(self):
+        self.env["FAKE_VERIFY_500"] = "1"
+        code, out = self.run_cli([*UP, "windows-mcp", "box", "--create-task"])
+        self.assertEqual(code, 1, out)
+        self.assertIn("已收掉", out)
+        self.assertFalse(self.has("listen") or self.has("serve") or self.has("config"))
+        self.assertTrue(self.has("task"))  # keep: true
+
+    def test_up_tears_down_when_server_never_listens(self):
+        self.env["FAKE_NO_LISTEN"] = "1"
+        code, out = self.run_cli([*UP, "windows-mcp", "box", "--create-task"])
+        self.assertEqual(code, 1, out)
+        self.assertIn("沒在 8000 起來", out)
+        self.assertFalse(self.has("config"))
+
+    def test_up_twice_reports_running(self):
+        self.run_cli([*UP, "windows-mcp", "box", "--create-task"])
+        code, out = self.run_cli([*UP, "windows-mcp", "box"])
+        self.assertEqual(code, 0, out)
+        self.assertIn("已經起好", out)
+        self.assertEqual(self.read("scripts").count("# remote-access:start"), 1)
+
+    def test_up_restarts_when_running_server_has_another_key(self):
+        self.run_cli([*UP, "windows-mcp", "box", "--create-task"])
+        self.env["WINDOWS_MCP_AUTH_KEY"] = "rotated-key-9876543210"
+        code, out = self.run_cli([*UP, "windows-mcp", "box"])
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.read("config"), "rotated-key-9876543210")
+
+    def test_up_reads_key_from_key_env(self):
+        self.env.pop("WINDOWS_MCP_AUTH_KEY")
+        self.env["CLIENT_KEY"] = "client-key-0123456789"
+        code, out = self.run_cli([*UP, "windows-mcp", "box", "--create-task"])
+        self.assertEqual(code, 1, out)
+        self.assertIn("WINDOWS_MCP_AUTH_KEY", out)
+        code, out = self.run_cli([*UP, "windows-mcp", "box", "--create-task", "--key-env", "CLIENT_KEY"])
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.read("config"), "client-key-0123456789")
+
+    def test_up_refuses_when_port_is_taken_by_another_program(self):
+        (self.state / "task").write_text("")
+        (self.state / "listen").write_text("other:4242/nginx.exe")
+        code, out = self.run_cli([*UP, "windows-mcp", "box"])
+        self.assertEqual(code, 1, out)
+        self.assertIn("4242/nginx.exe", out)
+        self.assertEqual(self.read("listen"), "other:4242/nginx.exe")
+        self.assertNotIn("# remote-access:start", self.read("scripts"))
+
+    def test_up_refuses_when_serve_is_used_by_someone_else(self):
+        (self.state / "task").write_text("")
+        (self.state / "serve").write_text("other")
+        code, out = self.run_cli([*UP, "windows-mcp", "box"])
+        self.assertEqual(code, 1, out)
+        self.assertIn("tailscale serve", out)
+        self.assertEqual(self.read("serve"), "other")
+
+    def test_unknown_service_or_host_lists_choices(self):
+        code, out = self.run_cli([*UP, "chrome", "box"])
+        self.assertEqual(code, 1, out)
+        self.assertIn("windows-mcp", out)
+        code, out = self.run_cli([*DOWN, "windows-mcp", "nobox"])
+        self.assertEqual(code, 1, out)
+        self.assertIn("box、other-box", out)
+        self.assertNotIn("ssh -o", self.read("calls"))
+
+    def test_dry_run_does_not_touch_the_host(self):
+        code, out = self.run_cli([*UP, "windows-mcp", "box", "--dry-run"])
+        self.assertEqual(code, 0, out)
+        self.assertIn(EC2_IP, out)
+        code, out = self.run_cli([*DOWN, "windows-mcp", "box", "--dry-run"])
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.read("scripts"), "")
+
+    def test_down_cleans_up_and_keeps_task(self):
+        self.run_cli([*UP, "windows-mcp", "box", "--create-task"])
+        code, out = self.run_cli([*DOWN, "windows-mcp", "box"])
+        self.assertEqual(code, 0, out)
+        self.assertIn("已收乾淨", out)
+        self.assertFalse(self.has("listen") or self.has("serve") or self.has("config"))
+        self.assertTrue(self.has("task"))
+
+    def test_down_when_not_running(self):
+        code, out = self.run_cli([*DOWN, "windows-mcp", "box"])
+        self.assertEqual(code, 0, out)
+        self.assertIn("本來就沒開", out)
+
+    def test_down_leaves_other_programs_alone(self):
+        (self.state / "listen").write_text("other:4242/nginx.exe")
+        (self.state / "serve").write_text("other")
+        code, out = self.run_cli([*DOWN, "windows-mcp", "box"])
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.read("listen"), "other:4242/nginx.exe")
+        self.assertEqual(self.read("serve"), "other")
+
+    def test_help(self):
+        for args in (UP, DOWN):
+            code, out = self.run_cli([*args, "--help"])
+            self.assertEqual(code, 0, out)
+            self.assertIn("--dry-run", out)
+        code, out = self.run_cli([sys.executable, str(ENTRY), "--help"])
+        self.assertIn("up", out)
+        self.assertIn("down", out)
+
+
 if __name__ == "__main__":
     unittest.main()

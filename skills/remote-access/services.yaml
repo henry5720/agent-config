@@ -1,0 +1,28 @@
+# remote-access up／down 用的服務定義。機器清單是 ssh config 的 Host，不寫在這裡。
+# 公開 repo：key 只寫從哪個環境變數拿，不寫值。
+services:
+  windows-mcp:
+    # windows-mcp 有 key，走 tailscale serve：MCP 直接連 https://<那台 ts.net 名稱>/mcp
+    mode: serve
+    # Windows-MCP serve 的預設 port；tailscale serve 從 443 轉進來，不佔 agent 這台的 port
+    port: 8000
+    # 截圖、點擊要在桌面 session 跑，從 ssh 起會沒有畫面，所以用 Interactive task 起
+    needs_desktop: true
+    start:
+      # keep: true 常駐，第一次建（要先問使用者），之後每次 up 只 schtasks /run；客戶機器改 false
+      - task: {name: remote-access-windows-mcp, keep: true}
+    # 停：停 task、停聽 port 而且命令列有 windows-mcp 的行程，別的程式不動
+    stop: {match: windows-mcp}
+    verify:
+      path: /mcp
+      # MCP initialize：不帶 key 401，帶 key 200
+      body: '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"remote-access","version":"1"}}}'
+      headers:
+        - "Content-Type: application/json"
+        - "Accept: application/json, text/event-stream"
+      expect_without: 401
+      expect_with: 200
+    key: {env: WINDOWS_MCP_AUTH_KEY}
+    # 允許連進來的 agent 機器（tailnet 名稱），CLI 用 tailscale ip -4 換成 IP 填 --ip-allowlist。
+    # serve 轉進來時 server 看到的是呼叫端的 tailnet IP，寫 127.0.0.1 會全部 403（#137 prototype）
+    allow: [company-ec2]

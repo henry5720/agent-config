@@ -8,6 +8,25 @@
 - **用來源 IP 擋人的設定不能用**：請求是代理從 127.0.0.1 轉進來的。uvicorn 這類 server 預設信任 127.0.0.1 帶的 `X-Forwarded-For`，會把來源 IP 改成真正的外部 IP；allowlist 填 `127.0.0.1` 就會連代理的請求一起擋掉（windows-mcp 的 `--ip-allowlist` 回 `403 … not in the IP allowlist`）。
 - **app 綁 `0.0.0.0` 時**，區網直連那個 port 只靠防火牆擋。開之前確認沒有放行它的 inbound 規則。
 
+## serve 模式（`remote-access up`／`down`）
+
+查證日期 2026-11-27，看的是 Windows-MCP `main`（commit `ccbe664`，鎖 fastmcp 4.2.5、uvicorn 0.54.0）的原始碼。
+
+- **windows-mcp 只在直接連線來自 `127.0.0.1`／`::1` 時才信 `X-Forwarded-For`**：
+  - windows-mcp 的 `IPAllowlistMiddleware` 看的是 ASGI 的 `request.client`（[security.py](https://github.com/CursorTouch/Windows-MCP/blob/ccbe664616e3ce62dc65b3bf98fd0a6b2e12c63e/src/windows_mcp/infrastructure/security.py#L266-L293)）。
+  - fastmcp 建 `uvicorn.Config` 時沒改 proxy 設定（fastmcp-slim 4.2.5 的 `server/mixins/transport.py`）。
+  - 所以用 uvicorn 的預設：`proxy_headers=True`，`forwarded_allow_ips` 取環境變數 `FORWARDED_ALLOW_IPS`，沒設時是 `127.0.0.1,::1`（uvicorn 0.54.0 的 `config.py`、`middleware/proxy_headers.py`）。只有直接連線來自這兩個位址時，才用 `X-Forwarded-For` 改寫 `request.client`。
+  - 影響：`tailscale serve` 從 127.0.0.1 轉進來，帶呼叫端的 tailnet IP，所以 allowlist 要填 agent 機器的 tailnet IP（#137 prototype 看到的 `100.100.7.68` 就是這樣來的）。區網直連 8000 的人來源不是 loopback，偽造 `X-Forwarded-For` 沒用，繞不過 allowlist。
+  - 前提：那台沒把 `FORWARDED_ALLOW_IPS` 設成 `*`。那台本機的程式本來就能從 127.0.0.1 偽造，allowlist 擋不了它們，只能靠 key 擋。
+- **`--config FILE` 可以放 key**：
+  - `serve --config <檔案>` 讀 TOML，支援 `[server]` 的 `transport`、`host`、`port`、`auth_key`，和 `[security]` 的 `ip_allowlist`（[config.py](https://github.com/CursorTouch/Windows-MCP/blob/ccbe664616e3ce62dc65b3bf98fd0a6b2e12c63e/src/windows_mcp/infrastructure/config.py)）。
+  - 指令列參數和環境變數優先，都沒給才用設定檔（`__main__.py` 的 `_choose_value`、`_param_explicit`）。所以那台的使用者環境變數裡有 `WINDOWS_MCP_AUTH_KEY` 或 `WINDOWS_MCP_IP_ALLOWLIST` 時，會蓋過設定檔：key 不對時 `up` 驗證會失敗並收掉；allowlist 被蓋掉驗證不一定看得出來，那台不要設這兩個變數。
+  - 所以不用包裝腳本：`up` 經 ssh 的 stdin 把 key 寫進那台的 `~\.windows-mcp\remote-access.toml`，task 的參數只有 `serve --config <那個檔>`；`down` 會刪掉這個檔。
+- **不加 `--allow-insecure-remote`**：
+  - prototype 有加。照 `__main__.py`，有 `auth_key` 時綁 `0.0.0.0` 本來就不會被拒絕。
+  - `0.0.0.0` 也不做 Host 檢查，加不加行為一樣。
+  - 只在實機驗收時確認。
+
 ## Funnel 專屬
 
 - **只能用 443、8443、10000**（[官方文件](https://tailscale.com/docs/features/tailscale-funnel)）。443 常被其他 `tailscale serve` 佔用，所以預設 8443。
