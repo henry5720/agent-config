@@ -1,12 +1,26 @@
 # remote-access reference
 
-公網驗證沒過、或連得上但 app 回錯誤時才讀。坑照原因分層：先看經過代理的（每種方式都會遇到），再看 Funnel、quick tunnel 各自專屬的。app 本身的坑看 app 自己的文件（例如 windows-access 的 reference.md）。
+`remote-access up` 失敗、公網驗證沒過、或連得上但 app 回錯誤時才讀。坑照原因分層：先看經過代理的（每種方式都會遇到），再看 Funnel、quick tunnel 各自專屬的。app 本身的坑看 app 自己的文件（例如 windows-access 的 reference.md）。
 
 ## 經過本機代理或 tunnel（Funnel、quick tunnel）
 
 - **`Host` 是公開網址**：代理預設把對外網址當成 `Host` 轉進來。app 綁 loopback 又檢查 `Host` 時會回 400（windows-mcp 是 Invalid host header）。解法二選一：app 綁 `0.0.0.0`（Funnel 只能這樣做），或讓代理改寫成 `localhost`（cloudflared 用 `--http-host-header localhost`）。
 - **用來源 IP 擋人的設定不能用**：請求是代理從 127.0.0.1 轉進來的。uvicorn 這類 server 預設信任 127.0.0.1 帶的 `X-Forwarded-For`，會把來源 IP 改成真正的外部 IP；allowlist 填 `127.0.0.1` 就會連代理的請求一起擋掉（windows-mcp 的 `--ip-allowlist` 回 `403 … not in the IP allowlist`）。
 - **app 綁 `0.0.0.0` 時**，區網直連那個 port 只靠防火牆擋。開之前確認沒有放行它的 inbound 規則。
+
+## `up` 的錯誤訊息
+
+起了一半的東西 `up` 已經收掉，照訊息處理：
+
+| 訊息 | 代表什麼、怎麼做 |
+|---|---|
+| `沒有人登入桌面` | 服務要桌面 session。請使用者登入那台桌面（ssh 的那個帳號）再跑 |
+| `HostName 要是 ts.net 名稱` | serve 網址從 ssh config 的 HostName 來。ssh config 由 dotfiles 管，回報使用者改；serve 真的連不到才在 `hosts.<host>` 改 `mode: forward` |
+| `還沒有常駐 task` | 照 SKILL.md〈服務定義〉第 1 步問，說好再加 `--create-task` |
+| `被別的程式佔著` | 照[本機 port 總表](SKILL.md#本機-port-總表)回報，不換 port、不停別人的程式 |
+| `已經有別的 tailscale serve 設定` | 那台的 serve 有別人的設定，回報使用者，不要蓋掉 |
+| `ssh … 跑 PowerShell 沒有回應` | 先確認 `ssh <host>` 連得上、那台是 Windows |
+| `驗證沒過`、`起不來` | 看下面〈serve 模式〉和服務 skill 的 reference.md |
 
 ## serve 模式（`remote-access up`／`down`）
 

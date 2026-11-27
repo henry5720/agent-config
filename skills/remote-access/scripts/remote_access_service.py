@@ -2,7 +2,7 @@
 
   remote-access up <服務> <host> [--create-task] [--key-env <變數>] [--dry-run]
   remote-access down <服務> <host> [--dry-run]
-  remote-access ps [<服務> [<host>]]
+  remote-access ps [<服務> [<host>]] [--key-env <變數>]
 
 <服務> 是 skill 資料夾 services.yaml 的 services 底下的名稱；<host> 是 ssh config 的 Host。
 
@@ -150,8 +150,9 @@ $d = @(Get-CimInstance Win32_Process -Filter "Name='explorer.exe'" | Where-Objec
 "desktop=$d"
 "task=$(if (Get-ScheduledTask -TaskName $Task -ErrorAction SilentlyContinue) { 1 } else { 0 })"
 $l = @(Listeners)
+# 程式名的非 ASCII 換成 ?：win() 只收 ASCII 行，整行丟掉會被當成沒人佔 port
 if (-not $l.Count) { 'listen=none' }
-elseif ($l | Where-Object { $_.CommandLine -notmatch $Match }) { 'listen=other:' + (($l | ForEach-Object { "$($_.ProcessId)/$($_.Name)" }) -join ',') }
+elseif ($l | Where-Object { $_.CommandLine -notmatch $Match }) { 'listen=other:' + ((($l | ForEach-Object { "$($_.ProcessId)/$($_.Name)" }) -join ',') -replace '[^\x20-\x7e]', '?') }
 else { 'listen=ours' }
 "serve=$(ServeState)"
 """
@@ -441,8 +442,8 @@ def cmd_down(args):
     say(f"{args.service} 在 {args.host} 已收乾淨" if was else f"{args.service} 在 {args.host} 本來就沒開")
 
 
-def ps_verify(svc, base):
-    key_env = svc["key"]["env"]
+def ps_verify(svc, base, key_env=None):
+    key_env = key_env or svc["key"]["env"]
     if not os.environ.get(key_env):
         return f"沒驗證（{key_env} 沒設）"
     with contextlib.redirect_stdout(io.StringIO()):  # verify 的過程訊息不混進表格
@@ -486,20 +487,14 @@ def running(service=None, host=None):
     return found
 
 
-def ps_verify(svc, base):
-    key_env = svc["key"]["env"]
-    if not os.environ.get(key_env):
-        return f"沒驗證（{key_env} 沒設）"
-    with contextlib.redirect_stdout(io.StringIO()):  # verify 的過程訊息不混進表格
-        return "通過" if verify(verify_check(svc, key_env), base, public_dns=False) else "沒通過"
-
-
 def cmd_ps(args):
+    if args.key_env and not ENV_NAME_RE.fullmatch(args.key_env):
+        die(f"--key-env 要是環境變數名稱：{args.key_env}")
     rows = []
     for name, host, svc, base, note in running(args.service, args.host):
         url = base + svc["verify"].get("path", "/")
         rows.append((name, host, svc["mode"], url, mcp_name(url) or "-",
-                     f"{note}（重跑 up）" if note else ps_verify(svc, base)))
+                     f"{note}（重跑 up）" if note else ps_verify(svc, base, args.key_env)))
     if not rows:
         say("沒有在跑的服務（ssh 連不上的 host 不列）")
         return
@@ -517,6 +512,7 @@ def main(argv, prog):
     if cmd == "ps":
         parser.add_argument("service", nargs="?", help="只查這個服務（預設全部）")
         parser.add_argument("host", nargs="?", help="只查這台（預設 ssh config 的全部 host）")
+        parser.add_argument("--key-env", help="驗證改用這個環境變數的 key（同 up 的 --key-env；預設看 services.yaml 的 key.env）")
         args = parser.parse_args(argv)
         sys.stdout.reconfigure(line_buffering=True)
         return cmd_ps(args)

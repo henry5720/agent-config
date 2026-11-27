@@ -664,7 +664,11 @@ def probe():
     print("desktop=" + ("1" if has("desktop") else "0"))
     print("task=" + ("1" if has("task") else "0"))
     listen = read("listen")
-    print("listen=" + ("none" if not has("listen") else listen if listen.startswith("other") else "ours"))
+    if listen.startswith("other") and "-replace '[^\\x20-\\x7e]', '?'" in script:
+        listen = "".join(c if " " <= c <= "~" else "?" for c in listen)
+    line = "listen=" + ("none" if not has("listen") else listen if listen.startswith("other") else "ours")
+    # PowerShell 5.1 經 ssh 照 console code page（Big5）送出
+    sys.stdout.flush(); sys.stdout.buffer.write((line + "\n").encode("big5", "replace")); sys.stdout.flush()
     print("serve=" + ("none" if not has("serve") else "other" if read("serve") == "other" else "ours"))
 # 模擬 PowerShell 5.1 經 ssh 的雜訊：CLIXML 進度訊息、Big5 中文
 sys.stdout.buffer.write("#< CLIXML\n準備中\n".encode("big5"))
@@ -867,6 +871,14 @@ class ServeTest(ServeFixture):
         self.assertEqual(self.read("listen"), "other:4242/nginx.exe")
         self.assertNotIn("# remote-access:start", self.read("scripts"))
 
+    def test_up_refuses_when_port_is_taken_by_program_with_non_ascii_name(self):
+        (self.state / "task").write_text("")
+        (self.state / "listen").write_text("other:4242/記事本.exe")
+        code, out = self.run_cli([*UP, "windows-mcp", "box"])
+        self.assertEqual(code, 1, out)
+        self.assertIn("4242/", out)
+        self.assertNotIn("# remote-access:start", self.read("scripts"))
+
     def test_up_refuses_when_serve_is_used_by_someone_else(self):
         (self.state / "task").write_text("")
         (self.state / "serve").write_text("other")
@@ -978,9 +990,17 @@ class ServeTest(ServeFixture):
         self.assertEqual(self.read("config"), SERVE_KEY)
         self.assertEqual(self.read("scripts").count("# remote-access:start"), 1)
 
+    def test_ps_verifies_with_key_env(self):
+        self.env.pop("WINDOWS_MCP_AUTH_KEY")
+        self.env["CLIENT_KEY"] = "client-key-0123456789"
+        self.run_cli([*UP, "windows-mcp", "box", "--create-task", "--key-env", "CLIENT_KEY"])
+        rows, out = self.ps_rows("--key-env", "CLIENT_KEY")
+        self.assertEqual(rows[0][-1], "通過", out)
+
     def test_help(self):
         code, out = self.run_cli([*PS, "--help"])
         self.assertEqual(code, 0, out)
+        self.assertIn("--key-env", out)
         for args in (UP, DOWN):
             code, out = self.run_cli([*args, "--help"])
             self.assertEqual(code, 0, out)

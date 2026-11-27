@@ -56,17 +56,7 @@ description: 連線：agent 跟服務不在同一台時怎麼連過去。同一�
 5. **換 key**：`remote-access key init` 第一次產生，`remote-access key rotate` 換新並重起已接上的機器；兩個都要重開 session 才讀得到。
    完成條件：`rotate` 沒有印 `這幾台沒同步到`；有的話照它印的 `up` 在新 session 重跑。
 
-`up` 失敗時已經收掉起了一半的東西，照訊息處理：
-
-| 訊息 | 代表什麼、怎麼做 |
-|---|---|
-| `沒有人登入桌面` | 服務要桌面 session。請使用者登入那台桌面（ssh 的那個帳號）再跑 |
-| `HostName 要是 ts.net 名稱` | serve 網址從 ssh config 的 HostName 來。ssh config 由 dotfiles 管，回報使用者改；serve 真的連不到才在 `hosts.<host>` 改 `mode: forward` |
-| `還沒有常駐 task` | 照第 1 步問，說好再加 `--create-task` |
-| `被別的程式佔著` | 照[本機 port 總表](#本機-port-總表)回報，不換 port、不停別人的程式 |
-| `已經有別的 tailscale serve 設定` | 那台的 serve 有別人的設定，回報使用者，不要蓋掉 |
-| `ssh … 跑 PowerShell 沒有回應` | 先確認 `ssh <host>` 連得上、那台是 Windows |
-| `驗證沒過`、`起不來` | 看 [reference.md](reference.md)〈serve 模式〉和服務 skill 的 reference.md |
+`up` 失敗時已經收掉起了一半的東西，照 [reference.md〈`up` 的錯誤訊息〉](reference.md#up-的錯誤訊息) 處理。
 
 ## tailnet 內
 
