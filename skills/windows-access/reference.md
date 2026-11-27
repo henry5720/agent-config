@@ -21,8 +21,8 @@
     Unregister-ScheduledTask -TaskName windows-mcp-temp -Confirm:$false
     ```
 
-    完成條件跟 SKILL.md 的 `start` 一樣，看 `$log`。**剪貼簿會被蓋掉**：script 在桌面 session 跑，key 直接複製到使用者桌面的剪貼簿，他原本剪貼簿裡的東西就沒了。註冊 task 前先跟使用者講，等他說好再起；之後 `stop` 換 key，剪貼簿裡那把就作廢。這跟 `windows-mcp install` 建的登入自動啟動 task 不同，用完不留。
-- **server 跑著時換 key 不生效**：`auth --force` 只改 `config.toml`，跑著的 server 繼續收舊 key（2026-11-05 在 henry-laptop 實測舊 key 仍回 `200`）。換 key 一律先停 server；`windows-mcp-http.ps1` 的 `start`（有 server 在聽就拒絕）和 `stop` 都是這個順序。
+    完成條件跟 SKILL.md 的 `start` 一樣，看 `$log`。**剪貼簿會被蓋掉**：script 在桌面 session 跑，key 直接複製到使用者桌面的剪貼簿，他原本剪貼簿裡的東西就沒了。註冊 task 前先跟使用者講，等他說好再起；之後 `rotate` 換 key，剪貼簿裡那把就作廢。這跟 `windows-mcp install` 建的登入自動啟動 task 不同，用完不留。
+- **server 跑著時換 key 不生效**：`auth --force` 只改 `config.toml`，跑著的 server 繼續收舊 key（2026-11-05 在 henry-laptop 實測舊 key 仍回 `200`）。換 key 一律先停 server；`windows-mcp-http.ps1` 的 `start`（有 server 在聽就拒絕）和 `rotate` 都是這個順序。
 - **`/mcp/` 會 307 轉到 `/mcp`**：有些 client 不跟 POST redirect，所以直接給 `/mcp`。
 - **log 在 server 的最小化視窗**：手動 `serve` 不寫檔；`~\.windows-mcp\server.log` 只有 scheduled task 會寫。
 - **`serve` 沒帶 `--transport` 時**，會照 `config.toml` 的 transport 起 server。`auth` 會把它寫成 HTTP，所以 stdio 一定要明寫 `--transport stdio`。

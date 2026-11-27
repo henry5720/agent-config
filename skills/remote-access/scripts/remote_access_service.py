@@ -323,6 +323,7 @@ def resolve(args):
 
 
 def verify_check(svc, key_env):
+    """給 verify 的參數：照服務定義的 verify，key 從環境變數 key_env 讀。"""
     v = svc["verify"]
     curl_args = [a for h in v.get("headers", []) for a in ("-H", h)]
     if "body" in v:
@@ -449,38 +450,56 @@ def ps_verify(svc, base):
 
 
 def ps_serve(svc, host):
-    """serve 模式：回 (網址, 驗證)；那台沒在跑或連不上回 None。"""
+    """serve 模式：回 (驗證打的網址, 驗不了的原因)；那台沒在跑或連不上回 None。"""
     hostname = ssh_hostname(host)
     if not hostname.endswith(".ts.net"):
         return None
     state = probe(host, svc)
-    if state.get("listen") != "ours" and state.get("serve") != "ours":
+    if "ours" not in (state.get("listen"), state.get("serve")):
         return None
-    base = f"https://{hostname}"
-    return base, ps_verify(svc, base)
+    return f"https://{hostname}", ""
 
 
 def ps_forward(svc, host):
-    """forward 模式：轉發開著（ssh -O check）才列，網址是本機 port。"""
-    if not forward_alive(host, svc):
-        return None
+    """forward 模式：網址是本機 port。轉發沒開（ssh -O check）時再問那台，在跑就列出來、說驗不了。"""
     base = f"http://127.0.0.1:{svc['local_port']}"
-    return base, ps_verify(svc, base)
+    if forward_alive(host, svc):
+        return base, ""
+    if probe(host, svc).get("listen") != "ours":
+        return None
+    return base, "轉發沒開"
 
 
 PS_BY_MODE = {"serve": ps_serve, "forward": ps_forward}
 
 
+def running(service=None, host=None):
+    """逐台查在跑的服務，回 [(服務, host, 整理好的服務定義, 驗證打的網址, 驗不了的原因)]。用查的，不動那台。"""
+    found = []
+    for name in [service] if service else load_services():
+        for h in [host] if host else ssh_hosts():
+            # mode 看 resolve 之後的（含 hosts.<host> 覆寫）
+            svc = resolve(SimpleNamespace(service=name, host=h))
+            hit = PS_BY_MODE[svc["mode"]](svc, h)
+            if hit:
+                found.append((name, h, svc, *hit))
+    return found
+
+
+def ps_verify(svc, base):
+    key_env = svc["key"]["env"]
+    if not os.environ.get(key_env):
+        return f"沒驗證（{key_env} 沒設）"
+    with contextlib.redirect_stdout(io.StringIO()):  # verify 的過程訊息不混進表格
+        return "通過" if verify(verify_check(svc, key_env), base, public_dns=False) else "沒通過"
+
+
 def cmd_ps(args):
     rows = []
-    for name in [args.service] if args.service else load_services():
-        for host in [args.host] if args.host else ssh_hosts():
-            # mode 看 resolve 之後的（含 hosts.<host> 覆寫）
-            svc = resolve(SimpleNamespace(service=name, host=host))
-            found = PS_BY_MODE[svc["mode"]](svc, host)
-            if found:
-                url = found[0] + svc["verify"].get("path", "/")
-                rows.append((name, host, svc["mode"], url, mcp_name(url) or "-", found[1]))
+    for name, host, svc, base, note in running(args.service, args.host):
+        url = base + svc["verify"].get("path", "/")
+        rows.append((name, host, svc["mode"], url, mcp_name(url) or "-",
+                     f"{note}（重跑 up）" if note else ps_verify(svc, base)))
     if not rows:
         say("沒有在跑的服務（ssh 連不上的 host 不列）")
         return
