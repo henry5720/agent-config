@@ -29,3 +29,8 @@ services:
     # forward 模式（hosts 底下對 serve 連不到的機器設 mode: forward）時 agent 這台接的本機 port，
     # 照 remote-access SKILL.md 的本機 port 總表。forward 不用 allow：server 綁 127.0.0.1，只有 ssh 轉得進來
     local_port: 18000
+    # 個別 host 的覆寫（key 是 ssh config 的 Host）：底下的欄位整個蓋掉上面同名的。
+    # 客戶機器不留 task：up 建、down 刪，不用 --create-task。serve 連不到的機器設 mode: forward。
+    # hosts:
+    #   <客戶的 Host>:
+    #     start: [{task: {name: remote-access-windows-mcp, keep: false}}]

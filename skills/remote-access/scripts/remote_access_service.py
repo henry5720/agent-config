@@ -11,7 +11,8 @@ up（serve 模式）：經 ssh 確認那台有人登入桌面（needs_desktop）
 第一次在那台建常駐 task 要加 --create-task（它會一直留在那台，先問使用者）。
 
 down：停 task 和聽那個 port 的服務行程、關掉轉到那個 port 的 serve、刪掉那台的設定檔（裡面有 key）；
-task 照 keep 留著或刪掉。本來就沒開也 exit 0。
+task 照 keep 留著或刪掉（keep: false 的 task 由 up 自己建，不用 --create-task）。本來就沒開也 exit 0。
+services.yaml 的 hosts.<host> 可以蓋掉個別 host 的欄位，例如客戶機器的 start 改 keep: false。
 
 up（forward 模式，services.yaml 的 hosts.<host> 設 mode: forward）：server 綁 127.0.0.1、不設 allowlist、
 不開 serve；agent 這台開 ssh ControlMaster，-L 把 local_port 轉到那台的 port，從 http://127.0.0.1:<local_port> 驗證。
@@ -272,7 +273,7 @@ def resolve(args):
     if args.host not in hosts:
         die(f"不認得的 host：{args.host}（ssh config 的 Host）。可用的：{'、'.join(hosts) or '（~/.ssh/config 沒有 Host）'}")
     svc = dict(services[args.service])
-    # hosts 底下可以對個別機器覆寫（例如 serve 連不到的改 mode: forward）
+    # 個別 host 的覆寫：hosts.<host> 底下的欄位整個蓋掉服務定義的同名欄位（例如 serve 連不到的改 mode: forward）
     svc.update((svc.pop("hosts", None) or {}).get(args.host) or {})
     svc["name"] = args.service
     if svc.get("mode") not in ("serve", "forward"):
@@ -365,7 +366,9 @@ def cmd_up(args):
         '"`n[security]`nip_allowlist = [' + ", ".join(f"'{ip}'" for ip in allow) + ']`n"')
     code, out = win(args.host, ps_script("start", PS_START, svc, BIND="127.0.0.1" if forward else "0.0.0.0",
                                          SECURITY=security, SERVE="$false" if forward else "$true",
-                                         CREATE="$true" if args.create_task else "$false"), stdin=key)
+                                         # keep: false 的 task 每次 up 建、down 刪，不用問
+                                         CREATE="$true" if args.create_task or not svc["task"]["keep"] else "$false"),
+                 stdin=key)
     if code != 0 or out.get("started") != "1":
         reason = {
             "notask": "task 不在（加 --create-task 建）",
