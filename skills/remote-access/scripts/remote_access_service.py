@@ -11,13 +11,20 @@ up（serve 模式）：經 ssh 確認那台有人登入桌面（needs_desktop）
 第一次在那台建常駐 task 要加 --create-task（它會一直留在那台，先問使用者）。
 
 down：停 task 和聽那個 port 的服務行程、關掉轉到那個 port 的 serve、刪掉那台的設定檔（裡面有 key）；
-task 照 keep 留著或刪掉。本來就沒開也 exit 0。
+task 照 keep 留著或刪掉（keep: false 的 task 由 up 自己建，不用 --create-task）。本來就沒開也 exit 0。
+services.yaml 的 hosts.<host> 可以蓋掉個別 host 的欄位，例如客戶機器的 start 改 keep: false。
+
+up（forward 模式，services.yaml 的 hosts.<host> 設 mode: forward）：server 綁 127.0.0.1、不設 allowlist、
+不開 serve；agent 這台開 ssh ControlMaster，-L 把 local_port 轉到那台的 port，從 http://127.0.0.1:<local_port> 驗證。
+local_port 被別的程式佔著就報錯、說出是誰，不換 port。down 多做 ssh -O exit；轉發開著沒看 ssh -O check。
+ControlMaster 的 socket 在 ~/.local/state/remote-access/。
 
 key 從環境變數讀（services.yaml 的 key.env，--key-env 可以改讀別的變數），不接受從參數輸入；
 不出現在任何指令參數、task 定義、輸出裡。送去 Windows 的 PowerShell 一律用 -EncodedCommand，
 那邊只回 ASCII 的 key=value 行，不受 Big5、CLIXML 影響。
 
 環境變數：
+  REMOTE_ACCESS_SERVICES       改讀這個服務定義檔（測試用）
   EXPOSE_PORT_PROBE_INTERVAL   驗證時每次重試間隔秒數，預設 3（測試設 0）
 """
 import argparse
@@ -25,14 +32,17 @@ import base64
 import ipaddress
 import os
 import re
+import socket
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 
 from remote_access_common import run, say, verify
 
-SERVICES_FILE = Path(__file__).resolve().parent.parent / "services.yaml"
+# 測試用 REMOTE_ACCESS_SERVICES 指到別的服務定義
+SERVICES_FILE = Path(os.environ.get("REMOTE_ACCESS_SERVICES") or Path(__file__).resolve().parent.parent / "services.yaml")
 ENV_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 # key 會寫進 TOML 字串，只收不用跳脫的字元
 KEY_RE = re.compile(r"[A-Za-z0-9._~+/=-]{16,}")
@@ -119,10 +129,11 @@ else { 'listen=ours' }
 # key 從 stdin 讀，寫進只有 server 讀的設定檔；task 的參數只有設定檔路徑
 PS_START = r"""
 $create = @CREATE@
+$serve = @SERVE@
 $key = [Console]::In.ReadLine()
 if (-not $key) { 'error=nokey'; exit 1 }
 New-Item -ItemType Directory -Force -Path (Split-Path $Cfg) | Out-Null
-$toml = "[server]`ntransport = `"streamable-http`"`nhost = `"0.0.0.0`"`nport = $Port`nauth_key = `"$key`"`n`n[security]`nip_allowlist = [@ALLOW@]`n"
+$toml = "[server]`ntransport = `"streamable-http`"`nhost = `"@BIND@`"`nport = $Port`nauth_key = `"$key`"`n" + @SECURITY@
 [IO.File]::WriteAllText($Cfg, $toml)
 if (-not (Get-ScheduledTask -TaskName $Task -ErrorAction SilentlyContinue)) {
   if (-not $create) { 'error=notask'; exit 1 }
@@ -139,8 +150,10 @@ if (-not (Get-ScheduledTask -TaskName $Task -ErrorAction SilentlyContinue)) {
 schtasks /run /tn $Task *> $null
 for ($i = 0; $i -lt 30 -and -not (Ours).Count; $i++) { Start-Sleep -Seconds 1 }
 if (-not (Ours).Count) { 'error=nolisten'; exit 1 }
-tailscale serve --bg "http://127.0.0.1:$Port" *> $null
-if ((ServeState) -ne 'ours') { 'error=serve'; exit 1 }
+if ($serve) {
+  tailscale serve --bg "http://127.0.0.1:$Port" *> $null
+  if ((ServeState) -ne 'ours') { 'error=serve'; exit 1 }
+}
 'started=1'
 """
 
@@ -181,15 +194,70 @@ def win(host, script, stdin=None):
     return p.returncode, out
 
 
+# ==========================================================================
+# forward 模式：ssh -L + ControlMaster。socket 放 agent 這台的 state 目錄
+# ==========================================================================
+
+def control_socket(host, svc):
+    d = Path.home() / ".local" / "state" / "remote-access"
+    d.mkdir(parents=True, exist_ok=True, mode=0o700)
+    return str(d / f"{svc['name']}-{host}.sock")
+
+
+def forward_alive(host, svc):
+    """forward 模式的轉發開著沒（ssh -O check）。"""
+    return run(["ssh", "-S", control_socket(host, svc), "-O", "check", host]).returncode == 0
+
+
+def forward_open(host, svc):
+    """開 ControlMaster 轉發，回 (成功, ssh 的錯誤訊息)。"""
+    # -f 之後 ssh 留在背景還拿著 stderr，用 pipe 會等不到結束，改寫暫存檔
+    with tempfile.TemporaryFile("w+") as err:
+        code = subprocess.run(
+            ["ssh", "-o", "BatchMode=yes", "-o", "ExitOnForwardFailure=yes", "-o", "ControlPersist=yes",
+             "-f", "-N", "-M", "-S", control_socket(host, svc),
+             "-L", f"127.0.0.1:{svc['local_port']}:127.0.0.1:{svc['port']}", host],
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=err,
+        ).returncode
+        err.seek(0)
+        return code == 0, err.read().strip()
+
+
+def forward_close(host, svc):
+    run(["ssh", "-S", control_socket(host, svc), "-O", "exit", host])
+
+
+def port_owner(port):
+    """agent 這台的 127.0.0.1:port 有人聽就回是誰（pid/程式），沒人聽回 None。"""
+    with socket.socket() as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            s.bind(("127.0.0.1", port))
+            return None
+        except OSError:
+            pass
+    try:
+        out = run(["ss", "-ltnpH", f"sport = :{port}"]).stdout
+    except FileNotFoundError:
+        out = ""
+    users = re.findall(r'\("([^"]+)",pid=(\d+)', out)
+    return "、".join(f"{pid}/{name}" for name, pid in users) or f"看不出是哪個程式，用 ss -ltnp | grep {port} 查"
+
+
 def probe(host, svc):
     return win(host, ps_script("probe", PS_PROBE, svc))[1]
 
 
 def stop(host, svc):
+    forwarded = svc["mode"] == "forward" and forward_alive(host, svc)
+    if forwarded:
+        forward_close(host, svc)
     _, out = win(host, ps_script("stop", PS_STOP, svc, KEEP="$true" if svc["task"]["keep"] else "$false"))
     after = probe(host, svc)
     clean = after.get("listen") != "ours" and after.get("serve") != "ours"
-    return out.get("was_running") == "1", clean
+    if svc["mode"] == "forward":
+        clean = clean and not forward_alive(host, svc)
+    return forwarded or out.get("was_running") == "1", clean
 
 
 # ==========================================================================
@@ -205,8 +273,15 @@ def resolve(args):
     if args.host not in hosts:
         die(f"不認得的 host：{args.host}（ssh config 的 Host）。可用的：{'、'.join(hosts) or '（~/.ssh/config 沒有 Host）'}")
     svc = dict(services[args.service])
-    if svc.get("mode") != "serve":
-        die(f"{args.service} 的 mode 是 {svc.get('mode')}：這版只支援 serve")
+    # 個別 host 的覆寫：hosts.<host> 底下的欄位整個蓋掉服務定義的同名欄位（例如 serve 連不到的改 mode: forward）
+    svc.update((svc.pop("hosts", None) or {}).get(args.host) or {})
+    svc["name"] = args.service
+    if svc.get("mode") not in ("serve", "forward"):
+        die(f"{args.service} 在 {args.host} 的 mode 是 {svc.get('mode')}：只支援 serve、forward")
+    if svc["mode"] == "forward":
+        if not svc.get("local_port"):
+            die(f"{args.service} 要有 local_port 才能走 forward（本機 port 照 remote-access 的本機 port 總表）")
+        svc["local_port"] = int(svc["local_port"])
     # shortcut: 只支援第一個 start 是 Windows 的 task；ssh 起法、依序嘗試等需要時再加
     task = next((s["task"] for s in svc.get("start", []) if "task" in s), None)
     if not task or not TASK_NAME_RE.fullmatch(task.get("name", "")):
@@ -217,7 +292,7 @@ def resolve(args):
     return svc
 
 
-def serve_check(svc, key_env):
+def verify_check(svc, key_env):
     """給 verify 的參數：照服務定義的 verify，key 從環境變數 key_env 讀。"""
     v = svc["verify"]
     curl_args = [a for h in v.get("headers", []) for a in ("-H", h)]
@@ -240,19 +315,27 @@ def cmd_up(args):
         die(f"環境變數 {key_env} 沒有 key：先讓 shell 讀進 key（agent 那台的 ~/.config/windows-mcp/auth.env）")
     if not KEY_RE.fullmatch(key):
         die(f"{key_env} 的 key 格式不對：至少 16 字元，只能英數和 ._~+/=-")
-    hostname = ssh_hostname(args.host)
-    if not hostname.endswith(".ts.net"):
-        die(f"{args.host} 在 ssh config 的 HostName 要是 ts.net 名稱，serve 網址從它來（現在是 {hostname or '空的'}）")
+    forward = svc["mode"] == "forward"
     allow = []
-    for name in svc.get("allow", []):
-        ip = tailnet_ip(name)
-        if not ip:
-            die(f"tailscale ip -4 {name} 查不到 IP：services.yaml 的 allow 要是 tailnet 裡的機器名稱")
-        allow.append(ip)
-    if not allow:
-        die(f"{args.service} 的 allow 是空的：serve 模式要列允許連進來的 agent 機器")
-    url = f"https://{hostname}"
-    check = serve_check(svc, key_env)
+    if forward:
+        url = f"http://127.0.0.1:{svc['local_port']}"
+    else:
+        hostname = ssh_hostname(args.host)
+        if not hostname.endswith(".ts.net"):
+            die(f"{args.host} 在 ssh config 的 HostName 要是 ts.net 名稱，serve 網址從它來（現在是 {hostname or '空的'}）")
+        for name in svc.get("allow", []):
+            ip = tailnet_ip(name)
+            if not ip:
+                die(f"tailscale ip -4 {name} 查不到 IP：services.yaml 的 allow 要是 tailnet 裡的機器名稱")
+            allow.append(ip)
+        if not allow:
+            die(f"{args.service} 的 allow 是空的：serve 模式要列允許連進來的 agent 機器")
+        url = f"https://{hostname}"
+    check = verify_check(svc, key_env)
+    if args.dry_run and forward:
+        say(f"[dry-run] {args.host}：{svc['task']['name']} task 起 {args.service}（127.0.0.1:{svc['port']}），"
+            f"ssh ControlMaster 轉發 → {url}{check.path}，key 從 {key_env}")
+        return
     if args.dry_run:
         say(f"[dry-run] {args.host}：{svc['task']['name']} task 起 {args.service}（0.0.0.0:{svc['port']}，"
             f"allowlist {','.join(allow)}），tailscale serve → {url}{check.path}，key 從 {key_env}")
@@ -265,9 +348,14 @@ def cmd_up(args):
         die(f"{args.host} 沒有人登入桌面：請先登入 {args.host} 的桌面（ssh 的那個帳號），再跑一次")
     if state.get("listen", "").startswith("other"):
         die(f"{args.host} 的 {svc['port']} 被別的程式佔著（{state['listen'][len('other:'):]}）：請使用者處理，不自動換 port")
-    if state.get("serve") == "other":
+    if state.get("serve") == "other" and not forward:
         die(f"{args.host} 已經有別的 tailscale serve 設定：先在那台 tailscale serve status 看是誰在用")
-    if state.get("listen") == "ours" or state.get("serve") == "ours":
+    forwarded = forward and forward_alive(args.host, svc)
+    if forward and not forwarded:
+        owner = port_owner(svc["local_port"])
+        if owner:
+            die(f"這台的 {svc['local_port']} 被別的程式佔著（{owner}）：請使用者處理，不自動換 port")
+    if state.get("listen") == "ours" or state.get("serve") == "ours" or forwarded:
         if verify(check, url, public_dns=False):
             say(f"{args.service} 在 {args.host} 已經起好：{url}{check.path}")
             return
@@ -276,10 +364,16 @@ def cmd_up(args):
     if state.get("task") != "1" and svc["task"]["keep"] and not args.create_task:
         die(f"{args.host} 還沒有常駐 task {svc['task']['name']}：它會一直留在那台，問過使用者後加 --create-task 再跑")
 
-    say(f"在 {args.host} 起 {args.service}（task {svc['task']['name']}），開 tailscale serve…")
-    allow_toml = ", ".join(f"'{ip}'" for ip in allow)
-    code, out = win(args.host, ps_script("start", PS_START, svc, ALLOW=allow_toml,
-                                         CREATE="$true" if args.create_task else "$false"), stdin=key)
+    say(f"在 {args.host} 起 {args.service}（task {svc['task']['name']}），"
+        + ("開 ssh 轉發…" if forward else "開 tailscale serve…"))
+    # forward 只有 ssh 轉進來的 127.0.0.1 連得到，不用 allowlist
+    security = "''" if forward else (
+        '"`n[security]`nip_allowlist = [' + ", ".join(f"'{ip}'" for ip in allow) + ']`n"')
+    code, out = win(args.host, ps_script("start", PS_START, svc, BIND="127.0.0.1" if forward else "0.0.0.0",
+                                         SECURITY=security, SERVE="$false" if forward else "$true",
+                                         # keep: false 的 task 每次 up 建、down 刪，不用問
+                                         CREATE="$true" if args.create_task or not svc["task"]["keep"] else "$false"),
+                 stdin=key)
     if code != 0 or out.get("started") != "1":
         reason = {
             "notask": "task 不在（加 --create-task 建）",
@@ -290,17 +384,24 @@ def cmd_up(args):
         }.get(out.get("error"), f"exit {code}")
         stop(args.host, svc)
         die(f"起不來：{reason}。起了一半的已收掉")
+    if forward:
+        ok, err = forward_open(args.host, svc)
+        if not ok:
+            stop(args.host, svc)
+            die(f"ssh 轉發開不起來（{err or '沒有錯誤訊息'}）。起了一半的已收掉")
     if not verify(check, url, public_dns=False):
         stop(args.host, svc)
         die("驗證沒過，起了一半的已收掉。看 remote-access 的 reference.md")
-    say(f"網址：{url}{check.path}（MCP 的 key 用 {key_env}）")
+    via = f"，ssh 轉到 {args.host} 的 {svc['port']}" if forward else ""
+    say(f"網址：{url}{check.path}（MCP 的 key 用 {key_env}{via}）")
     say("MCP 設定指到這個網址後，在 session 裡打 /mcp 重連")
 
 
 def cmd_down(args):
     svc = resolve(args)
     if args.dry_run:
-        say(f"[dry-run] {args.host}：停 {svc['task']['name']} 和聽 {svc['port']} 的 {svc['match']}、關 serve、"
+        say(f"[dry-run] {args.host}：停 {svc['task']['name']} 和聽 {svc['port']} 的 {svc['match']}、"
+            f"{'關 ssh 轉發' if svc['mode'] == 'forward' else '關 serve'}、"
             f"刪那台的設定檔，task {'留著' if svc['task']['keep'] else '刪掉'}")
         return
     was, clean = stop(args.host, svc)

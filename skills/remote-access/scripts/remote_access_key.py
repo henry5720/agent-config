@@ -23,7 +23,7 @@ from types import SimpleNamespace
 
 from remote_access_common import say, verify
 from remote_access_service import (
-    ENV_NAME_RE, cmd_up, die, load_services, probe, resolve, serve_check, ssh_hostname, ssh_hosts,
+    ENV_NAME_RE, cmd_up, die, forward_alive, load_services, probe, resolve, verify_check, ssh_hostname, ssh_hosts,
 )
 
 # shortcut: auth.env 和預設變數是 windows-mcp 的；別的服務也要 key 時改成照 services.yaml 的 key.env 分檔
@@ -78,16 +78,21 @@ def connected_machines(key_env, key):
     那台在跑我們的服務、而且這把 key 驗證得過才算，用別把 key 的機器不算。
     """
     found = []
-    for name, raw in load_services().items():
-        if raw.get("mode") != "serve":
-            continue
+    os.environ[key_env] = key
+    for name in load_services():
         for host in ssh_hosts():
             svc = resolve(SimpleNamespace(service=name, host=host))
             state = probe(host, svc)
             if "ours" not in (state.get("listen"), state.get("serve")):
                 continue
-            os.environ[key_env] = key
-            if verify(serve_check(svc, key_env), f"https://{ssh_hostname(host)}", public_dns=False):
+            if svc["mode"] == "forward":
+                if not forward_alive(host, svc):
+                    say(f"{host} 的 {name} 在跑但轉發沒開，驗不了 key，不動：要同步就重跑 up")
+                    continue
+                url = f"http://127.0.0.1:{svc['local_port']}"
+            else:
+                url = f"https://{ssh_hostname(host)}"
+            if verify(verify_check(svc, key_env), url, public_dns=False):
                 found.append((name, host))
             else:
                 say(f"{host} 的 {name} 用的不是 {key_env} 這把 key，不動")

@@ -10,7 +10,9 @@ tailscale、cloudflared、curl、sudo 都換成 PATH 上的假指令（見 FAKE_
 import os
 import re
 import select
+import shutil
 import signal
+import socket
 import subprocess
 import sys
 import tempfile
@@ -632,8 +634,21 @@ if argv[0] == "-G":
     print("hostname " + os.environ.get("FAKE_HOSTNAME", "__WIN_HOST__"))
     sys.exit(0)
 host = argv[argv.index("powershell") - 1] if "powershell" in argv else ""
-if os.environ.get("FAKE_ONLY_HOST") and host != os.environ["FAKE_ONLY_HOST"]:
+if host and os.environ.get("FAKE_ONLY_HOST") and host != os.environ["FAKE_ONLY_HOST"]:
     sys.exit(255)
+# ControlMaster：master 檔代表開著，內容是 -L 的參數；-O check／exit 看它
+if "-O" in argv:
+    op = argv[argv.index("-O") + 1]
+    if not (st / "master").exists():
+        sys.exit(255)
+    if op == "exit":
+        (st / "master").unlink()
+    sys.exit(0)
+if "-M" in argv:
+    if os.environ.get("FAKE_MASTER_FAIL"):
+        sys.exit(255)
+    (st / "master").write_text(argv[argv.index("-L") + 1])
+    sys.exit(0)
 if "-EncodedCommand" not in argv:
     sys.exit("fake ssh: 只認 -EncodedCommand")
 script = base64.b64decode(argv[argv.index("-EncodedCommand") + 1]).decode("utf-16-le")
@@ -663,7 +678,8 @@ elif action == "start":
     if os.environ.get("FAKE_NO_LISTEN"):
         print("error=nolisten"); sys.exit(1)
     (st / "listen").write_text("ours")
-    (st / "serve").write_text("ours")
+    if "$serve = $true" in script:
+        (st / "serve").write_text("ours")
     print("started=1")
 elif action == "stop":
     was = 0
@@ -688,18 +704,21 @@ exit 1
 FAKE_SERVE_CURL = r"""#!/usr/bin/env bash
 state="$FAKE_STATE"
 printf 'curl' >> "$state/calls"; printf ' %q' "$@" >> "$state/calls"; echo >> "$state/calls"
-header=""
+header=""; url=""
 while [ $# -gt 0 ]; do
   if [ "$1" = -H ] && [ "${2:0:1}" = @ ]; then header=$(cat "${2:1}"); fi
+  case "$1" in http*) url="$1" ;; esac
   shift
 done
 if [ -n "$FAKE_VERIFY_500" ]; then printf 500; exit 0; fi
-if [ ! -e "$state/serve" ] || [ "$(cat "$state/listen" 2>/dev/null)" != ours ]; then printf 000; exit 7; fi
+# forward：打本機 port，要 ControlMaster 開著；serve：打 ts.net，要 serve 開著
+case "$url" in http://127.0.0.1:*) up="$state/master" ;; *) up="$state/serve" ;; esac
+if [ ! -e "$up" ] || [ "$(cat "$state/listen" 2>/dev/null)" != ours ]; then printf 000; exit 7; fi
 if [ "$header" = "Authorization: Bearer $(cat "$state/config")" ]; then printf 200; else printf 401; fi
 """
 
 
-class ServeFakes(unittest.TestCase):
+class ServeFixture(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
@@ -735,7 +754,7 @@ class ServeFakes(unittest.TestCase):
         return (self.state / name).exists()
 
 
-class ServeTest(ServeFakes):
+class ServeTest(ServeFixture):
     def test_up_starts_server_opens_serve_and_verifies(self):
         code, out = self.run_cli([*UP, "windows-mcp", "box", "--create-task"])
         self.assertEqual(code, 0, out)
@@ -863,6 +882,28 @@ class ServeTest(ServeFakes):
         self.assertFalse(self.has("listen") or self.has("serve") or self.has("config"))
         self.assertTrue(self.has("task"))
 
+    def test_client_host_with_keep_false_leaves_no_task(self):
+        # 客戶機器：在 services.yaml 用 hosts 覆寫那台的 start，task 用完就刪
+        skill = Path(self.tmp.name) / "remote-access"
+        shutil.copytree(RA_SCRIPTS.parent, skill)
+        with open(skill / "services.yaml", "a") as f:
+            f.write("    hosts:\n      client-box:\n"
+                    "        start: [{task: {name: remote-access-windows-mcp, keep: false}}]\n")
+        with open(Path(self.env["HOME"]) / ".ssh" / "config", "a") as f:
+            f.write("\nHost client-box\n  HostName client-box.tail123.ts.net\n")
+        entry = [sys.executable, str(skill / "scripts" / "remote-access")]
+        # 不用 --create-task：task 不會留在那台
+        code, out = self.run_cli([*entry, "up", "windows-mcp", "client-box"])
+        self.assertEqual(code, 0, out)
+        self.assertTrue(self.has("task") and self.has("listen"))
+        code, out = self.run_cli([*entry, "down", "windows-mcp", "client-box"])
+        self.assertEqual(code, 0, out)
+        self.assertFalse(self.has("task") or self.has("listen") or self.has("serve") or self.has("config"))
+        # 其他 host 照服務定義 keep: true
+        self.run_cli([*entry, "up", "windows-mcp", "box", "--create-task"])
+        self.run_cli([*entry, "down", "windows-mcp", "box"])
+        self.assertTrue(self.has("task"))
+
     def test_down_when_not_running(self):
         code, out = self.run_cli([*DOWN, "windows-mcp", "box"])
         self.assertEqual(code, 0, out)
@@ -886,6 +927,103 @@ class ServeTest(ServeFakes):
         self.assertIn("down", out)
 
 
+
+# ==========================================================================
+# up／down：forward 模式（ssh -L + ControlMaster）
+# ==========================================================================
+
+SERVICES = ROOT / "skills" / "remote-access" / "services.yaml"
+
+
+def free_port():
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+class ForwardTest(ServeFixture):
+    """services.yaml 的 hosts 覆寫把 box 指定成 forward；假 ssh 也模擬 ControlMaster（master 檔）。"""
+
+    def setUp(self):
+        super().setUp()
+        import yaml
+        self.local_port = free_port()
+        services = yaml.safe_load(SERVICES.read_text())
+        svc = services["services"]["windows-mcp"]
+        self.assertEqual(svc["mode"], "serve")  # 預設維持 serve，forward 只靠 host 覆寫
+        svc["local_port"] = self.local_port
+        svc["hosts"] = {"box": {"mode": "forward"}}
+        path = Path(self.tmp.name) / "services.yaml"
+        path.write_text(yaml.safe_dump(services, allow_unicode=True))
+        self.env["REMOTE_ACCESS_SERVICES"] = str(path)
+
+    def test_forward_up_opens_control_master_and_verifies(self):
+        code, out = self.run_cli([*UP, "windows-mcp", "box", "--create-task"])
+        self.assertEqual(code, 0, out)
+        self.assertIn("不帶驗證=401（要 401）", out)
+        self.assertIn("帶驗證=200（要 200）", out)
+        self.assertIn(f"http://127.0.0.1:{self.local_port}/mcp", out)
+        self.assertEqual(self.read("master"), f"127.0.0.1:{self.local_port}:127.0.0.1:8000")
+        self.assertEqual(self.read("config"), SERVE_KEY)
+        # server 綁 127.0.0.1、不設 allowlist、不開 tailscale serve
+        start = self.read("scripts").split("# remote-access:start", 1)[1]
+        self.assertIn('host = `"127.0.0.1`"', start)
+        self.assertNotIn("ip_allowlist", start)
+        self.assertFalse(self.has("serve"))
+        self.assertNotIn("tailscale ip", self.read("calls"))
+
+
+    def test_forward_up_refuses_when_local_port_is_taken(self):
+        (self.state / "task").write_text("")
+        with socket.socket() as taken:
+            taken.bind(("127.0.0.1", self.local_port))
+            taken.listen()
+            code, out = self.run_cli([*UP, "windows-mcp", "box"])
+        self.assertEqual(code, 1, out)
+        self.assertIn(f"{os.getpid()}/python", out)  # 說出佔著的程式
+        self.assertIn("不自動換 port", out)
+        self.assertNotIn("# remote-access:start", self.read("scripts"))
+        self.assertFalse(self.has("master"))
+
+    def test_forward_up_tears_down_when_ssh_forward_fails(self):
+        self.env["FAKE_MASTER_FAIL"] = "1"
+        code, out = self.run_cli([*UP, "windows-mcp", "box", "--create-task"])
+        self.assertEqual(code, 1, out)
+        self.assertIn("ssh 轉發開不起來", out)
+        self.assertFalse(self.has("listen") or self.has("config") or self.has("master"))
+
+    def test_forward_up_twice_reports_running(self):
+        self.run_cli([*UP, "windows-mcp", "box", "--create-task"])
+        # master 拿著本機 port 不算被佔
+        with socket.socket() as taken:
+            taken.bind(("127.0.0.1", self.local_port))
+            taken.listen()
+            code, out = self.run_cli([*UP, "windows-mcp", "box"])
+        self.assertEqual(code, 0, out)
+        self.assertIn("已經起好", out)
+        self.assertEqual(self.read("scripts").count("# remote-access:start"), 1)
+
+    def test_forward_down_closes_control_master(self):
+        self.run_cli([*UP, "windows-mcp", "box", "--create-task"])
+        code, out = self.run_cli([*DOWN, "windows-mcp", "box"])
+        self.assertEqual(code, 0, out)
+        self.assertIn("已收乾淨", out)
+        self.assertFalse(self.has("master") or self.has("listen") or self.has("config"))
+        self.assertIn("-O exit", self.read("calls"))
+        # ControlMaster 的 socket 在 agent 這台 HOME 底下的 state 目錄
+        self.assertIn(str(Path(self.env["HOME"]) / ".local" / "state" / "remote-access"), self.read("calls"))
+        code, out = self.run_cli([*DOWN, "windows-mcp", "box"])
+        self.assertEqual(code, 0, out)
+        self.assertIn("本來就沒開", out)
+
+    def test_hosts_without_override_stay_serve(self):
+        code, out = self.run_cli([*UP, "windows-mcp", "other-box", "--dry-run"])
+        self.assertIn("tailscale serve", out)
+        code, out = self.run_cli([*UP, "windows-mcp", "box", "--dry-run"])
+        self.assertEqual(code, 0, out)
+        self.assertIn("ssh ControlMaster", out)
+
+
 # ==========================================================================
 # key init／rotate：agent 那台的固定 key（HOME 指到暫存目錄，不碰真的 auth.env）
 # ==========================================================================
@@ -893,7 +1031,7 @@ class ServeTest(ServeFakes):
 KEY_CMD = [sys.executable, str(ENTRY), "key"]
 
 
-class KeyTest(ServeFakes):
+class KeyTest(ServeFixture):
     def setUp(self):
         super().setUp()
         self.auth_env = Path(self.env["HOME"]) / ".config" / "windows-mcp" / "auth.env"
@@ -997,6 +1135,20 @@ class KeyTest(ServeFakes):
         self.assertIn("box", out)
         self.assertEqual(self.saved(), old)
         self.assertEqual(self.read("config"), old)
+
+    def test_rotate_syncs_forward_machine_through_its_control_master(self):
+        import yaml
+        services = yaml.safe_load(SERVICES.read_text())
+        services["services"]["windows-mcp"]["local_port"] = free_port()
+        services["services"]["windows-mcp"]["hosts"] = {"box": {"mode": "forward"}}
+        path = Path(self.tmp.name) / "services.yaml"
+        path.write_text(yaml.safe_dump(services, allow_unicode=True))
+        self.env["REMOTE_ACCESS_SERVICES"] = str(path)
+        self.up_with_saved_key()
+        code, out = self.run_cli([*KEY_CMD, "rotate"])
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.read("config"), self.saved())
+        self.assertTrue(self.has("master"))
 
     def test_rotate_fails_when_a_machine_cannot_be_synced(self):
         self.up_with_saved_key()
