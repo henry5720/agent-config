@@ -26,3 +26,6 @@ services:
     # 允許連進來的 agent 機器（tailnet 名稱），CLI 用 tailscale ip -4 換成 IP 填 --ip-allowlist。
     # serve 轉進來時 server 看到的是呼叫端的 tailnet IP，寫 127.0.0.1 會全部 403（#137 prototype）
     allow: [company-ec2]
+    # forward 模式（hosts 底下對 serve 連不到的機器設 mode: forward）時 agent 這台接的本機 port，
+    # 照 remote-access SKILL.md 的本機 port 總表。forward 不用 allow：server 綁 127.0.0.1，只有 ssh 轉得進來
+    local_port: 18000
