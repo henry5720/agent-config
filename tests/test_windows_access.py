@@ -1,14 +1,16 @@
 """windows-access 的 script：同一台用的 windows-mcp-stdio、別台用的 windows-mcp-http.ps1。
 
 windows-mcp-stdio 在假 WSL 跑：powershell.exe、wslpath 換成 PATH 上的假指令。
-windows-mcp-http.ps1 要 pwsh 才跑（沒有就 skip）：Get-NetTCPConnection、Get-CimInstance、Stop-Process、Start-Process、
-Set-Clipboard、防火牆 cmdlet 換成同名的 PowerShell 函式（函式比 cmdlet 先被找到），windows-mcp.exe 換成假的 mise shim。
+windows-mcp-http.ps1 要 PowerShell 才跑（TEST_POWERSHELL 指定哪支，預設 pwsh，沒有就 skip）：Get-NetTCPConnection、Get-CimInstance、Stop-Process、Start-Process、
+Set-Clipboard、防火牆 cmdlet 換成同名的 PowerShell 函式（函式比 cmdlet 先被找到），windows-mcp.exe 換成假的：
+Linux 放在 mise shim 的位置，Windows 上做不出假 .exe，改放 PATH 上的 windows-mcp.cmd（script 找不到 shim 時找 PATH）。
 假 windows-mcp 把每次呼叫記進 calls、auth 時換 key 並把 key 印到 stdout／stderr，用來驗 script 有把它丟掉。
 """
 import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -18,7 +20,8 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "skills" / "windows-access" / "scripts"
 STDIO_SCRIPT = SCRIPTS / "windows-mcp-stdio"
 HTTP_SCRIPT = SCRIPTS / "windows-mcp-http.ps1"
-PWSH = shutil.which("pwsh")
+PWSH = os.environ.get("TEST_POWERSHELL") or shutil.which("pwsh")
+WINDOWS = os.name == "nt"
 KEY = "s3cret-key"
 MISE_SHIM = Path("AppData") / "Local" / "mise" / "shims" / "windows-mcp.exe"
 
@@ -37,11 +40,12 @@ echo "$FAKE_WINHOME${p#C:/Users/me}"
 
 class McpYamlTest(unittest.TestCase):
     def test_stdio_server_points_at_existing_script(self):
-        text = (ROOT / "mcp.yaml").read_text()
+        text = (ROOT / "mcp.yaml").read_text(encoding="utf-8")
         path = re.search(r'\$HOME/\.claude/skills/([^"]+windows-mcp-stdio)', text).group(1)
         self.assertTrue((ROOT / "skills" / path).is_file(), path)
 
 
+@unittest.skipIf(WINDOWS, "windows-mcp-stdio 在 WSL 跑")
 class WindowsMcpStdioTest(unittest.TestCase):
     """windows-mcp-stdio：mcp.yaml 的進入點。找到 mise 裝的 shim 就 exec，找不到叫人去 apply，不是 WSL 就結束。"""
 
@@ -95,6 +99,8 @@ class WindowsMcpHttpFileTest(unittest.TestCase):
 
 # 換掉 script 會叫的 Windows cmdlet。server「在聽 8000」用 state/listening 檔案代表
 FAKES_PS1 = r"""
+# Windows PowerShell 5.1 導向時用 OEM code page 輸出，中文訊息會壞
+[Console]::OutputEncoding = New-Object Text.UTF8Encoding $false
 function Get-NetTCPConnection { [CmdletBinding()] param($LocalPort, $State)
   if (Test-Path "$env:FAKE_STATE/listening") { [pscustomobject]@{ OwningProcess = 4242 } } }
 # 聽 8000 的那支行程：預設是 windows-mcp，FAKE_PROC_* 換成別的程式
@@ -121,16 +127,21 @@ function Get-NetFirewallPortFilter { [CmdletBinding()] param([Parameter(ValueFro
 """
 
 # 假 windows-mcp：auth 換 key 並把 key 印出來（真的 auth --force 也會印）；serve 開始「聽」後就結束
-FAKE_WINDOWS_MCP = r"""#!/usr/bin/env bash
-echo "$*" >> "$FAKE_STATE/calls"
-case "$1" in
-  auth)
-    [ -n "$FAKE_AUTH_BROKEN" ] && exit 1
-    k="rotated-$RANDOM$RANDOM"
-    printf 'transport = "streamable-http"\nauth_key = "%s"\n' "$k" > "$HOME/.windows-mcp/config.toml"
-    echo "Generated auth key: $k"; echo "Authorization: Bearer $k" >&2 ;;
-  serve) touch "$FAKE_STATE/listening" ;;
-esac
+FAKE_WINDOWS_MCP = r"""
+import os, random, sys
+from pathlib import Path
+state = Path(os.environ["FAKE_STATE"])
+with open(state / "calls", "a") as f:
+    f.write(" ".join(sys.argv[1:]) + "\n")
+if sys.argv[1] == "auth":
+    if os.environ.get("FAKE_AUTH_BROKEN"):
+        sys.exit(1)
+    k = f"rotated-{random.randrange(10**9)}"
+    Path(os.environ["FAKE_CONFIG"]).write_text(f'transport = "streamable-http"\nauth_key = "{k}"\n')
+    print(f"Generated auth key: {k}")
+    print(f"Authorization: Bearer {k}", file=sys.stderr)
+elif sys.argv[1] == "serve":
+    (state / "listening").touch()
 """
 
 
@@ -138,7 +149,7 @@ def auth_call(host):
     return f"auth --transport streamable-http --host {host} --port 8000 --force"
 
 
-@unittest.skipUnless(PWSH, "沒有 pwsh")
+@unittest.skipUnless(PWSH, "沒有 PowerShell")
 class WindowsMcpHttpTest(unittest.TestCase):
     """windows-mcp-http.ps1 start|stop|auth-header：key 不印出來、先停再換 key、--host 傳到 auth 和 serve。"""
 
@@ -153,19 +164,31 @@ class WindowsMcpHttpTest(unittest.TestCase):
         self.config = home / ".windows-mcp" / "config.toml"
         self.config.write_text(f'transport = "streamable-http"\nauth_key = "{KEY}"\n')
         local = self.tmp / "local"
-        exe = local / "mise" / "shims" / "windows-mcp.exe"
-        exe.parent.mkdir(parents=True)
-        exe.write_text(FAKE_WINDOWS_MCP)
-        exe.chmod(0o755)
+        fake = self.tmp / "fake_windows_mcp.py"
+        fake.write_text(FAKE_WINDOWS_MCP)
+        self.env = {**os.environ, "HOME": str(home), "LOCALAPPDATA": str(local), "FAKE_STATE": str(self.state),
+                    "FAKE_CONFIG": str(self.config)}
+        if WINDOWS:
+            bin_dir = self.tmp / "bin"
+            bin_dir.mkdir()
+            (bin_dir / "windows-mcp.cmd").write_text(f'@"{sys.executable}" "{fake}" %*\r\n@exit /b %ERRORLEVEL%\r\n')
+            drive, rest = os.path.splitdrive(str(home))
+            # pwsh 7 的 $HOME 取 USERPROFILE，5.1 取 HOMEDRIVE + HOMEPATH
+            self.env.update(USERPROFILE=str(home), HOMEDRIVE=drive, HOMEPATH=rest,
+                            PATH=f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+        else:
+            exe = local / MISE_SHIM.relative_to("AppData/Local")
+            exe.parent.mkdir(parents=True)
+            exe.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{fake}" "$@"\n')
+            exe.chmod(0o755)
         self.fakes = self.tmp / "fakes.ps1"
-        self.fakes.write_text(FAKES_PS1)
-        self.env = {**os.environ, "HOME": str(home), "LOCALAPPDATA": str(local), "FAKE_STATE": str(self.state)}
+        self.fakes.write_text(FAKES_PS1, encoding="utf-8-sig")  # 5.1 讀沒有 BOM 的檔照 ANSI 解
 
     def run_ps(self, *args, **env):
         # 參數不加引號，跟人在 PowerShell 打的一樣（--host 這種 token 要照原樣進 $args）
         cmd = f". '{self.fakes}'; & '{HTTP_SCRIPT}' {' '.join(args)}; exit $LASTEXITCODE"
         return subprocess.run([PWSH, "-NoProfile", "-NonInteractive", "-Command", cmd], env={**self.env, **env},
-                              capture_output=True, text=True, timeout=60)
+                              capture_output=True, encoding="utf-8", timeout=60)
 
     def calls(self):
         path = self.state / "calls"

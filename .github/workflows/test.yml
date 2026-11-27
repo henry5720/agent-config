@@ -1,0 +1,33 @@
+# 自己寫的 skill script 在它會跑的 OS 上測（範圍見 #150）
+name: test
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ubuntu:
+    # Python、bash、pwsh（runner 內建）的測試全跑
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: |
+          uv run --isolated --no-project --with-requirements tests/requirements.txt \
+            python3 -B -m unittest discover -s tests -v
+
+  windows:
+    # 只有 windows-mcp-http.ps1 在 Windows 原生跑；其他測試用 bash 寫的假指令
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        powershell: [powershell, pwsh]  # Windows PowerShell 5.1、PowerShell 7
+    env:
+      TEST_POWERSHELL: ${{ matrix.powershell }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: |
+          & $env:TEST_POWERSHELL -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'
+          uv run --isolated --no-project python -B -m unittest discover -s tests -p test_windows_access.py -v
