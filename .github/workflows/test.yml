@@ -5,10 +5,15 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   ubuntu:
     # Python、bash、pwsh（runner 內建）的測試全跑
     runs-on: ubuntu-latest
+    env:
+      TEST_POWERSHELL: pwsh  # 指定了找不到會報錯，不會整批 skip
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -22,12 +27,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        powershell: [powershell, pwsh]  # Windows PowerShell 5.1、PowerShell 7
+        include:
+          - powershell: powershell  # Windows PowerShell 5.1
+            major: 5
+          - powershell: pwsh
+            major: 7
     env:
       TEST_POWERSHELL: ${{ matrix.powershell }}
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
       - run: |
-          & $env:TEST_POWERSHELL -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'
+          $v = & $env:TEST_POWERSHELL -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'
+          "$env:TEST_POWERSHELL $v"
+          if (([version]$v).Major -ne ${{ matrix.major }}) { "要 ${{ matrix.major }}.x"; exit 1 }
           uv run --isolated --no-project python -B -m unittest discover -s tests -p test_windows_access.py -v
