@@ -109,6 +109,8 @@ if ($cmd -in 'stop', 'rotate') {
   # rotate 一定先停再換 key：server 跑著時 auth --force 只改 config.toml，跑著的 server 繼續收舊 key
   Listeners | Where-Object { IsWindowsMcp $_ } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
   if ($cmd -eq 'rotate') { Rotate '127.0.0.1' }
+  # 殺掉後 port 要一兩秒才放掉（2026-11-27 henry-desktop 實測，5.1 的 stop 因此誤報還在聽）
+  for ($i = 0; $i -lt 10 -and (Listening) -ne 0; $i++) { Start-Sleep -Seconds 1 }
   $left = Listening
   "還在聽 ${Port} 的程式：${left}（要 0）"
   if ($left -ne 0) { Fail "還有程式在聽 ${Port}（$(DescribeListeners)）：是 windows-mcp 就重跑 ${cmd}（重跑也安全）；不是的話 ${cmd} 不會停它，請自己處理" }
