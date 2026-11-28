@@ -543,7 +543,7 @@ def running(service=None, host=None):
         pairs = [p for p in recorded() if not service or p[0] == service]
     found, hosts, seen = [], ssh_hosts(), set()
     for name, h in pairs:
-        if h not in hosts:
+        if h not in hosts and not host:  # 指定的 host 打錯時交給 resolve 報「不認得」
             say(f"記錄裡的 {h} 不在 ssh config 了，略過：刪掉 {state_dir() / 'connected'} 的那一行")
             continue
         # `Host desktop henry-desktop` 是同一台：照 ssh -G 的 hostname 只查一次

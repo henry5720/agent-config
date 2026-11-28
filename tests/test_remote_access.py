@@ -1085,6 +1085,11 @@ class ServeTest(ServeFixture):
         self.assertEqual([(r[1], " ".join(r[5:])) for r in rows],
                          [("box", "通過"), ("laptop", "逾時（重跑 up，不用了就 down）")], out)
 
+    def test_ps_with_unknown_host_says_unknown(self):
+        code, out = self.run_cli([*PS, "windows-mcp", "no-such-host"])
+        self.assertEqual(code, 1, out)
+        self.assertIn("不認得的 host", out)
+
     def test_down_keeps_the_record_when_host_cannot_be_checked(self):
         self.run_cli([*UP, "windows-mcp", "box", "--create-task"])
         self.env["FAKE_ONLY_HOST"] = "nobody"
