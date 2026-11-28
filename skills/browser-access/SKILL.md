@@ -16,15 +16,15 @@ description: 接瀏覽器：自己的 headless、使用者的獨立 profile（92
 
 - **同一台**（你跑在使用者面前那台 Windows，`uname -s` 印 `MINGW*`／`MSYS*`；他可能是 ssh 進來的，不確定就問他）→ 照下面〈同一台 Windows〉。
 - **你跑在 Windows、使用者在別台** → tailnet 內用獨立 profile（照下一條）。一定要插件或使用者在 tailnet 外時，跟使用者說這台接不了，請他從 Linux／macOS 的已配置主機開 session。
-- **tailnet 內** → 讀服務卡〈先挑哪支 Chrome〉決定用哪支，再照那一節做到它寫的「怎麼確認」成立。轉發由使用者在他的個人電腦開；ssh 指令照抄服務卡給他。例外：獨立 profile 在 Windows、你 ssh 得進那台時，照服務卡〈獨立 profile〉的 `chrome-agent` task 自己叫起 Chrome、自己開 `-L`。`schtasks /query /tn chrome-agent` 查不到 task 時，問使用者要不要建（建了會一直留在他那台），他說好再照那段建。
+- **tailnet 內** → 讀服務卡〈先挑哪支 Chrome〉決定用哪支，再照那一節做到它寫的「怎麼確認」成立。轉發由使用者在他的個人電腦開；ssh 指令照抄服務卡給他。例外：獨立 profile 在 Windows、你 ssh 得進那台時，一律照 `remote-access`〈服務定義〉跑 `remote-access up browser <host>`。`up` 說那台還沒有 `chrome-agent` task 時，問使用者要不要建（建了會一直留在他那台），他說好再照服務卡〈獨立 profile〉那段建，再重跑 `up`。
 - **tailnet 外** → 照下面〈接插件〉跑 `--tunnel`，把輸出交給他。插件的 relay 由這支 script 自己開 tunnel，不走 `remote-access` 的 Funnel、quick tunnel。
 
 ## 只有你要守的
 
 - **9222、9377、1080 沒有驗證，只走 tailnet 內**（`remote-access`〈本機 port 總表〉）。開到 tailnet 外的只有插件的 relay，而且只經 `playwright-extension-attach --tunnel` 開。
-- **port 被佔照 `remote-access`〈本機 port 總表〉回報**，由使用者決定怎麼處理。例外：9222 上是使用者的獨立 profile（`/json/version` 不是 `HeadlessChrome`）時直接用它，不另開 headless。
+- **port 被佔照 `remote-access`〈本機 port 總表〉回報**，由使用者決定怎麼處理。例外：9222 上是使用者自己開 `-L`／`-R` 轉過來的獨立 profile（`/json/version` 不是 `HeadlessChrome`）時直接用它，不另開 headless。
 - **使用者的 Chrome 開新分頁再操作。** 接上他的獨立 profile 或插件後，用 `tab-new <網址>`；他正在看的分頁留給他。插件接上後一樣能開多個分頁（收在同一個分頁群組），用 `tab-list` 確認看得到。
-- **用完收。** 自己開的 headless、`show` 收掉；接使用者的 Chrome 用 `detach`（Chrome 和分頁留給他），tailnet 內再請他關 ssh（你自己開的 `-L` 自己收）。
+- **用完收。** 自己開的 headless、`show` 收掉；接使用者的 Chrome 用 `detach`（Chrome 和分頁留給他），tailnet 內再請他關 ssh；`up browser` 開的由你 `remote-access down browser <host>` 收。
 
 ## 同一台 Windows
 

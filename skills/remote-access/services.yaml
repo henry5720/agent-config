@@ -34,3 +34,23 @@ services:
     # hosts:
     #   <客戶的 Host>:
     #     start: [{task: {name: remote-access-windows-mcp, keep: false}}]
+  browser:
+    # 使用者在 Windows 個人電腦上的獨立 profile Chrome（browser-access）。CDP 沒有驗證，只走 ssh 轉發
+    mode: forward
+    port: 9222
+    # chrome-devtools MCP 寫死 127.0.0.1:9222（mcp.yaml），本機也接 9222。被佔就報錯，不換
+    local_port: 9222
+    # Interactive task 開在使用者的桌面：從 ssh 直接開的 Chrome 在 session 0，看不到視窗
+    needs_desktop: true
+    start:
+      # task 由 browser-access 照 dotfiles 服務卡建（要先問使用者），up 只 schtasks /run，不建
+      - task: {name: chrome-agent, keep: true}
+    # 聽 9222 而且命令列有 chrome-agent（--user-data-dir）的才是這支；down 只關轉發，Chrome 和分頁留給使用者
+    stop: {match: chrome-agent, keep_running: true}
+    verify:
+      path: /json/version
+      expect_without: 200
+      # 每支 Chrome 的 webSocketDebuggerUrl 不同：這台 9222 看到的要跟那台自己的一樣，不然就是接到別支
+      same_as_host: webSocketDebuggerUrl
+    # stdio 的 MCP，mcp.yaml 沒有網址可以對
+    mcp: chrome-devtools
