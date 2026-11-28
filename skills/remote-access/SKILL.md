@@ -31,7 +31,7 @@ description: 連線：agent 跟服務不在同一台時怎麼連過去。同一�
 | 7681 | ttyd 網頁 shell | dotfiles 的 [ttyd-serve](https://github.com/henry5720/dotfiles/blob/main/docs/how-to/remote-access/ttyd-serve.md) | 可以，ttyd 帶隨機密碼 |
 | `services.yaml` 的 `local_port` | 服務定義走 forward 模式時 agent 這台接的 port（windows-mcp、browser）；serve 模式不佔本機 port | `remote-access up` | 照服務 |
 
-服務定義的 port 以 `services.yaml` 為準，這張不抄數字。agent 那台在 WSL mirrored networking 下跟 Windows 共用 port，`local_port` 要跟服務本身的 `port` 錯開；browser 例外，兩個都是 9222（chrome-devtools MCP 寫死），這台的 9222 被佔時 `up` 會報錯。兩台都走 forward 時，第二台在 `hosts.<host>` 另給 `local_port`。
+服務定義的 port 以 `services.yaml` 為準，這張不抄數字。agent 那台在 WSL mirrored networking 下跟 Windows 共用 port，`local_port` 要跟服務本身的 `port` 錯開。兩台都走 forward 時，第二台在 `hosts.<host>` 另給 `local_port`。browser 的 `local_port` 跟 `port` 相同（chrome-devtools MCP 寫死 9222），同時只接一台。
 
 **port 被佔就回報，不換 port。** 換了會接到錯的 server，或跟寫死 port 的 MCP 設定對不上。用 `ss -ltnp | grep <port>` 找出是誰（Windows 用 `Get-NetTCPConnection -State Listen -LocalPort <port> -ErrorAction SilentlyContinue | ForEach-Object { Get-Process -Id $_.OwningProcess }`，沒印東西就是沒人在聽），告訴使用者，由他決定。
 
@@ -46,7 +46,7 @@ description: 連線：agent 跟服務不在同一台時怎麼連過去。同一�
 服務寫在這支 skill 的 `services.yaml`（現在有 windows-mcp、browser）時，一律用 CLI `~/.claude/skills/remote-access/scripts/remote-access`，不手動開 ssh、serve，參數看 `remote-access <子命令> --help`。`<host>` 是 ssh config 的 Host。CLI 經 ssh 送 PowerShell 到那台做事，那台不用有 skill 目錄（沒勾 agent-config 的 Windows 也行）。服務自己要的前置（安裝、key、MCP 設定）看服務的 skill。
 
 1. **先問使用者**，說好才跑：
-   - 那台第一次 `up` 要加 `--create-task`：常駐 task 會一直留在那台。
+   - 那台第一次 `up` 要加 `--create-task`：常駐 task 會一直留在那台。browser 的 task 由 browser-access 建：`up` 回報沒有 task 時照 browser-access 問。
    - 客戶的機器：`up`、`down`、`ps <服務> <host>` 都會在那台跑 PowerShell，每次都先問。客戶機器在 `services.yaml` 的 `hosts.<host>` 設 `keep: false`（範例在檔案註解），task 由 `up` 建、`down` 刪。
 2. **起**：`remote-access up <服務> <host>`。已經起好而且驗證過時只回報，重跑安全。
    完成條件：印出 `網址：…`（或 `已經起好：…`）和 `MCP：<名稱>`。

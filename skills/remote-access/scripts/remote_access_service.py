@@ -22,9 +22,11 @@ local_port 被別的程式佔著就報錯、說出是誰，不換 port。down �
 ControlMaster 的 socket 在 ~/.local/state/remote-access/。
 
 沒有 key 的服務（browser）：不送 key、不寫設定檔，只 `schtasks /run` 叫起服務的 skill 建好的 task，
-task 不在就報錯（remote-access 不建）。驗證打 verify.path 要回 expect_without。
+task 不在就報錯（remote-access 不建）；那台已經在聽（使用者開著的 Chrome）就不叫 task、只開轉發；
+命令列對得上 match 的行程開著卻沒聽 port（chrome-agent profile 沒帶 9222）就請使用者先關掉。驗證打 verify.path 要回 expect_without。
 verify.same_as_host 是 JSON 欄位名稱：這台經轉發打到的那個欄位，要跟那台自己打 127.0.0.1:<port> 的一樣，
-不一樣就是接到別支（例如 browser 的 webSocketDebuggerUrl 每支 Chrome 不同）。
+不一樣就是接到別支，收掉轉發、報錯（browser 的 webSocketDebuggerUrl 只比路徑 /devtools/browser/<guid>）。
+那台查不到值（ssh 斷、逾時）時是「比對不了」：轉發留著、exit 1，不當成接錯。
 stop.keep_running 的服務 down 只關轉發，服務留在那台（browser 的 Chrome 和分頁留給使用者）。
 
 ps：查這台 up 過的（服務、host）：up 成功時記到 ~/.local/state/remote-access/connected，down 收乾淨時刪掉。
@@ -60,6 +62,7 @@ import tempfile
 import unicodedata
 from pathlib import Path
 from types import SimpleNamespace
+from urllib.parse import urlsplit
 
 from remote_access_common import probe as probe_url, run, say, verify
 
@@ -173,6 +176,8 @@ if (-not $l.Count) { 'listen=none' }
 elseif ($l | Where-Object { $_.CommandLine -notmatch $Match }) { 'listen=other:' + ((($l | ForEach-Object { "$($_.ProcessId)/$($_.Name)" }) -join ',') -replace '[^\x20-\x7e]', '?') }
 else { 'listen=ours' }
 "serve=$(ServeState)"
+# 命令列對得上 $Match 的行程有幾個：browser 的 chrome-agent profile 開著但沒聽 port 時要分辨出來
+"procs=$(@(Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match $Match }).Count)"
 """
 
 # 沒有 key 的服務：task 由服務的 skill 建好，這裡只叫起、等它聽 port
@@ -416,6 +421,7 @@ def verify_service(host, svc, base, key_env):
     """有 key 照 verify（不帶、帶 key 各回 verify 寫的碼）；沒 key 只打不帶的。再照 same_as_host 比對是不是那台的。"""
     v = svc["verify"]
     url = base + v.get("path", "/")
+    # 回 True／False；same_as_host 那台查不到值時回 None（比對不了，不代表接錯）
     if "key" in svc:
         if not verify(verify_check(svc, key_env), base, public_dns=False):
             return False
@@ -428,13 +434,33 @@ def verify_service(host, svc, base, key_env):
     if not field:
         return True
     seen = local_json(url)
-    theirs = win(host, ps_script("identity", PS_IDENTITY, svc, PATH=v.get("path", "/"), FIELD=field))[1].get("id", "")
-    if theirs and seen.get(field) == theirs:
-        say(f"比對：{url} 的 {field} 跟 {host} 自己的一樣，接到的是 {host} 那支")
+    code, out = win(host, ps_script("identity", PS_IDENTITY, svc, PATH=v.get("path", "/"), FIELD=field),
+                    timeout=float(os.environ.get("REMOTE_ACCESS_PROBE_TIMEOUT", "15")))
+    theirs = out.get("id", "")
+    if not theirs:
+        why = "逾時" if "timeout" in out else "ssh 連不上" if code == 255 else \
+            f"那台打 127.0.0.1:{svc['port']}{v.get('path', '/')} 沒拿到 {field}"
+        say(f"比對不了：{host} 自己的 {field} 查不到（{why}）")
+        return None
+    mine = printable(seen.get(field, ""))
+    if same_target(mine, theirs):
+        say(f"比對：{url} 的 {field} 跟 {host} 自己的是同一支（{urlsplit(theirs).path or theirs}），接到的是 {host} 那支")
         return True
-    say(f"比對：{url} 接到的不是 {host} 那支（{field}：這台看到 {seen.get(field) or '空的'}，"
-        f"{host} 自己的是 {theirs or '空的'}；這台看到的 User-Agent：{seen.get('User-Agent') or '空的'}）")
+    say(f"比對：{url} 接到的不是 {host} 那支（{field}：這台看到 {mine or '空的'}，"
+        f"{host} 自己的是 {theirs}；這台看到的 User-Agent：{printable(seen.get('User-Agent', '')) or '空的'}）")
     return False
+
+
+def printable(value):
+    """要印出來的、別台回的字串：非 ASCII 和控制字元換成 ?（同 PS_IDENTITY）。"""
+    return re.sub(r"[^\x20-\x7e]", "?", str(value))
+
+
+def same_target(mine, theirs):
+    """URL 只比路徑：Chrome 的 webSocketDebuggerUrl 的 host:port 跟著請求的 Host 變，
+    /devtools/browser/<guid> 才是那支 Chrome（2026-11-28 company-ec2 實測，local_port 跟 port 不同時整串一定不一樣）。"""
+    ident = lambda u: urlsplit(u).path if "://" in u else u
+    return bool(mine) and ident(mine) == ident(theirs)
 
 
 def verify_check(svc, key_env):
@@ -503,26 +529,35 @@ def cmd_up(args):
         if owner:
             # 佔著的常是別台的 ssh -R：看不出是哪台，附上它回的 User-Agent（Windows／Linux、HeadlessChrome）
             ua = svc["verify"].get("same_as_host") and local_json(f"http://127.0.0.1:{svc['local_port']}{path}").get("User-Agent")
-            die(f"這台的 {svc['local_port']} 被別的程式佔著（{owner}" + (f"；它回的 User-Agent：{ua}" if ua else "")
+            die(f"這台的 {svc['local_port']} 被別的程式佔著（{owner}" + (f"；它回的 User-Agent：{printable(ua)}" if ua else "")
                 + "）：請使用者處理，不自動換 port")
     running_there = state.get("listen") == "ours" or state.get("serve") == "ours"
     # keep_running 的服務（browser）在那台開著、這台還沒轉發是常態（使用者自己開的 Chrome），不用收掉重起
     if forwarded or (running_there and not (forward and svc["keep_running"])):
-        if verify_service(args.host, svc, url, key_env):
+        ok = verify_service(args.host, svc, url, key_env)
+        if ok:
             say(f"{args.service} 在 {args.host} 已經起好：{url}{path}")
             say_mcp(svc, url + path, key_env)
             set_recorded(args.service, args.host, True)
             return
+        if ok is None:
+            cannot_compare(args, svc)
         say("上一輪起的沒通過驗證，收掉重起")
         stop(args.host, svc)
-    if state.get("task") != "1" and not keyed:
-        die(f"{args.host} 還沒有 task {svc['task']['name']}：{args.service} 的 task 由服務的 skill 建（問過使用者），"
-            "remote-access 不建")
-    if state.get("task") != "1" and svc["task"]["keep"] and not args.create_task:
+    # 那台已經在聽（使用者開著的 Chrome）：不叫 task，叫了會在他桌面多彈一個視窗
+    already_listening = forward and svc["keep_running"] and state.get("listen") == "ours"
+    if not keyed and not already_listening:
+        if state.get("procs", "0") not in ("", "0") and state.get("listen") == "none":
+            die(f"{args.host} 上命令列有 {svc['match']} 的程式開著，但沒在聽 {svc['port']}"
+                f"（browser：chrome-agent profile 的 Chrome 開著但沒開 {svc['port']}）：請使用者先關掉它再 up")
+        if state.get("task") != "1":
+            die(f"{args.host} 還沒有 task {svc['task']['name']}：{args.service} 的 task 由服務的 skill 建（問過使用者），"
+                "remote-access 不建")
+    if keyed and state.get("task") != "1" and svc["task"]["keep"] and not args.create_task:
         die(f"{args.host} 還沒有常駐 task {svc['task']['name']}：它會一直留在那台，問過使用者後加 --create-task 再跑")
 
-    say(f"在 {args.host} 起 {args.service}（task {svc['task']['name']}），"
-        + ("開 ssh 轉發…" if forward else "開 tailscale serve…"))
+    say(f"{args.service} 在 {args.host} 已經開著，開 ssh 轉發…" if already_listening else
+        f"在 {args.host} 起 {args.service}（task {svc['task']['name']}），" + ("開 ssh 轉發…" if forward else "開 tailscale serve…"))
     # forward 只有 ssh 轉進來的 127.0.0.1 連得到，不用 allowlist
     security = "''" if forward else (
         '"`n[security]`nip_allowlist = [' + ", ".join(f"'{ip}'" for ip in allow) + ']`n"')
@@ -533,11 +568,13 @@ def cmd_up(args):
                                              SECURITY=security, SERVE="$false" if forward else "$true",
                                              # keep: false 的 task 每次 up 建、down 刪，不用問
                                              CREATE="$true" if args.create_task or not svc["task"]["keep"] else "$false"))
+    elif already_listening:
+        code, out = 0, {"started": "1"}
     else:
         code, out = win(args.host, ps_script("start", PS_RUN, svc))
     if code != 0 or out.get("started") != "1":
         reason = {
-            "notask": "task 不在（加 --create-task 建）",
+            "notask": "task 不在（加 --create-task 建）" if keyed else "task 不在（由服務的 skill 建，remote-access 不建）",
             "noexe": "那台找不到 windows-mcp（照 windows-access 裝）",
             "taskcreate": "建 task 失敗",
             "nolisten": f"server 30 秒內沒在 {svc['port']} 起來（桌面 session 有沒有登入著；其他原因看服務的 skill）",
@@ -550,7 +587,10 @@ def cmd_up(args):
         if not ok:
             stop(args.host, svc)
             die(f"ssh 轉發開不起來（{err or '沒有錯誤訊息'}）。起了一半的已收掉")
-    if not verify_service(args.host, svc, url, key_env):
+    ok = verify_service(args.host, svc, url, key_env)
+    if ok is None:
+        cannot_compare(args, svc)
+    if not ok:
         stop(args.host, svc)
         die("驗證沒過，起了一半的已收掉。看 remote-access 的 reference.md")
     via = f"（ssh 轉到 {args.host} 的 {svc['port']}）" if forward else ""
@@ -559,8 +599,18 @@ def cmd_up(args):
     set_recorded(args.service, args.host, True)
 
 
+def cannot_compare(args, svc):
+    """比對不了（那台查不到值）：不是接錯，轉發留著、記下來，讓 ps／down 找得到。"""
+    set_recorded(args.service, args.host, True)
+    die(f"轉發留著（http://127.0.0.1:{svc['local_port']}）：確認 ssh {args.host} 正常後重跑 up，"
+        f"不用了就 down {args.service} {args.host}")
+
+
 def cmd_down(args):
     svc = resolve(args)
+    if args.dry_run and svc["keep_running"]:
+        say(f"[dry-run] {args.host}：只關 ssh 轉發，{svc['match']}（聽 {svc['port']}）留在那台")
+        return
     if args.dry_run:
         say(f"[dry-run] {args.host}：停 {svc['task']['name']} 和聽 {svc['port']} 的 {svc['match']}、"
             f"{'關 ssh 轉發' if svc['mode'] == 'forward' else '關 serve'}、"
@@ -579,7 +629,8 @@ def ps_verify(host, svc, base, key_env=None):
         if not os.environ.get(key_env):
             return f"沒驗證（{key_env} 沒設）"
     with contextlib.redirect_stdout(io.StringIO()):  # verify 的過程訊息不混進表格
-        return "通過" if verify_service(host, svc, base, key_env) else "沒通過"
+        ok = verify_service(host, svc, base, key_env)
+    return "通過" if ok else "比對不了" if ok is None else "沒通過"
 
 
 def ps_serve(svc, host):

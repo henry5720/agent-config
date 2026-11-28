@@ -625,7 +625,8 @@ SERVE_KEY = "fixed-key-0123456789"
 # 解開後照第一行的 `# remote-access:<動作>` 模擬那台。每台的狀態放 $FAKE_STATE/<host>/，用檔案代表：
 #   desktop（有人登入桌面）、task（常駐 task 在）、listen（windows-mcp 聽著；內容 other:… 是別的程式）、
 #   serve（tailscale serve 開著；內容 other 是別人的）、config（server 讀的設定檔，內容是 key）、
-#   keyfile（sftp 放上來的 key 暫存檔，start 讀完就刪）、cdp-id（那台自己打 9222 看到的 webSocketDebuggerUrl）
+#   keyfile（sftp 放上來的 key 暫存檔，start 讀完就刪）、cdp-id（那台 Chrome 的 browser GUID；identity 回 ws://127.0.0.1:9222/devtools/browser/<GUID>）、
+#   procs（命令列對得上 match 的行程數）
 # argv 記在 calls，解開的 script 記在 scripts。stdin 一律不讀：實機上 PowerShell 經 ssh 讀 stdin 偶爾收不到。
 FAKE_SSH = r"""#!/usr/bin/env python3
 import base64, os, sys
@@ -681,13 +682,17 @@ def probe():
     # PowerShell 5.1 經 ssh 照 console code page（Big5）送出
     sys.stdout.flush(); sys.stdout.buffer.write((line + "\n").encode("big5", "replace")); sys.stdout.flush()
     print("serve=" + ("none" if not has("serve") else "other" if read("serve") == "other" else "ours"))
+    print("procs=" + (read("procs") or ("1" if has("listen") else "0")))
 # 模擬 PowerShell 5.1 經 ssh 的雜訊：CLIXML 進度訊息、Big5 中文
 sys.stdout.buffer.write("#< CLIXML\n準備中\n".encode("big5"))
 sys.stdout.flush()
 if action == "probe":
     probe()
 elif action == "identity":
-    print("id=" + read("cdp-id"))
+    # FAKE_IDENTITY_DOWN：這次 ssh 連不上（255）
+    if os.environ.get("FAKE_IDENTITY_DOWN"):
+        sys.exit(255)
+    print("id=ws://127.0.0.1:9222/devtools/browser/" + read("cdp-id"))
 elif action == "start" and "$create" not in script:
     # 沒有 key 的服務（browser）：只叫起已經建好的 task
     if not has("task"):
@@ -753,7 +758,8 @@ exit 1
 # 假 curl：serve 打 https://<host>.tail123.ts.net/…，狀態在 $FAKE_STATE/<host>/；forward 打本機 port，當成轉到 box。
 # windows-mcp 聽著、serve（或轉發）開著時，帶的 key 跟那台 config 一樣回 200，否則 401；沒開回 000
 # /json/version（browser）沒有驗證：$FAKE_STATE/local-cdp.json 在時代表這台的 port 上是別支 Chrome，回它；
-# 不然轉發開著、Chrome 聽著就回 box 那支（webSocketDebuggerUrl 是 cdp-id）。不帶 -w 時印 body
+# 不然轉發開著、Chrome 聽著就回 box 那支。跟真的 Chrome 一樣，webSocketDebuggerUrl 的 host:port 照請求的 Host
+# （預設是網址的 host:port），路徑 /devtools/browser/<cdp-id> 才是那支。不帶 -w 時印 body
 FAKE_SERVE_CURL = r"""#!/usr/bin/env bash
 header=""; url=""
 for a in "$@"; do case "$a" in http*) url="$a" ;; esac; done
@@ -763,7 +769,9 @@ printf 'curl' >> "$state/calls"; printf ' %q' "$@" >> "$state/calls"; echo >> "$
 case "$url" in */json/version)
   if [ -e "$FAKE_STATE/local-cdp.json" ]; then body=$(cat "$FAKE_STATE/local-cdp.json")
   elif [ -e "$state/master" ] && [ "$(cat "$state/listen" 2>/dev/null)" = ours ]; then
-    body="{\"webSocketDebuggerUrl\": \"$(cat "$state/cdp-id")\", \"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0) Chrome/142\"}"
+    hostport=${url#http://}; hostport=${hostport%%/*}
+    for a in "$@"; do case "$a" in "Host: "*) hostport=${a#Host: } ;; esac; done
+    body="{\"webSocketDebuggerUrl\": \"ws://$hostport/devtools/browser/$(cat "$state/cdp-id")\", \"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0) Chrome/142\"}"
   else printf 000; exit 7; fi
   case " $* " in *" -w "*) printf 200 ;; *) printf '%s' "$body" ;; esac
   exit 0 ;;
@@ -1276,7 +1284,7 @@ class ForwardTest(ServeFixture):
 class BrowserTest(ServeFixture):
     """browser：沒有 key、forward、task 由 browser-access 建好；本機 port 換成空的，不碰這台真的 9222。"""
 
-    CDP_ID = "ws://127.0.0.1:9222/devtools/browser/box-1111"
+    CDP_ID = "box-1111"
 
     def setUp(self):
         super().setUp()
@@ -1340,12 +1348,58 @@ class BrowserTest(ServeFixture):
             self.assertIn("由服務的 skill 建", out)
         self.assertNotIn("# remote-access:start", self.read("scripts"))
 
+    def test_same_chrome_matches_although_local_port_differs(self):
+        # Chrome 的 webSocketDebuggerUrl 的 host:port 跟著 Host 變：這台看到 local_port，那台看到 9222，只比 GUID
+        self.assertNotEqual(self.local_port, 9222)
+        code, out = self.run_cli([*UP, "browser", "box"])
+        self.assertEqual(code, 0, out)
+        self.assertIn("/devtools/browser/box-1111", out)
+        self.assertNotIn("接到的不是", out)
+
+    def test_cannot_compare_keeps_the_forward_and_says_why(self):
+        self.env["FAKE_IDENTITY_DOWN"] = "1"
+        code, out = self.run_cli([*UP, "browser", "box"])
+        self.assertEqual(code, 1, out)
+        self.assertIn("比對不了", out)
+        self.assertIn("ssh 連不上", out)
+        self.assertNotIn("接到的不是", out)
+        self.assertTrue(self.has("master"))  # 轉發留著
+        code, out = self.run_cli([*PS])
+        self.assertIn("比對不了", out)
+        del self.env["FAKE_IDENTITY_DOWN"]
+        code, out = self.run_cli([*DOWN, "browser", "box"])
+        self.assertEqual(code, 0, out)
+        self.assertFalse(self.has("master"))
+
+    def test_printed_values_from_the_other_side_are_ascii_only(self):
+        (self.base / "local-cdp.json").write_text(
+            '{"webSocketDebuggerUrl": "ws://x/devtools/browser/other", "User-Agent": "Chrome\\u001b[31m 中"}')
+        code, out = self.run_cli([*UP, "browser", "box"])
+        self.assertEqual(code, 1, out)
+        self.assertIn("Chrome?[31m ?", out)
+        self.assertNotIn("\x1b", out)
+
+    def test_profile_open_without_debug_port_says_close_it_first(self):
+        (self.state / "procs").write_text("3")
+        code, out = self.run_cli([*UP, "browser", "box"])
+        self.assertEqual(code, 1, out)
+        self.assertIn("chrome-agent profile 的 Chrome 開著但沒開 9222", out)
+        self.assertNotIn("# remote-access:start", self.read("scripts"))
+
+    def test_down_dry_run_says_it_only_closes_the_forward(self):
+        code, out = self.run_cli([*DOWN, "browser", "box", "--dry-run"])
+        self.assertEqual(code, 0, out)
+        self.assertIn("只關 ssh 轉發", out)
+        self.assertNotIn("刪那台的設定檔", out)
+
     def test_up_when_chrome_is_already_open_only_adds_the_forward(self):
         (self.state / "listen").write_text("ours")
+        (self.state / "task").unlink()  # 使用者自己開的：沒有 task 也接得上
         code, out = self.run_cli([*UP, "browser", "box"])
         self.assertEqual(code, 0, out)
         self.assertNotIn("收掉重起", out)
         self.assertNotIn("# remote-access:stop", self.read("scripts"))
+        self.assertNotIn("# remote-access:start", self.read("scripts"))  # 不叫 task，不多彈視窗
         code, out = self.run_cli([*UP, "browser", "box"])
         self.assertEqual(code, 0, out)
         self.assertIn("已經起好", out)
