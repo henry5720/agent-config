@@ -6,7 +6,7 @@ skillshare 的通用用法看[官方文件](https://skillshare.runkids.cc)，這
 ## 目錄樹
 
 ```text
-instructions/<名字>/   給模型讀的指令檔（全域規則、commit 指引），由 extras 連到各 client
+extras/<名字>/         給模型讀的指令檔（全域規則、commit 指引），由 extras 連到各 client
 mcp.yaml              三個 client 共用的 MCP server
 hooks/<名字>.yaml      自己寫的 hook（skillshare 的 hook entry），每台各自 add
 docs/                 給人看的文件
@@ -31,7 +31,7 @@ hook 和 plugin 也存在 `config.yaml`，所以每台要各自 add（hook 見 [
 
 ## extras 連到哪
 
-`instructions/` 底下每個資料夾是一個 extra，skillshare 把裡面的檔連到各 client 讀的位置：
+`extras/` 底下每個資料夾是一個 extra，skillshare 把裡面的檔連到各 client 讀的位置：
 
 | extra | 連到 |
 |---|---|

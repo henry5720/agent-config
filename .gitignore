@@ -8,7 +8,7 @@ extras/memory/
 # skillshare 在 Windows 把執行時檔案寫進 repo 資料夾（%APPDATA%\skillshare；Linux 放在 repo 外），
 # 沒忽略的話 skillshare pull 會當成本機改動拒絕拉（2026-11-28 henry-desktop 實測）
 /backups/
-/extras/
+/extras/backups/
 /logs/
 /mcp/
 /skill-version-check.json

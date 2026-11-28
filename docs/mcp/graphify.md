@@ -1,7 +1,7 @@
 # Graphify Cloud
 
 Graphify Cloud 是雲端的程式碼圖譜：把自家 repo 的 symbol、呼叫、依賴做成圖，讓 agent 不用 grep 一路讀檔就查得到。
-本機只有 `mcp.yaml` 一筆，不裝東西。agent 什麼時候用它寫在全域規則（`instructions/agents-md/AGENTS.md` 的「Graphify」段），
+本機只有 `mcp.yaml` 一筆，不裝東西。agent 什麼時候用它寫在全域規則（`extras/agents-md/AGENTS.md` 的「Graphify」段），
 這份講給人看的用法、坑，和跟 codegraph 的差別。試用紀錄在 [#99](https://github.com/henry5720/agent-config/issues/99)（到 2026-12-04）。
 
 ## 人怎麼用
