@@ -23,7 +23,8 @@ ControlMaster 的 socket 在 ~/.local/state/remote-access/。
 
 ps：查這台 up 過的（服務、host）：up 成功時記到 ~/.local/state/remote-access/connected，down 收乾淨時刪掉。
 記錄只決定查哪幾台，在不在跑照樣即時查（serve 模式查那台的 serve 狀態、port 有沒有在聽；forward 模式查 ssh -O check），
-列出服務、host、mode、網址或本機 port、MCP 名稱、驗證結果；ssh 連不上、沒在跑也列出來。只查不動那台。
+列出服務、host、mode、網址或本機 port、MCP 名稱、驗證結果；ssh 連不上、逾時、沒在跑也列出來。多台同時查，每台最多等 REMOTE_ACCESS_PROBE_TIMEOUT 秒
+（跟 docker-machine ls 一樣：連上後 PowerShell 卡住時 ConnectTimeout 管不到）。只查不動那台。
 不逐台掃 ssh config：太慢，也會到客戶機器跑 PowerShell（#157）。ps <服務> <host> 直接查那台，不看記錄。
 key 的環境變數沒設就不驗證。
 
@@ -35,9 +36,11 @@ key 從環境變數讀（services.yaml 的 key.env，--key-env 可以改讀別�
   REMOTE_ACCESS_SERVICES       改讀這個服務定義檔（測試用）
   EXPOSE_PORT_PROBE_INTERVAL   驗證時每次重試間隔秒數，預設 3（測試設 0）
   REMOTE_ACCESS_MCP_FILE       找 MCP 名稱用的 mcp.yaml，預設 ~/.config/skillshare/mcp.yaml
+  REMOTE_ACCESS_PROBE_TIMEOUT  ps、up 查一台最多等幾秒，預設 15（測試設短）
 """
 import argparse
 import base64
+import concurrent.futures
 import contextlib
 import io
 import ipaddress
@@ -217,13 +220,19 @@ def ps_script(action, body, svc, **extra):
     return script
 
 
-def win(host, script):
-    """經 ssh 在那台跑 PowerShell，回 (exit code, {key: value})。只認 ASCII 的 key=value 行，其他（CLIXML、中文）略過。"""
+def win(host, script, timeout=None):
+    """經 ssh 在那台跑 PowerShell，回 (exit code, {key: value})。只認 ASCII 的 key=value 行，其他（CLIXML、中文）略過。
+
+    超過 timeout 秒回 (124, {"timeout": "1"})。
+    """
     encoded = base64.b64encode(script.encode("utf-16-le")).decode()
-    p = subprocess.run(
-        ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", host, "powershell", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
-        stdin=subprocess.DEVNULL, capture_output=True, text=True, errors="replace",
-    )
+    try:
+        p = subprocess.run(
+            ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", host, "powershell", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
+            stdin=subprocess.DEVNULL, capture_output=True, text=True, errors="replace", timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return 124, {"timeout": "1"}
     out = {}
     for line in p.stdout.splitlines():
         m = re.fullmatch(r"([a-z_]+)=([\x20-\x7e]*)", line.strip())
@@ -314,7 +323,7 @@ def port_owner(port):
 
 
 def probe(host, svc):
-    return win(host, ps_script("probe", PS_PROBE, svc))[1]
+    return win(host, ps_script("probe", PS_PROBE, svc), timeout=float(os.environ.get("REMOTE_ACCESS_PROBE_TIMEOUT", "15")))[1]
 
 
 def stop(host, svc):
@@ -323,7 +332,8 @@ def stop(host, svc):
         forward_close(host, svc)
     _, out = win(host, ps_script("stop", PS_STOP, svc, KEEP="$true" if svc["task"]["keep"] else "$false"))
     after = probe(host, svc)
-    clean = after.get("listen") != "ours" and after.get("serve") != "ours"
+    # 查不到（ssh 連不上、逾時）不算收乾淨，不然 down 會刪掉記錄、把還在跑的藏起來
+    clean = bool(after) and "timeout" not in after and after.get("listen") != "ours" and after.get("serve") != "ours"
     if svc["mode"] == "forward":
         clean = clean and not forward_alive(host, svc)
     return forwarded or out.get("was_running") == "1", clean
@@ -411,8 +421,8 @@ def cmd_up(args):
         return
 
     state = probe(args.host, svc)
-    if not state:
-        die(f"ssh {args.host} 跑 PowerShell 沒有回應：先確認 ssh {args.host} 連得上、那台是 Windows")
+    if not state or "timeout" in state:
+        die(f"ssh {args.host} 跑 PowerShell 沒有回應{'（逾時）' if state else ''}：先確認 ssh {args.host} 連得上、那台是 Windows")
     if svc.get("needs_desktop") and state.get("desktop", "0") in ("", "0"):
         die(f"{args.host} 沒有人登入桌面：請先登入 {args.host} 的桌面（ssh 的那個帳號），再跑一次")
     if state.get("listen", "").startswith("other"):
@@ -499,8 +509,8 @@ def ps_serve(svc, host):
         return None
     base = f"https://{hostname}"
     state = probe(host, svc)
-    if not state:
-        return base, "ssh 連不上"
+    if not state or "timeout" in state:
+        return base, "逾時" if state else "ssh 連不上"
     if "ours" not in (state.get("listen"), state.get("serve")):
         return base, "沒在跑"
     return base, ""
@@ -512,8 +522,8 @@ def ps_forward(svc, host):
     if forward_alive(host, svc):
         return base, ""
     state = probe(host, svc)
-    if not state:
-        return base, "ssh 連不上"
+    if not state or "timeout" in state:
+        return base, "逾時" if state else "ssh 連不上"
     if state.get("listen") != "ours":
         return base, "沒在跑"
     return base, "在跑但轉發沒開"
@@ -541,12 +551,12 @@ def running(service=None, host=None):
         if same in seen:
             continue
         seen.add(same)
-        # mode 看 resolve 之後的（含 hosts.<host> 覆寫）
-        svc = resolve(SimpleNamespace(service=name, host=h))
-        hit = PS_BY_MODE[svc["mode"]](svc, h)
-        if hit and not (host and hit[1] == "沒在跑"):
-            found.append((name, h, svc, *hit))
-    return found
+        # mode 看 resolve 之後的（含 hosts.<host> 覆寫）；resolve 可能 die，先在主執行緒做完
+        found.append((name, h, resolve(SimpleNamespace(service=name, host=h))))
+    # 多台同時查：一台卡住只拖到它自己的逾時，不疊加
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        hits = list(pool.map(lambda f: PS_BY_MODE[f[2]["mode"]](f[2], f[1]), found))
+    return [(*f, *hit) for f, hit in zip(found, hits) if hit and not (host and hit[1] == "沒在跑")]
 
 
 def cmd_ps(args):

@@ -646,6 +646,10 @@ host = aliases.get(argv[argv.index("powershell") - 1], "") if "powershell" in ar
 host = host or (argv[argv.index("powershell") - 1] if "powershell" in argv else "")
 if host and os.environ.get("FAKE_ONLY_HOST") and host != os.environ["FAKE_ONLY_HOST"]:
     sys.exit(255)
+# FAKE_HANG_HOST：那台連上後 PowerShell 卡住（ConnectTimeout 管不到）
+if host and host == os.environ.get("FAKE_HANG_HOST"):
+    import time
+    time.sleep(30)
 # ControlMaster：master 檔代表開著，內容是 -L 的參數；-O check／exit 看它
 if "-O" in argv:
     op = argv[argv.index("-O") + 1]
@@ -1067,6 +1071,29 @@ class ServeTest(ServeFixture):
         self.run_cli([*DOWN, "windows-mcp", "box"])
         rows, out = self.ps_rows()
         self.assertEqual(rows, [], out)
+
+    def test_ps_queries_in_parallel_and_marks_a_hung_host_as_timeout(self):
+        # #157：跟 docker-machine ls 一樣，多台同時查、每台有上限，一台卡住不拖垮整個 ps
+        (self.base / "laptop").mkdir()
+        (self.base / "laptop" / "desktop").write_text("")
+        for host in ("box", "laptop"):
+            self.run_cli([*UP, "windows-mcp", host, "--create-task"])
+        self.env.update(FAKE_HANG_HOST="laptop", REMOTE_ACCESS_PROBE_TIMEOUT="2")
+        start = time.monotonic()
+        rows, out = self.ps_rows()
+        self.assertLess(time.monotonic() - start, 15, out)
+        self.assertEqual([(r[1], " ".join(r[5:])) for r in rows],
+                         [("box", "通過"), ("laptop", "逾時（重跑 up，不用了就 down）")], out)
+
+    def test_down_keeps_the_record_when_host_cannot_be_checked(self):
+        self.run_cli([*UP, "windows-mcp", "box", "--create-task"])
+        self.env["FAKE_ONLY_HOST"] = "nobody"
+        code, out = self.run_cli([*DOWN, "windows-mcp", "box"])
+        self.assertEqual(code, 1, out)
+        self.assertIn("還沒收乾淨", out)
+        self.env.pop("FAKE_ONLY_HOST")
+        rows, out = self.ps_rows()
+        self.assertEqual([r[1] for r in rows], ["box"], out)
 
     def test_ps_counts_one_machine_up_under_two_host_names_once(self):
         cfg = Path(self.env["HOME"]) / ".ssh" / "config"
