@@ -52,7 +52,7 @@ For a supported hosted request, announce the hosted backend without listing loca
 
 ### Local engine route
 
-`--diagnose` prints JSON. `ACTIVE_SOURCES_LIST` is its `available_sources` array — the engine's authoritative source set, computed after credential resolution. Map the tokens to display names: `reddit`→Reddit, `hackernews`→Hacker News, `polymarket`→Polymarket, `github`→GitHub, `digg`→Digg, `x`→X, `youtube`→YouTube, `tiktok`→TikTok, `instagram`→Instagram, `threads`→Threads, `pinterest`→Pinterest, `linkedin`→LinkedIn, `bluesky`→Bluesky, `perplexity`→Perplexity, `grounding`→Web, `jobs`→Jobs, `meta_ads`→Meta Ads, `corpus`→Your files, `dripstack`→DripStack.
+`--diagnose` prints JSON. `ACTIVE_SOURCES_LIST` is its `available_sources` array — the engine's authoritative source set, computed after credential resolution. Map the tokens to display names: `reddit`→Reddit, `hackernews`→Hacker News, `polymarket`→Polymarket, `github`→GitHub, `digg`→Digg, `x`→X, `youtube`→YouTube, `tiktok`→TikTok, `instagram`→Instagram, `threads`→Threads, `pinterest`→Pinterest, `linkedin`→LinkedIn, `bluesky`→Bluesky, `perplexity`→Perplexity, `grounding`→Web, `jobs`→Jobs, `meta_ads`→Meta Ads, `corpus`→Your files, `dripstack`→DripStack, `v2ex`→V2EX, `juejin`→Juejin.
 
 - If EXCLUDE_SOURCES is set (comma-separated, case-insensitive): drop any matching source from ACTIVE_SOURCES_LIST before displaying
 
@@ -101,23 +101,23 @@ Known keyword-trap classes and how to handle each:
 
 **Class 1: Demographic shopping query**
 - Pattern: `gift for {age} year old {gender}`, `what to buy for my {relationship}`, `present for {demographic}`, `birthday gift for {age} {gender}`.
-- Why it fails: no human on Reddit posts "I bought a 42 year old man a gift." Real posts use relationship + hobbies + budget. A "Birthday gift for 42 year old man" run returned r/todayilearned, r/japannews crime posts, r/LivestreamFail drama - none about gifts.
+- Why it fails: Reddit posts use relationship + hobbies + budget, not "42 year old man" (that pulled unrelated r/todayilearned and r/japannews posts).
 - Action: **Ask ONE clarifying question upfront**:
   > "Before I research, tell me a bit more - hobbies (cooks / runs / reads / gaming / outdoors / golf / music)? Relationship (husband / dad / friend / boss / brother)? Budget range? A 'gift for a 42 year old man' is a wide net; hobbies + relationship narrow it 10x."
 - If the user declines to narrow ("just run it"), reframe to generic-demographic and scope to gift subreddits:
-  - Drop the literal age (age 42 reads identically to 41 or 43 in social content; the number causes keyword collisions like Jackie Robinson #42)
+  - Drop the literal age (causes collisions like Jackie Robinson #42)
   - Rewrite as `gifts for men in their 40s` or `gifts for men who [hobby]`
   - For local engine research, scope `--subreddits=GiftIdeas,BuyItForLife,AskMen,malefashionadvice,Dads` (plus hobby-specific subs when known)
   - Note in the Resolved block: "Reframed demographic shopping query. Dropping literal age; scoping to gift communities."
 
 **Class 2: Numeric / age keyword trap**
 - Pattern: topic contains a specific number that collides with unrelated content (42 = Jackie Robinson + Hitchhiker's + a 42" quilt; 40 = 40th anniversary posts; 50 = state-count posts; 100 = bench-press posts).
-- Why it fails: the number dominates retrieval and pulls in unrelated content. A search that prominently features "42" returns jersey-number posts; a search for "the 100" returns TV-show posts.
-- Action: Strip the number from the engine search query unless changing or removing it would change the topic itself (e.g., "GPT-4" yes, "40 year old man" no, "Area 51" yes, "top 10 foods" no). Keep the number in the user's original framing for context; drop it from the engine query. Document in Resolved: "Dropping '{number}' from the search query - it is a keyword trap that pulls in unrelated content. Search will cover the concept generically."
+- Why it fails: numbers dominate retrieval ("42" pulls jersey-number posts; "the 100" pulls TV-show posts).
+- Action: Strip the number from the engine query unless integral to the topic ("GPT-4", "Area 51" keep; "40 year old man", "top 10 foods" drop). Keep it only in user-facing framing. Document in Resolved: "Dropping '{number}' from the search query - it is a keyword trap that pulls in unrelated content. Search will cover the concept generically."
 
 **Class 3: Overly-literal concept phrase**
 - Pattern: `how to use X`, `what is Y`, `tutorial for Z`, `explain A` — tutorial-shaped phrasing where social posts are in different vocabulary.
-- Why it fails: social posts about Docker do not say "how to use Docker"; they say "my Docker setup", "nginx in Docker", "my dev loop", "tip for folks using Docker Compose". Tutorial phrasing matches blog titles, not social discussions.
+- Why it fails: social posts say "my Docker setup" or "Docker Compose tips", not "how to use Docker"; tutorial phrasing matches blogs, not discussions.
 - Action: Reframe from tutorial phrasing to discussion phrasing: "how to use Docker" becomes "Docker tips tricks workflows" or "Docker production setups". Document the reframe in the Resolved block.
 
 **Class 4: Generic single-noun common word**
@@ -168,7 +168,7 @@ Without such a subagent, run the same searches directly with the same output; th
 Before running the engine, determine every applicable targeting flag and resolve it. Run every lookup below that needs web search through the pre-engine isolated web search dispatch, together with Step 0.55. The checklist below is the full pre-flight contract; reading only the X-handle subsection is insufficient.
 
 | Flag | Resolved in | Applies when |
-|------|-------------|--------------|
+|---|---|---|
 | `--x-handle={handle}` | Section A | X is in `ACTIVE_SOURCES_LIST` and the topic is a person, brand, product, or creator with an X presence |
 | `--official-site={domain}` | Section A | Company / product / service with a website; the engine fills unset `--x-handle` / `--github-user` from its homepage links |
 | `--no-x-handle="{reason}"` | Section A | X is active, the topic is entity-shaped, and no first-party X account was found |
@@ -378,11 +378,11 @@ Store: `META_ADS_PAGE = {page id or empty}` — add `meta_ads` to `--search`, an
 
 ## Step 0.55: Pre-Research Intelligence (resolve communities + handles)
 
-> **PLATFORM GATE:** If your platform does NOT support WebSearch (e.g., OpenClaw, raw CLI), **skip Steps 0.55 and 0.75** but add `--auto-resolve` to the Python command in the Research Execution section. The engine will do its own pre-research using configured web search backends (Brave, Exa, or Serper) to discover subreddits, X handles, and current events context before planning.
+> **PLATFORM GATE:** If your platform does NOT support WebSearch (e.g., OpenClaw, raw CLI), **skip Steps 0.55 and 0.75** but add `--auto-resolve` to the Python command in the Research Execution section. The engine then resolves subreddits, X handles, and news with its configured web backends.
 
 **MANDATORY on Claude Code (and any platform with WebSearch), on every run, including repeat runs of the same topic.** Run Step 0.55 before the engine. An engine command without a `--plan` carrying resolved handles and subreddits is a Step 0.55 skip, and the engine's `[Resolve] No web search backend available, skipping resolve` line means this step was skipped, not that the engine covered it.
 
-**Run 2-3 focused WebSearches (in parallel, inside the pre-engine isolated web search dispatch) to resolve platform-specific targeting. Do NOT search for every platform individually: infer most targeting from your knowledge of the topic, and WebSearch only for what you can't infer.**
+**Run 2-3 focused WebSearches (in parallel, inside the pre-engine isolated web search dispatch) to resolve platform-specific targeting. Infer the rest from your knowledge of the topic.**
 
 **1. X handles** - Already resolved in Step 0.5 above (including company handles and commentators). Reference your `RESOLVED_HANDLE` and `RESOLVED_RELATED` from that step.
 
@@ -407,26 +407,31 @@ Label conservatively: only a sub clearly named for / dedicated to the entity goe
 
 **Category peers:** when the product eligibility rule above applies, follow the root routing gate for `category-peers.md` before continuing.
 
-**2b. Host Reddit threads.** Keep each `reddit.com/r/<sub>/comments/<id>/` URL found (no `/s/` share or redirect links; max 50). The engine reads only `url`, rehydrates each thread, drops off-topic or stale ones. Only if any were found, write them with a single-quoted heredoc and add `--reddit-threads=/tmp/l30d-threads.json` (single-topic runs):
+**2b. Host Reddit threads.** Keep each `reddit.com/r/<sub>/comments/<id>/` URL found (no `/s/` share or redirect links; max 50). The engine reads only `url`, drops off-topic or stale ones. If any, write one-line JSON in the same shell as the engine call (fresh 12-char `{NONCE}`) and add `--reddit-threads="$REDDIT_THREADS_FILE"` (single-topic runs, as for 2c):
 
 ```bash
-cat > /tmp/l30d-threads.json <<'THREADS_EOF'
+REDDIT_THREADS_DIR=${X_POSTS_DIR:-$(mktemp -d "${TMPDIR:-/tmp}/last30days-reddit-threads.XXXXXX")}
+REDDIT_THREADS_FILE="$REDDIT_THREADS_DIR/threads.json"
+trap 'rm -rf -- ${X_POSTS_DIR:+"$X_POSTS_DIR"} ${REDDIT_THREADS_DIR:+"$REDDIT_THREADS_DIR"}' EXIT
+cat >| "$REDDIT_THREADS_FILE" <<'THREADS_EOF_{NONCE}'
 {"schema": "last30days-reddit-threads/1", "topic": "{TOPIC}", "threads": [{"url": "{THREAD_URL}"}]}
-THREADS_EOF
+THREADS_EOF_{NONCE}
 ```
 
-**3. TikTok hashtags + creators** - **INFER these from your topic knowledge. Do NOT WebSearch for "{PERSON} TikTok account" - most people/CEOs don't have TikTok, and the search is wasted.**
+**2c. Host TikTok/Instagram URLs.** Only if `tiktok` or `instagram` is active and `has_scrapecreators` is false: run 2-3 searches (`{TOPIC} site:tiktok.com`, `{TOPIC} tiktok account`, `site:instagram.com reel {TOPIC}`); keep post and `@creator` URLs, even old (max 40). Add up to 5 handles posting on it (official, fan, reviewer) to `RESOLVED_TIKTOK_CREATORS`. If any, write `shortform.json` in a private `mktemp -d` dir with an `EXIT` trap (reuse `$REDDIT_THREADS_DIR` or `$X_POSTS_DIR` when set) via `cat >|` + nonced single-quoted heredoc as `{"schema": "last30days-shortform-urls/1", "topic": "{TOPIC}", "urls": [{"url": "{URL}"}]}` and add `--shortform-urls="$SHORTFORM_FILE"`.
 
-- **Hashtags:** Infer 2-3 from the topic name + category. Examples: "Kanye West" → `kanyewest,ye,bully`. "Claude Code" → `claudecode,aiagent,aicoding`. "Sam Altman" → `samaltman,openai,chatgpt`.
-- **Creators:** Only search if the topic is a content creator, influencer, or brand that likely has TikTok presence. For CEOs, politicians, and non-creator people: skip.
+**3. TikTok hashtags + creators** - **INFER these from topic knowledge. Never WebSearch for a TikTok account (2c aside); most people and CEOs have none.**
+
+- **Hashtags:** Infer 2-3 from the topic name + category. Examples: "Kanye West" → `kanyewest,ye,bully`. "Claude Code" → `claudecode,aiagent,aicoding`.
+- **Creators:** Only for a creator, influencer, or brand likely on TikTok; skip CEOs, politicians, other people.
 
 Store as `RESOLVED_HASHTAGS` and `RESOLVED_TIKTOK_CREATORS`.
 
-**4. Instagram creators** - **Same rule: INFER from topic knowledge.** If the topic is a celebrity, brand, or creator with obvious Instagram presence, use their handle directly. If the topic is a tech CEO or abstract concept, skip. Do NOT waste a WebSearch on "Dario Amodei Instagram account."
+**4. Instagram creators** - **Same rule: INFER from topic knowledge.** Use the handle of a celebrity, brand, or creator with obvious Instagram presence; skip tech CEOs and abstract concepts. Never WebSearch for a handle.
 
 Store as `RESOLVED_IG_CREATORS`.
 
-**5. YouTube content queries** - Infer 2-3 YouTube content-type queries from the topic without searching. The current events search (#2 above) may surface relevant YouTube channels.
+**5. YouTube content queries** - Infer 2-3 YouTube content-type queries from the topic without searching.
 
 - **For music artists:** `'{TOPIC} album review'`, `'{TOPIC} reaction'`
 - **For products/SaaS:** `'{TOPIC} review'`, `'{TOPIC} tutorial'`
@@ -440,7 +445,7 @@ Store as `RESOLVED_YT_QUERIES`.
 **Concrete examples:**
 
 | Topic | WebSearches needed | Reddit subs | TikTok hashtags | TikTok creators | IG creators | YT queries |
-|-------|-------------------|-------------|-----------------|-----------------|-------------|------------|
+|---|---|---|---|---|---|---|
 | **Kanye West** | 2 (subreddit + BULLY news) | `Kanye,WestSubEver,hiphopheads,Music` | `kanyewest,ye,bully` | (inferred: `kanyewest`) | (inferred: `kanyewest`) | `kanye west bully review,kanye west bully reaction` |
 | **Sam Altman vs Dario** | 2 (subreddit + AI CEO news) | `artificial,MachineLearning,OpenAI,ClaudeAI` | `samaltman,openai,anthropic` | (skip - CEOs don't TikTok) | (skip - CEOs don't Reel) | `sam altman interview 2026,dario amodei interview 2026` |
 | **Tella** (SaaS) | 2 (subreddit + Tella news) | `SaaS,Entrepreneur,screenrecording,productivity` | `tella,tellaapp,screenrecording` | (search: `tella screen recorder TikTok`) | (inferred: `tella.tv`) | `tella screen recorder review,tella tutorial` |
@@ -544,7 +549,8 @@ Only show lines for platforms where something was resolved. On the Reddit line, 
 
 **Rules for your plan:**
 - Emit 1 to 4 subqueries (more for multi-faceted topics, fewer for simple ones)
-- **CRITICAL: Your PRIMARY subquery MUST include every applicable source from `ACTIVE_SOURCES_LIST`, including installed lanes such as digg, arxiv, techmeme, bluesky, and linkedin.** Leave out only `grounding`, `corpus`, `perplexity` (engine-attached) and `amazon` / `meta_ads` (the engine adds them when `--search` names them; Step 0.5e / 0.5f). For a company or the person who leads it, name `jobs` (unlisted) plus top-level `jobs_queries`: 2-4 product or team terms, not the company name. Never invent an unavailable source. Preserve X whenever it is active. Never omit active Reddit (highest-signal discussion) or active YouTube (unique transcripts + official content). Secondary subqueries can target specific platforms. Above quick depth, an installed lane named in no subquery is added to the primary subquery unless it cannot run (Trustpilot when `trustpilot_can_run` is false); exclusions win.
+- **Primary: include every applicable source from `ACTIVE_SOURCES_LIST`.** Preserve X whenever it is active. Keep active Reddit and YouTube. Never add unavailable sources. Leave out only `grounding`, `corpus`, `perplexity` (engine-attached), `amazon` / `meta_ads` (`--search`, Steps 0.5e / 0.5f), and explicit omissions. For a company or the person who leads it, name `jobs` (unlisted) plus top-level `jobs_queries`: 2-4 product or team terms, not the company name.
+- Above quick depth, an unnamed optional lane is added to the primary subquery unless it cannot run (Trustpilot when `trustpilot_can_run` is false); exclusions win. To avoid backfilling a lane (digg, arxiv, techmeme, bluesky, truthsocial, stocktwits, linkedin, dripstack, devto, v2ex, juejin, telegram, trustpilot), omit it from all subqueries and list it in top-level `"omit_sources": ["arxiv"]`. Never omit a user-requested source.
 - `search_query` should be concise and keyword-heavy - match how content is TITLED on platforms
 - `ranking_query` should read like a natural language question
 - **X disambiguation:** express your disambiguation intent in `ranking_query` (e.g., "What are people saying about Rome the city in Italy, not AS Roma or Rome Odunze?") — do not phrase-quote `search_query` for X or invent X operators; the engine handles X query compilation internally.
@@ -561,7 +567,7 @@ Only show lines for platforms where something was resolved. On the Reddit line, 
 - For how_to: prioritize YouTube (tutorials) and Reddit (guides)
 - Primary subquery weight = 1.0, secondary = 0.6-0.8, peripheral = 0.3-0.5
 
-**Available sources (include every active one in the primary subquery):** use the engine's `ACTIVE_SOURCES_LIST`. The normal candidates are reddit, x, youtube, tiktok, instagram, hackernews, and polymarket; X remains part of the normal set when active and is simply omitted when unavailable. Optional: bluesky, truthsocial, threads, pinterest, grounding (web search - only if user has Brave/Exa/Serper key), digg (Digg clusters - only if `digg-pp-cli` is on PATH). `amazon` and `meta_ads` go in `--search`, not the plan (Step 0.5e / 0.5f)
+**Available sources (include every active one in the primary subquery):** use the engine's `ACTIVE_SOURCES_LIST`. The normal candidates are reddit, x, youtube, tiktok, instagram, hackernews, and polymarket; X remains part of the normal set when active and is simply omitted when unavailable. Optional: bluesky, truthsocial, threads, pinterest, grounding (web search - only if user has Brave/Exa/Serper key), digg (Digg clusters - only if `digg-pp-cli` is on PATH), v2ex (Chinese developer community - only when the user enabled it with `INCLUDE_SOURCES=v2ex`; when the user asks for V2EX or Chinese developer discussion, add `v2ex` to the full `--search` list), juejin (Chinese developer articles - only when the user enabled it with `INCLUDE_SOURCES=juejin`; when the user asks for Juejin/掘金 or Chinese developer articles, add `juejin` to the full `--search` list). `amazon` and `meta_ads` go in `--search`, not the plan (Step 0.5e / 0.5f)
 
 **Intent → freshness_mode mapping:**
 - breaking_news, prediction → `strict_recent`
