@@ -10,49 +10,48 @@ servers:
       - --browser-url=http://127.0.0.1:9222
       - --no-usage-statistics
       - --no-performance-crux
-    targets: [claude, codex, opencode]
+    targets: [claude, codex, opencode, pi]
   codegraph:
     command: codegraph
     args: [serve, --mcp]
-    targets: [claude, codex, opencode]
+    targets: [claude, codex, opencode, pi]
   # key 從環境變數讀，不進 repo。dotfiles 會 export CONTEXT7_API_KEY。
   context7:
     url: https://mcp.context7.com/mcp
     headers:
       CONTEXT7_API_KEY:
         fromEnv: CONTEXT7_API_KEY
-    targets: [claude, codex, opencode]
+    targets: [claude, codex, opencode, pi]
   # 讓 agent 用自己的 Discord bot 讀、發訊息。設定步驟見 docs/mcp/discord.md。
   # token 由 dotfiles export DISCORD_TOKEN，不進 repo。只開 discovery、messages（25 個工具），全開 100 個約吃 35k tokens。
-  # 沒加 opencode：用不到，要再加。
   discord:
     command: npx
     args: ["-y", "@pasympa/discord-mcp@2.4.0"]
     env:
       DISCORD_TOKEN: {fromEnv: DISCORD_TOKEN}
       DISCORD_MCP_TOOLSETS: discovery,messages
-    targets: [claude, codex]
+    targets: [claude, codex, opencode, pi]
   gh_grep:
     url: https://mcp.grep.app
-    targets: [claude, codex, opencode]
+    targets: [claude, codex, opencode, pi]
   # Graphify Cloud：把 repo 做成圖（熱點、架構、PR 影響範圍），跟 codegraph 並存試用（#99，到 2026-12-04）。
   # 公司給的 API key 走 /v1/mcp 的 Authorization: Bearer；key 由 dotfiles export GRAPHIFY_API_KEY，不進 repo。
   graphify:
     url: https://api.graphify.com/v1/mcp
     bearerToken:
       fromEnv: GRAPHIFY_API_KEY
-    targets: [claude, codex, opencode]
+    targets: [claude, codex, opencode, pi]
   # 公司 PMS（正式環境）。OAuth（DCR），各 client 第一次用時自己登入，repo 不存 token。
   # 單一 /mcp 入口，整合個人工作與專案交付。
   pms:
     url: https://pms.teamsync.com.tw/c/tnt_6b24e7fe8a974ac6850f84557cfc15ce/mcp
-    targets: [claude, codex, opencode]
+    targets: [claude, codex, opencode, pi]
   # 操作 Windows 桌面（localhost 模式）。包裝腳本只在桌機 WSL 找得到 windows-mcp.exe，
   # 其他機器會直接結束，這個 server 顯示連不上。經 sh 展開 $HOME，各台的家目錄不同也能用。
   windows-mcp:
     command: sh
     args: [-c, 'exec "$HOME/.claude/skills/windows-access/scripts/windows-mcp-stdio"']
-    targets: [claude, codex, opencode]
+    targets: [claude, codex, opencode, pi]
   # 連別台 Windows 的 Windows-MCP，每台一筆、以機器命名。那台用 `remote-access up windows-mcp <host>` 起，
   # 走 tailscale serve，url 是那台的 ts.net 網址（只有 tailnet 內連得到）；up 照 url 印出要用哪一筆。
   # key 由 agent 那台的 shell 讀 ~/.config/windows-mcp/auth.env export WINDOWS_MCP_AUTH_KEY，不進 repo、不進 chezmoi。
@@ -60,9 +59,9 @@ servers:
     url: https://henry-desktop.tail0fed08.ts.net/mcp
     bearerToken:
       fromEnv: WINDOWS_MCP_AUTH_KEY
-    targets: [claude, codex, opencode]
+    targets: [claude, codex, opencode, pi]
   windows-mcp-laptop:
     url: https://henry-laptop.tail0fed08.ts.net/mcp
     bearerToken:
       fromEnv: WINDOWS_MCP_AUTH_KEY
-    targets: [claude, codex, opencode]
+    targets: [claude, codex, opencode, pi]

@@ -25,8 +25,8 @@
   讓人自己打、自己改參數。
 - **skill 資料夾裡不放 README。** skill 資料夾會被 sync 到各 client；給人看的照上面那條放。
   第三方 skill 帶來的 README 不動。
-- **不要加 OpenCode target。** OpenCode 會讀 `~/.claude/skills` 和 `~/.agents/skills`，加了會
-  同一支出現三次。
+- **OpenCode、pi 的 target 不開 skills。** OpenCode 會讀 `~/.claude/skills` 和 `~/.agents/skills`，pi 會讀
+  `~/.agents/skills`，開了同一支會出現好幾次。這兩個 target 只為了 MCP 和全域規則（由 dotfiles 釘成 `enabled: false`；那台沒勾讀得到的 claude、codex 時才照常同步）。
 
 ## 放哪
 
@@ -34,7 +34,7 @@
 
 | 機制 | 放哪 |
 |---|---|
-| 全域規則 | `extras/agents-md/AGENTS.md`；skillshare extras 連到 `~/.claude/CLAUDE.md`、`~/.codex/AGENTS.md`、`~/.config/opencode/AGENTS.md`。要加連結改 dotfiles 的 `modify_config.yaml.tmpl`，不要用 `skillshare extras` 指令（下次 `chezmoi apply` 會蓋回去） |
+| 全域規則 | `extras/agents-md/AGENTS.md`；skillshare extras 連到 `~/.claude/CLAUDE.md`、`~/.codex/AGENTS.md`、`~/.config/opencode/AGENTS.md`、`~/.pi/agent/AGENTS.md`。要加連結改 dotfiles 的 `modify_config.yaml.tmpl`，不要用 `skillshare extras` 指令（下次 `chezmoi apply` 會蓋回去） |
 | skill | `skills/<名字>/`；補第三方 skill 沒寫的步驟也是另寫一支。疊在第三方 skill、MCP、工具上的個人偏好命名 `<工具>-workflow`（`herdr-workflow`、`pms-workflow`），開頭寫明官方管什麼、這份只寫偏好；自己的工具用它本身的名字（`remote-access`） |
 | MCP | `skillshare mcp add`，寫進 `mcp.yaml` |
 | hook | 自己寫的定義放 `hooks/<名字>.yaml`，用 `skillshare hooks add <名字> --file` 存進 `config.yaml` 再 sync（每台都要 add，步驟在 [docs/hooks/](docs/hooks/README.md)）；工具自己裝的（herdr、codegraph、wakatime）不收，重裝時它們會再寫一次 |
@@ -47,7 +47,7 @@
 uv run --isolated --no-project --with-requirements tests/requirements.txt \
   python3 -B -m unittest discover -s tests  # 動到自己寫的 skill 的 script、hooks/ 時
 skillshare sync --dry-run               # skill 會怎麼落到 target
-skillshare sync mcp -g --dry-run        # MCP 會怎麼寫進三個 client
+skillshare sync mcp -g --dry-run        # MCP 會怎麼寫進四個 client
 skillshare hooks sync -g --dry-run      # hook 會怎麼寫進 Claude Code、Codex
 ```
 

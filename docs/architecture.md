@@ -7,11 +7,11 @@ skillshare 的通用用法看[官方文件](https://skillshare.runkids.cc)，這
 
 ```text
 extras/<名字>/         給模型讀的文字檔（全域規則、commit 指引），由 extras 連到各 client
-mcp.yaml              三個 client 共用的 MCP server
+mcp.yaml              四個 client 共用的 MCP server
 hooks/<名字>.yaml      自己寫的 hook（skillshare 的 hook entry），每台各自 add
 docs/                 給人看的文件
   skills/             skill：從哪來、裝給誰、怎麼選、怎麼關；要自己動手的 skill 各有一份
-  mcp/                MCP：三個 client 怎麼共用、key、衝突、Graphify
+  mcp/                MCP：四個 client 怎麼共用、key、衝突、Graphify
   hooks/              hook：add、edit、Codex trusted
   research/           研究紀錄
 skills/
@@ -35,7 +35,7 @@ hook 和 plugin 也存在 `config.yaml`，所以每台要各自 add（hook 見 [
 
 | extra | 連到 |
 |---|---|
-| `agents-md`（全域規則） | `~/.claude/CLAUDE.md`、`~/.codex/AGENTS.md`、`~/.config/opencode/AGENTS.md` |
+| `agents-md`（全域規則） | `~/.claude/CLAUDE.md`、`~/.codex/AGENTS.md`、`~/.config/opencode/AGENTS.md`、`~/.pi/agent/AGENTS.md` |
 | `agent-commit` | `~/.config/agent-commit/instructions.md` |
 | `opencode-commit` | `~/.config/opencode/commit-instructions.md` |
 | `pstack-models`（pstack 每個角色用哪個模型） | `~/.claude/rules/pstack-models.md`；只給 Claude，官方 pstack 只支援 Cursor 和 Claude Code。要改就重跑 `/pstack:setup-pstack`，它會寫回這個檔 |

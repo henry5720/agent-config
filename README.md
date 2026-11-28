@@ -1,7 +1,7 @@
 # agent-config
 
 [skillshare](https://github.com/runkids/skillshare) 的設定目錄（`~/.config/skillshare`）。三台機器的
-Claude Code、Codex、OpenCode 共用同一份全域規則、skills、MCP 和 hook，改一次全部跟著動。
+Claude Code、Codex、OpenCode、pi 共用同一份全域規則、skills、MCP 和 hook，改一次全部跟著動。
 dotfiles（chezmoi）負責裝 skillshare 和各 client 的設定，這個 repo 負責 client 要讀的內容。
 
 ## 安裝
@@ -19,7 +19,7 @@ dotfiles（chezmoi）負責裝 skillshare 和各 client 的設定，這個 repo 
 ## 文件索引
 
 - [docs/skills/](docs/skills/README.md)：skill 從哪來、裝給誰、怎麼選、怎麼關，以及要自己動手的 skill 的說明。
-- [docs/mcp/](docs/mcp/README.md)：三個 client 怎麼共用 MCP、API key、sync 衝突、Graphify。
+- [docs/mcp/](docs/mcp/README.md)：四個 client 怎麼共用 MCP、API key、sync 衝突、Graphify。
 - [docs/hooks/](docs/hooks/README.md)：自己寫的 hook 怎麼 add、edit，Codex 要設 trusted。
 
 改這個 repo：結構看 [docs/architecture.md](docs/architecture.md)，規則看 [AGENTS.md](AGENTS.md)。

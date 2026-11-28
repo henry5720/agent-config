@@ -9,11 +9,11 @@
 _Avoid_: 本機 skill
 
 **Target**:
-skillshare 把 skill 同步過去的 client 目錄。現在有兩個：`claude`（`~/.claude/skills`）和 `codex`（`~/.agents/skills`）。
+skillshare 把 skill 同步過去的 client 目錄。現在有四個：`claude`（`~/.claude/skills`）、`codex`（`~/.agents/skills`）、`opencode`、`pi`；後兩個的 skills 通常關掉（那台沒勾 claude、codex 時才開），只用來寫 MCP 和連全域規則。
 _Avoid_: client
 
 **Client**:
-實際讀 skill、呼叫 MCP 的程式：Claude Code、Codex、OpenCode。OpenCode 是 client，但不是 target。
+實際讀 skill、呼叫 MCP 的程式：Claude Code、Codex、OpenCode、pi。OpenCode 的 skill 讀 claude、codex 兩個 target 的目錄，pi 只讀 codex 的（`~/.agents/skills`）。
 
 **Local skill**:
 target 目錄裡不是 skillshare 放進去的條目，例如 obsidian-wiki 自己連的。這是 `skillshare status` 的用語，不代表錯誤。
@@ -71,7 +71,7 @@ _Avoid_: 交接（那是 issue 換手）
 - 一個 **Source** 會 **Sync** 到多個 **Target**
 - **Extras** 的內容在 **Source** 裡，由 **Extras sync** 連到各 client；連到哪由 chezmoi 釘在 `config.yaml`；**Settings** 在 chezmoi
 - **全域規則**是 **Extras** 的其中一份，`agent-commit` 由它指過去
-- 一個 **Client** 可以讀多個 **Target**（OpenCode 同時讀兩個）
+- 一個 **Client** 可以讀多個 **Target**（OpenCode 同時讀 claude、codex 兩個的目錄）
 - **Own skill** 和 **Third-party skill** 都在 **Source** 裡；**Local skill** 只在 **Target** 裡
 - 一個操作不是 **HITL 操作**就是 **AFK 操作**；**人工步驟**只出現在 **HITL 操作**裡
 
