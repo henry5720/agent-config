@@ -45,7 +45,7 @@ Get-CimInstance Win32_Process | Where-Object Name -like herdr* | Select-Object P
 
    ```powershell
    $u = [Security.Principal.WindowsIdentity]::GetCurrent().Name   # ssh 的 USERDOMAIN 是 WORKGROUP，不能拿來拼
-   $a = New-ScheduledTaskAction -Execute conhost.exe -Argument ('--headless "{0}" server' -f (Join-Path $env:LOCALAPPDATA 'mise\shims\herdr.exe'))
+   $a = New-ScheduledTaskAction -Execute conhost.exe -Argument ('--headless "{0}" server' -f (Join-Path $env:LOCALAPPDATA 'mise\shims\herdr.exe')) -WorkingDirectory $HOME
    $p = New-ScheduledTaskPrincipal -UserId $u -LogonType Interactive -RunLevel Limited
    $s = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero)
    Register-ScheduledTask herdr-server -Action $a -Principal $p -Settings $s -Force | Out-Null
