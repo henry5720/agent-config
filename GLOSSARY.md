@@ -13,7 +13,7 @@ skillshare 把 skill 同步過去的 client 目錄。現在有四個：`claude`�
 _Avoid_: client
 
 **Client**:
-實際讀 skill、呼叫 MCP 的程式：Claude Code、Codex、OpenCode、pi。OpenCode、pi 的 skill 讀 claude、codex 那兩個 target 的目錄。
+實際讀 skill、呼叫 MCP 的程式：Claude Code、Codex、OpenCode、pi。OpenCode 的 skill 讀 claude、codex 兩個 target 的目錄，pi 只讀 codex 的（`~/.agents/skills`）。
 
 **Local skill**:
 target 目錄裡不是 skillshare 放進去的條目，例如 obsidian-wiki 自己連的。這是 `skillshare status` 的用語，不代表錯誤。
