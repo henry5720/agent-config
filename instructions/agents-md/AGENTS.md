@@ -47,7 +47,7 @@
 
 別人正在用的 worktree 只讀，要動碼就自己開一個：另一個 session 可能住在裡面，`git switch` 會把它的 HEAD 和未提交的檔案帶到你的分支。
 
-`HERDR_ENV=1` 時，要跑改到自己工作目錄以外的指令（別台機器、系統套件、服務、別人的 checkout）、跑很久的指令（build、migration），或要人親手做的那一步之前，先載入 `herdr-workflow`：這些指令開 herdr workspace 跑給使用者看。唯讀查詢和工作目錄裡的開發指令照常在自己的 shell 跑。
+`HERDR_ENV=1` 時，要跑改到自己工作目錄以外、跑很久、或要人親手做的指令之前，先載入 `herdr-workflow`：這些指令開 herdr workspace 跑給使用者看，判準在它的 `hitl.md`。
 
 <!-- CODEGRAPH_START -->
 ## CodeGraph

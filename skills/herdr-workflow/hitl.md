@@ -1,7 +1,5 @@
 # HITL 操作走 herdr
 
-跟官方 `herdr` skill 的關係看 [SKILL.md](SKILL.md) 開頭。
-
 ## 判準
 
 - **HITL 操作**：改到自己工作目錄以外的（別台機器、系統套件、apply、重啟服務、別人 checkout 的 git reset）、跑很久的、含**人工步驟**的。人可能會看、review、喊停或接手，所以要跑在 workspace 裡讓人看得到。

@@ -1,6 +1,6 @@
 ---
 name: matt-workflow
-description: Matt Pocock skill 的個人用法：跑 wayfinder、research、prototype 時載入。
+description: Matt Pocock skill 的個人用法：跑 wayfinder、research 時載入。
 ---
 
 # Matt skill 的個人用法
@@ -11,7 +11,4 @@ description: Matt Pocock skill 的個人用法：跑 wayfinder、research、prot
 
 - 寫進它自己那張 issue：結論寫在解答留言，完整原文放在同一則留言的 `<details>`，附查核日。
   不開 `research/*` 分支，這條蓋掉 wayfinder〈Chart the map〉第 5 步的分支做法；ticket 的 context pointer 指向那則留言。
-- 單則留言放不下（GitHub 上限 65536 字元）時，結論留在留言，原文才放 `research/<name>` 分支。
 - 之後會被當作現況查的（規則、API 事實），另外開 docs PR 收進 repo。
-
-prototype 照官方做法留在 throwaway 分支。
