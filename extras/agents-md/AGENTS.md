@@ -14,24 +14,18 @@
 - ❌「這個 hook 的職責邊界應該收斂到單一 concern」
 - ✅「這個 hook 做了兩件事，拆開」
 
-## 回覆
-
-- 先講結論再講理由，不要開場白。
-- 有兩種做法時只講推薦的那個，加一句為什麼不選另一個。不要列選項清單。
-- 一次只問一個問題。skill 明確要求成批提問時（例如 `grilling` 一輪問完整個 frontier）照 skill 走。
-
 ## 照讀者選格式
 
-- 給人看的說明：流程、前後比較、目錄關係用表格或縮排樹；一句話講得完的不畫圖，同一內容不重複展示。
-- 依接收平台選擇可直接閱讀的形式；PR/GitHub 不提供只能本機檢視的 HTML。
-- 要畫圖前先確認那個地方渲染得出來 —— 終端機和 Discord 都不會渲染 mermaid，改用文字箭頭或縮排樹；表格可以用。
+- 給人看的說明：流程、前後比較、目錄關係用表格或縮排樹；一句話講得完就只寫那句話，同一內容只展示一次。
+- 先確認接收的地方渲染得出來，讀者打不開的格式附了等於沒附：PR/GitHub 用網頁上直接看得到的形式（Markdown、圖片附件，不是要下載才能開的 HTML）；終端機和 Discord 用文字箭頭、縮排樹或表格，因為 mermaid 不會渲染。
 
 ## 誠實
 
-- 不要說「看起來沒問題」「應該可以」。有疑慮直說「可以跑，但…」。
-- 講風險、講影響範圍時要附檔案路徑、行號或指令輸出。憑印象講的不算數。
+- 講風險、影響範圍時附證據（路徑:行號、指令輸出）；沒驗證的地方，直接寫出沒驗證什麼。
+  - ❌「看起來沒問題」
+  - ✅「`npm test` 過了，但沒測 Windows」
 - 回覆裡提到的路徑、檔名、函式名，先確認存在再寫出來。
-- 截圖、影片等證據作為附件提供，不 commit、不含敏感資料。
+- 截圖、影片等證據作為附件提供，不 commit、不含敏感資料：commit 會讓 repo 變大，而且可能拍到客戶資料，有些 repo 是 public。
 
 ## Issue 狀態
 
@@ -43,11 +37,9 @@
 
 ## Herdr
 
-開 worktree 前先載入 `herdr-workflow` skill：`HERDR_ENV=1` 時由 herdr 開，Claude、Codex、opencode 的 worktree 才會都歸 herdr 管。
+開 worktree，或 `HERDR_ENV=1` 時要跑改到自己工作目錄以外、跑很久、要人親手做的指令前，先載入 `herdr-workflow`：`HERDR_ENV=1` 時 worktree 由 herdr 開，Claude、Codex、opencode 的才會都歸 herdr 管；那些指令開 herdr workspace 跑給使用者看，判準在它的 `hitl.md`。
 
 別人正在用的 worktree 只讀，要動碼就自己開一個：另一個 session 可能住在裡面，`git switch` 會把它的 HEAD 和未提交的檔案帶到你的分支。
-
-`HERDR_ENV=1` 時，要跑改到自己工作目錄以外、跑很久、或要人親手做的指令之前，先載入 `herdr-workflow`：這些指令開 herdr workspace 跑給使用者看，判準在它的 `hitl.md`。
 
 <!-- CODEGRAPH_START -->
 ## CodeGraph
