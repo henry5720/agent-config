@@ -1,6 +1,6 @@
 ---
 name: browser-access
-description: 接瀏覽器：自己的 headless、使用者的獨立 profile（9222）、使用者的 Chrome 經插件（tailnet 內走 ssh，tailnet 外走一次性 tunnel）。要開瀏覽器操作或查原因（chrome-devtools MCP 連不上 9222）、使用者要你在他看得到的 Chrome 裡做事、一定要他日常的 Chrome（passkey、硬體金鑰、裝置 SSO）、使用者不在 tailnet、使用者跟你在同一台 Windows、網站擋機房 IP 時使用。
+description: 接瀏覽器：自己的 headless、使用者的獨立 profile（9222）、使用者的 Chrome 經插件（tailnet 內走 ssh，tailnet 外走一次性 tunnel）。要開瀏覽器操作或查原因（chrome-devtools MCP 連不上 9222）、使用者要你在他看得到的 Chrome 裡做事、一定要他日常的 Chrome（passkey、硬體金鑰、裝置 SSO）、網站擋機房 IP 時使用。
 ---
 
 # browser-access

@@ -41,11 +41,13 @@
 
 建立或 amend commit 前，讀 `~/.config/agent-commit/instructions.md`：誰改的誰 commit，每顆 commit 標自己。
 
-## Worktree
+## Herdr
 
 開 worktree 前先載入 `herdr-workflow` skill：`HERDR_ENV=1` 時由 herdr 開，Claude、Codex、opencode 的 worktree 才會都歸 herdr 管。
 
 別人正在用的 worktree 只讀，要動碼就自己開一個：另一個 session 可能住在裡面，`git switch` 會把它的 HEAD 和未提交的檔案帶到你的分支。
+
+`HERDR_ENV=1` 時，要跑改到自己工作目錄以外、跑很久、或要人親手做的指令之前，先載入 `herdr-workflow`：這些指令開 herdr workspace 跑給使用者看，判準在它的 `hitl.md`。
 
 <!-- CODEGRAPH_START -->
 ## CodeGraph

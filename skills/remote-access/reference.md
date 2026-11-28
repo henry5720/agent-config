@@ -77,7 +77,7 @@
 
 ## quick tunnel 專屬
 
-- **連得上、一般請求 200，但某個操作卡住或斷線**：先懷疑 SSE（quick tunnel 的四項限制在 [SKILL.md〈quick tunnel〉](SKILL.md#quick-tunnel)）。2026-11-05 在 henry-laptop 實測，單次請求用 SSE 回的收得到（MCP `initialize` 回 `text/event-stream`、`tools/list` 23615 bytes 都完整）；長時間開著的 SSE stream 會怎麼壞**未實測**。卡住的是這種時改走 Funnel。
+- **連得上、一般請求 200，但某個操作卡住或斷線**：先懷疑 SSE（quick tunnel 的四項限制在 [tailnet-outside.md〈quick tunnel〉](tailnet-outside.md#quick-tunnel)）。2026-11-05 在 henry-laptop 實測，單次請求用 SSE 回的收得到（MCP `initialize` 回 `text/event-stream`、`tools/list` 23615 bytes 都完整）；長時間開著的 SSE stream 會怎麼壞**未實測**。卡住的是這種時改走 Funnel。
 - **不帶驗證回 `400`**：Host 沒對好。app 綁 loopback 又檢查 `Host` 時要 `--host-header localhost`（cloudflared 的 `--http-host-header localhost`）。
 - **不帶驗證回 `5xx`**：多半是 cloudflared 接到了、app 沒在那個 port 聽（cloudflared 的 log 會有 origin 連不上的錯誤）。回 app 的文件確認 server 起了、port 對。
 - **剛印出網址時連不上**：網址要幾秒才生效。腳本用公開 DNS 查到的 IP 加 `--resolve` 重打，避開本機 DNS 把剛查不到的名稱快取起來。手動打時隔幾秒重試。

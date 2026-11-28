@@ -20,7 +20,7 @@
   `docs/skills/<名字>.md`，MCP 的寫 `docs/mcp/`，hook 的寫 `docs/hooks/`，repo 結構和 `config.yaml`、extras 的來歷寫
   `docs/architecture.md`，一樣引用 skill 的指令、不抄。README 只當入口。通用概念連官方或高品質來源，不抄。
   SKILL.md 只寫什麼時候走哪條、agent 要做的步驟和完成條件、只有 agent 要守的限制；坑和實測紀錄放同一支 skill 的
-  `reference.md`、參數看 script 的 `--help`、給人看的理由在 dotfiles，從 SKILL.md 直接連過去（只隔一層）。
+  `reference.md`、參數看 script 的 `--help`、給人看的理由在 dotfiles，從 SKILL.md 直接連過去（只隔一層）。只有部分分支會走到的步驟拆成同層的 `<分支>.md`（例如 `herdr-workflow/hitl.md`），同樣從 SKILL.md 直接連。
 - **script 只包脆弱的操作。** 會漏秘密、會忘記收、順序錯就壞的才寫成 `scripts/`；一兩行標準指令寫在文件裡，
   讓人自己打、自己改參數。
 - **skill 資料夾裡不放 README。** skill 資料夾會被 sync 到各 client；給人看的照上面那條放。
@@ -35,7 +35,7 @@
 | 機制 | 放哪 |
 |---|---|
 | 全域規則 | `instructions/agents-md/AGENTS.md`；skillshare extras 連到 `~/.claude/CLAUDE.md`、`~/.codex/AGENTS.md`、`~/.config/opencode/AGENTS.md`。要加連結改 dotfiles 的 `modify_config.yaml.tmpl`，不要用 `skillshare extras` 指令（下次 `chezmoi apply` 會蓋回去） |
-| skill | `skills/<名字>/`；補第三方 skill 沒寫的步驟也是另寫一支 |
+| skill | `skills/<名字>/`；補第三方 skill 沒寫的步驟也是另寫一支。疊在第三方 skill、MCP、工具上的個人偏好命名 `<工具>-workflow`（`herdr-workflow`、`pms-workflow`），開頭寫明官方管什麼、這份只寫偏好；自己的工具用它本身的名字（`remote-access`） |
 | MCP | `skillshare mcp add`，寫進 `mcp.yaml` |
 | hook | 自己寫的定義放 `hooks/<名字>.yaml`，用 `skillshare hooks add <名字> --file` 存進 `config.yaml` 再 sync（每台都要 add，步驟在 [docs/hooks/](docs/hooks/README.md)）；工具自己裝的（herdr、codegraph、wakatime）不收，重裝時它們會再寫一次 |
 | plugin | `skillshare plugin add`，記在 `config.yaml` 的 `plugins:`（不進 repo，每台各自 add）。wakatime 的由 dotfiles apply 裝，不收 |

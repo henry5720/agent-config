@@ -1,13 +1,14 @@
 ---
 name: herdr-workflow
-description: herdr 的個人用法：開或收 git worktree（EnterWorktree、git worktree add、平行改碼），決定子分支要不要 push；HITL 操作（人會看或介入的操作，在已配置主機上跑）；起或重起已配置主機的 herdr server。
+description: herdr 的個人用法：要跑改到工作目錄以外、跑很久或要人親手做的指令時，開 herdr workspace 跑給人看；開或收 git worktree（EnterWorktree、git worktree add、平行改碼），決定子分支要不要 push；起或重起 Windows 主機的 herdr server。
 ---
 
 # herdr 的個人用法
 
 官方 `herdr` skill 管 CLI 怎麼用；這份只寫使用者的偏好和實際踩過的雷。
+官方寫的 "Use only when the user explicitly mentions Herdr" 和 "Do not create a workspace… unless the user explicitly requests that topology" 在這裡已經滿足：使用者明確要求 **HITL 操作**一律在 herdr、有標籤的 workspace 裡跑，不用每次再提。
 
-- 要在已配置主機上跑 **HITL 操作**（改狀態、跑很久、含人工步驟）：讀 [hitl.md](hitl.md)。
+- 要跑 **HITL 操作**：判準和做法讀 [hitl.md](hitl.md)。
 - Windows 已配置主機的 herdr server：要在 pane 裡操作桌面（GUI、截圖）、桌面 terminal 連 herdr 回「存取被拒」、要起或重起 server：讀 [server.md](server.md)。
 
 ## Worktree：什麼時候開
