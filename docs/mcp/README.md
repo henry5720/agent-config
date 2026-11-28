@@ -1,4 +1,4 @@
-# MCP：三個 client 共用一份
+# MCP：四個 client 共用一份
 
 MCP 是讓 agent 連到外部服務的通道 —— 查文件、開瀏覽器、讀 Slack、連資料庫。**跟 skill 是兩回事**：
 skill 是步驟說明（純文字），MCP 是真的能對外做事的工具。也是可選的，想接什麼再裝什麼。
@@ -9,16 +9,17 @@ skill 是步驟說明（純文字），MCP 是真的能對外做事的工具。�
 
 **不同 client 不會共用 MCP 設定。** Claude 裝過的 MCP，OpenCode 不會自動載入 —— 跟 skill 不同，
 不要因為 OpenCode 讀得到 `~/.claude/skills/` 就以為它也讀 Claude 的 MCP。所以同一份清單
-由 skillshare 分別寫進三邊：
+由 skillshare 分別寫進四邊：
 
 ```mermaid
 flowchart LR
   Y["mcp.yaml<br/>（這個 repo）"] -- "skillshare sync mcp -g<br/>只動自己寫的條目" --> F
   D["dotfiles（chezmoi）"] -- "modify_：provider 等其他 key" --> F
-  subgraph F["三個 client 的設定檔"]
+  subgraph F["四個 client 的設定檔"]
     C["~/.claude.json<br/>mcpServers"]
     X["~/.codex/config.toml<br/>[mcp_servers.*]"]
     O["~/.config/opencode/opencode.json<br/>mcp"]
+    P["~/.pi/agent/mcp.json<br/>mcpServers"]
   end
 ```
 

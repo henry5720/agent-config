@@ -1,6 +1,6 @@
 # Discord
 
-讓 Claude Code、Codex 用你自己的 Discord bot 讀頻道、發訊息。server 是社群專案
+讓 Claude Code、Codex、OpenCode、pi 用你自己的 Discord bot 讀頻道、發訊息。server 是社群專案
 [PaSympa/discord-mcp](https://github.com/pasympa/discord-mcp)（MIT），版本釘在 `mcp.yaml`。
 
 方向別搞反：這份是「agent 去操作 Discord」。要「在 Discord 裡叫 agent 做事」是另一回事，
@@ -36,7 +36,7 @@ Claude 有官方的 [channels](https://code.claude.com/docs/en/channels)，不�
 
    ```bash
    skillshare pull                   # 先拿到含 discord 的 mcp.yaml
-   skillshare sync mcp -g --dry-run  # 應該只有 claude、codex 各一筆 discord add
+   skillshare sync mcp -g --dry-run  # 應該只有 claude、codex、opencode、pi 各一筆 discord add
    skillshare sync mcp -g
    ```
 

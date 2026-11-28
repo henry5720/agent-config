@@ -8,7 +8,7 @@ skill 是一套「做某件事的步驟」。本體（SKILL.md 內文）用到�
 
 ## 從哪來、落到哪
 
-別人的和自己寫的 skill 都放在這個 repo 的 `skills/`，由 skillshare 同步到兩個 target：
+別人的和自己寫的 skill 都放在這個 repo 的 `skills/`，由 skillshare 同步到 claude、codex 兩個 target 的目錄：
 
 ```mermaid
 flowchart LR
@@ -22,10 +22,12 @@ flowchart LR
   A --> CX["Codex"]
   C --> OC["OpenCode"]
   A --> OC
+  A --> PI["pi"]
 ```
 
 OpenCode 自己會掃 `~/.claude/skills/`、`~/.agents/skills/`、`~/.config/opencode/skills/` 和
-專案裡對應的目錄，所以**不要給 skillshare 加 OpenCode target**，不然同一支出現三份。
+專案裡對應的目錄，pi 會掃 `~/.agents/skills/`，所以 skillshare 的 opencode、pi target **skills 關掉**
+（只拿來寫 MCP、連全域規則），不然同一支出現好幾份。
 
 不歸 skillshare 管的例外：
 
