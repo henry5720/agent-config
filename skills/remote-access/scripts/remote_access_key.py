@@ -79,7 +79,7 @@ def connected_machines(key_env, key):
     os.environ[key_env] = key
     for name, host, svc, base, note in running():
         if note:
-            say(f"{host} 的 {name} 在跑但{note}，驗不了 key，不動：要同步就重跑 up")
+            say(f"{host} 的 {name} {note}，驗不了 key，不動：要同步就重跑 up")
         elif verify(verify_check(svc, key_env), base, public_dns=False):
             found.append((name, host))
         else:

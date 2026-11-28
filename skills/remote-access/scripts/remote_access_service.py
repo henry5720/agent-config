@@ -21,9 +21,12 @@ up（forward 模式，services.yaml 的 hosts.<host> 設 mode: forward）：serv
 local_port 被別的程式佔著就報錯、說出是誰，不換 port。down 多做 ssh -O exit；轉發開著沒看 ssh -O check。
 ControlMaster 的 socket 在 ~/.local/state/remote-access/。
 
-ps：對 ssh config 的 host 逐台查（serve 模式查那台的 serve 狀態、port 有沒有在聽，只查 HostName 是 ts.net 的；
-forward 模式查 ssh -O check），列出在跑的服務、host、mode、網址或本機 port、MCP 名稱、驗證結果。用查的，不記狀態檔；只查不動那台。key 的環境變數沒設就不驗證。
-ssh 連不上的 host 不列。
+ps：查這台 up 過的（服務、host）：up 成功時記到 ~/.local/state/remote-access/connected，down 收乾淨時刪掉。
+記錄只決定查哪幾台，在不在跑照樣即時查（serve 模式查那台的 serve 狀態、port 有沒有在聽；forward 模式查 ssh -O check），
+列出服務、host、mode、網址或本機 port、MCP 名稱、驗證結果；ssh 連不上、逾時、沒在跑也列出來。多台同時查，每台最多等 REMOTE_ACCESS_PROBE_TIMEOUT 秒
+（跟 docker-machine ls 一樣：連上後 PowerShell 卡住時 ConnectTimeout 管不到）。只查不動那台。
+不逐台掃 ssh config：太慢，也會到客戶機器跑 PowerShell（#157）。ps <服務> <host> 直接查那台，不看記錄。
+key 的環境變數沒設就不驗證。
 
 key 從環境變數讀（services.yaml 的 key.env，--key-env 可以改讀別的變數），不接受從參數輸入；
 不出現在任何指令參數、task 定義、輸出裡。送去 Windows 的 PowerShell 一律用 -EncodedCommand，
@@ -33,9 +36,11 @@ key 從環境變數讀（services.yaml 的 key.env，--key-env 可以改讀別�
   REMOTE_ACCESS_SERVICES       改讀這個服務定義檔（測試用）
   EXPOSE_PORT_PROBE_INTERVAL   驗證時每次重試間隔秒數，預設 3（測試設 0）
   REMOTE_ACCESS_MCP_FILE       找 MCP 名稱用的 mcp.yaml，預設 ~/.config/skillshare/mcp.yaml
+  REMOTE_ACCESS_PROBE_TIMEOUT  ps、up 查一台最多等幾秒，預設 15（測試設短）
 """
 import argparse
 import base64
+import concurrent.futures
 import contextlib
 import io
 import ipaddress
@@ -215,13 +220,19 @@ def ps_script(action, body, svc, **extra):
     return script
 
 
-def win(host, script):
-    """經 ssh 在那台跑 PowerShell，回 (exit code, {key: value})。只認 ASCII 的 key=value 行，其他（CLIXML、中文）略過。"""
+def win(host, script, timeout=None):
+    """經 ssh 在那台跑 PowerShell，回 (exit code, {key: value})。只認 ASCII 的 key=value 行，其他（CLIXML、中文）略過。
+
+    超過 timeout 秒回 (124, {"timeout": "1"})。
+    """
     encoded = base64.b64encode(script.encode("utf-16-le")).decode()
-    p = subprocess.run(
-        ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", host, "powershell", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
-        stdin=subprocess.DEVNULL, capture_output=True, text=True, errors="replace",
-    )
+    try:
+        p = subprocess.run(
+            ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", host, "powershell", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
+            stdin=subprocess.DEVNULL, capture_output=True, text=True, errors="replace", timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return 124, {"timeout": "1"}
     out = {}
     for line in p.stdout.splitlines():
         m = re.fullmatch(r"([a-z_]+)=([\x20-\x7e]*)", line.strip())
@@ -249,10 +260,26 @@ def put_key(host, key):
 # forward 模式：ssh -L + ControlMaster。socket 放 agent 這台的 state 目錄
 # ==========================================================================
 
-def control_socket(host, svc):
+def state_dir():
     d = Path.home() / ".local" / "state" / "remote-access"
     d.mkdir(parents=True, exist_ok=True, mode=0o700)
-    return str(d / f"{svc['name']}-{host}.sock")
+    return d
+
+
+def control_socket(host, svc):
+    return str(state_dir() / f"{svc['name']}-{host}.sock")
+
+
+def recorded():
+    """這台 up 過、還沒 down 的 [(服務, host)]。"""
+    path = state_dir() / "connected"
+    pairs = [tuple(l.split()) for l in path.read_text().splitlines()] if path.exists() else []
+    return list(dict.fromkeys(p for p in pairs if len(p) == 2))
+
+
+def set_recorded(service, host, on):
+    pairs = [p for p in recorded() if p != (service, host)] + ([(service, host)] if on else [])
+    (state_dir() / "connected").write_text("".join(f"{s} {h}\n" for s, h in pairs))
 
 
 def forward_alive(host, svc):
@@ -296,7 +323,7 @@ def port_owner(port):
 
 
 def probe(host, svc):
-    return win(host, ps_script("probe", PS_PROBE, svc))[1]
+    return win(host, ps_script("probe", PS_PROBE, svc), timeout=float(os.environ.get("REMOTE_ACCESS_PROBE_TIMEOUT", "15")))[1]
 
 
 def stop(host, svc):
@@ -305,7 +332,8 @@ def stop(host, svc):
         forward_close(host, svc)
     _, out = win(host, ps_script("stop", PS_STOP, svc, KEEP="$true" if svc["task"]["keep"] else "$false"))
     after = probe(host, svc)
-    clean = after.get("listen") != "ours" and after.get("serve") != "ours"
+    # 查不到（ssh 連不上、逾時）不算收乾淨，不然 down 會刪掉記錄、把還在跑的藏起來
+    clean = bool(after) and "timeout" not in after and after.get("listen") != "ours" and after.get("serve") != "ours"
     if svc["mode"] == "forward":
         clean = clean and not forward_alive(host, svc)
     return forwarded or out.get("was_running") == "1", clean
@@ -393,8 +421,8 @@ def cmd_up(args):
         return
 
     state = probe(args.host, svc)
-    if not state:
-        die(f"ssh {args.host} 跑 PowerShell 沒有回應：先確認 ssh {args.host} 連得上、那台是 Windows")
+    if not state or "timeout" in state:
+        die(f"ssh {args.host} 跑 PowerShell 沒有回應{'（逾時）' if state else ''}：先確認 ssh {args.host} 連得上、那台是 Windows")
     if svc.get("needs_desktop") and state.get("desktop", "0") in ("", "0"):
         die(f"{args.host} 沒有人登入桌面：請先登入 {args.host} 的桌面（ssh 的那個帳號），再跑一次")
     if state.get("listen", "").startswith("other"):
@@ -410,6 +438,7 @@ def cmd_up(args):
         if verify(check, url, public_dns=False):
             say(f"{args.service} 在 {args.host} 已經起好：{url}{check.path}")
             say_mcp(url + check.path, key_env)
+            set_recorded(args.service, args.host, True)
             return
         say("上一輪起的沒通過驗證，收掉重起")
         stop(args.host, svc)
@@ -448,6 +477,7 @@ def cmd_up(args):
     via = f"（ssh 轉到 {args.host} 的 {svc['port']}）" if forward else ""
     say(f"網址：{url}{check.path}{via}")
     say_mcp(url + check.path, key_env)
+    set_recorded(args.service, args.host, True)
 
 
 def cmd_down(args):
@@ -460,6 +490,7 @@ def cmd_down(args):
     was, clean = stop(args.host, svc)
     if not clean:
         die(f"{args.host} 還沒收乾淨：在那台看 {svc['port']} 誰在聽、tailscale serve status，重跑 down 也安全")
+    set_recorded(args.service, args.host, False)
     say(f"{args.service} 在 {args.host} 已收乾淨" if was else f"{args.service} 在 {args.host} 本來就沒開")
 
 
@@ -472,14 +503,17 @@ def ps_verify(svc, base, key_env=None):
 
 
 def ps_serve(svc, host):
-    """serve 模式：回 (驗證打的網址, 驗不了的原因)；那台沒在跑或連不上回 None。"""
+    """serve 模式：回 (驗證打的網址, 驗不了的原因)；HostName 不是 ts.net 回 None。"""
     hostname = ssh_hostname(host)
     if not hostname.endswith(".ts.net"):
         return None
+    base = f"https://{hostname}"
     state = probe(host, svc)
+    if not state or "timeout" in state:
+        return base, "逾時" if state else "ssh 連不上"
     if "ours" not in (state.get("listen"), state.get("serve")):
-        return None
-    return f"https://{hostname}", ""
+        return base, "沒在跑"
+    return base, ""
 
 
 def ps_forward(svc, host):
@@ -487,34 +521,42 @@ def ps_forward(svc, host):
     base = f"http://127.0.0.1:{svc['local_port']}"
     if forward_alive(host, svc):
         return base, ""
-    if probe(host, svc).get("listen") != "ours":
-        return None
-    return base, "轉發沒開"
+    state = probe(host, svc)
+    if not state or "timeout" in state:
+        return base, "逾時" if state else "ssh 連不上"
+    if state.get("listen") != "ours":
+        return base, "沒在跑"
+    return base, "在跑但轉發沒開"
 
 
 PS_BY_MODE = {"serve": ps_serve, "forward": ps_forward}
 
 
 def running(service=None, host=None):
-    """逐台查在跑的服務，回 [(服務, host, 整理好的服務定義, 驗證打的網址, 驗不了的原因)]。用查的，不動那台。"""
-    found = []
-    hosts = [host]
-    if not host:
+    """查服務，回 [(服務, host, 整理好的服務定義, 驗證打的網址, 驗不了的原因)]。用查的，不動那台。
+
+    給了 host 就直接查那台，沒在跑不列；沒給就查 up 記下來的（recorded），沒在跑、連不上也列。
+    """
+    if host:
+        pairs = [(name, host) for name in ([service] if service else load_services())]
+    else:
+        pairs = [p for p in recorded() if not service or p[0] == service]
+    found, hosts, seen = [], ssh_hosts(), set()
+    for name, h in pairs:
+        if h not in hosts and not host:  # 指定的 host 打錯時交給 resolve 報「不認得」
+            say(f"記錄裡的 {h} 不在 ssh config 了，略過：刪掉 {state_dir() / 'connected'} 的那一行")
+            continue
         # `Host desktop henry-desktop` 是同一台：照 ssh -G 的 hostname 只查一次
-        seen, hosts = set(), []
-        for h in ssh_hosts():
-            hn = ssh_hostname(h) or h
-            if hn not in seen:
-                seen.add(hn)
-                hosts.append(h)
-    for name in [service] if service else load_services():
-        for h in hosts:
-            # mode 看 resolve 之後的（含 hosts.<host> 覆寫）
-            svc = resolve(SimpleNamespace(service=name, host=h))
-            hit = PS_BY_MODE[svc["mode"]](svc, h)
-            if hit:
-                found.append((name, h, svc, *hit))
-    return found
+        same = (name, ssh_hostname(h) or h)
+        if same in seen:
+            continue
+        seen.add(same)
+        # mode 看 resolve 之後的（含 hosts.<host> 覆寫）；resolve 可能 die，先在主執行緒做完
+        found.append((name, h, resolve(SimpleNamespace(service=name, host=h))))
+    # 多台同時查：一台卡住只拖到它自己的逾時，不疊加
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        hits = list(pool.map(lambda f: PS_BY_MODE[f[2]["mode"]](f[2], f[1]), found))
+    return [(*f, *hit) for f, hit in zip(found, hits) if hit and not (host and hit[1] == "沒在跑")]
 
 
 def cmd_ps(args):
@@ -524,9 +566,9 @@ def cmd_ps(args):
     for name, host, svc, base, note in running(args.service, args.host):
         url = base + svc["verify"].get("path", "/")
         rows.append((name, host, svc["mode"], url, mcp_name(url) or "-",
-                     f"{note}（重跑 up）" if note else ps_verify(svc, base, args.key_env)))
+                     f"{note}（重跑 up，不用了就 down）" if note else ps_verify(svc, base, args.key_env)))
     if not rows:
-        say("沒有在跑的服務（ssh 連不上的 host 不列）")
+        say("沒有在跑的服務" if args.host else "這台沒有 up 過的機器（只列 up 過的；查別台用 ps <服務> <host>）")
         return
     rows.insert(0, ("服務", "host", "mode", "網址或本機 port", "MCP", "驗證"))
     # 中文字在終端機佔兩格
