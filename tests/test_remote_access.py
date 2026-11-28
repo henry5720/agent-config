@@ -1265,6 +1265,20 @@ class KeyTest(ServeFixture):
             self.assertNotIn(new, where)
             self.assertNotIn(old, where)
 
+    def test_rotate_reads_hand_written_auth_env_without_quotes(self):
+        # #154：手寫的 auth.env 沒加引號或用雙引號，rotate 照樣讀得到舊 key，寫回時改成單引號格式
+        self.up_with_saved_key()
+        for quote in ("", '"'):
+            with self.subTest(quote=quote):
+                old = self.saved()
+                self.auth_env.write_text(f"export WINDOWS_MCP_AUTH_KEY={quote}{old}{quote}\n")
+                code, out = self.run_cli([*KEY_CMD, "rotate"])
+                self.assertEqual(code, 0, out)
+                new = self.saved()
+                self.assertNotEqual(new, old)
+                self.assertEqual(self.read("config"), new)
+                self.env["WINDOWS_MCP_AUTH_KEY"] = new
+
     def test_rotate_leaves_machines_using_another_key_alone(self):
         self.up_with_saved_key("CLIENT_KEY")
         client = self.saved("CLIENT_KEY")
