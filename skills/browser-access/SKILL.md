@@ -15,6 +15,7 @@ description: 接瀏覽器：自己的 headless、使用者的獨立 profile（92
 使用者跟你在同一台、tailnet 內還是 tailnet 外，照 `remote-access` skill 的〈判準〉判斷；ssh 轉發的寫法和本機 port 也照它。判完照這裡接：
 
 - **同一台**（你跑在使用者面前那台 Windows，`uname -s` 印 `MINGW*`／`MSYS*`；他可能是 ssh 進來的，不確定就問他）→ 照下面〈同一台 Windows〉。
+- **你跑在 Windows、使用者在別台** → tailnet 內用獨立 profile（照下一條）。一定要插件或使用者在 tailnet 外時，跟使用者說這台接不了，請他從 Linux／macOS 的已配置主機開 session。
 - **tailnet 內** → 讀服務卡〈先挑哪支 Chrome〉決定用哪支，再照那一節做到它寫的「怎麼確認」成立。轉發由使用者在他的個人電腦開；ssh 指令照抄服務卡給他。例外：獨立 profile 在 Windows、你 ssh 得進那台時，照服務卡〈獨立 profile〉的 `chrome-agent` task 自己叫起 Chrome、自己開 `-L`。`schtasks /query /tn chrome-agent` 查不到 task 時，問使用者要不要建（建了會一直留在他那台），他說好再照那段建。
 - **tailnet 外** → 照下面〈接插件〉跑 `--tunnel`，把輸出交給他。插件的 relay 由這支 script 自己開 tunnel，不走 `remote-access` 的 Funnel、quick tunnel。
 
@@ -27,7 +28,7 @@ description: 接瀏覽器：自己的 headless、使用者的獨立 profile（92
 
 ## 同一台 Windows
 
-`scripts/playwright-extension-attach` 在 Windows 跑不了（要 `/proc`、`mkfifo`、`python3`），也用不到：它做的是把 relay 轉到使用者那台，同一台時 relay 本來就在使用者的 `127.0.0.1`。
+`scripts/playwright-extension-attach` 只在 Linux／macOS 跑，同一台時也用不到：它做的是把 relay 轉到使用者那台，同一台時 relay 本來就在使用者的 `127.0.0.1`。
 
 1. 背景跑 `playwright-cli -s=<S> attach --extension=chrome`，它停住等使用者接上。它自己用這台的 Chrome 開插件的 connect 分頁，網址不印出來。
 2. 請使用者在那個分頁的插件畫面選分頁、按允許。沒跳出分頁，或插件畫面說沒裝插件，就請他在那支 Chrome 裝 Playwright Extension（<https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm>）再重跑。
