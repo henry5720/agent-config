@@ -9,7 +9,7 @@
 _Avoid_: 本機 skill
 
 **Target**:
-skillshare 把 skill 同步過去的 client 目錄。現在有四個：`claude`（`~/.claude/skills`）、`codex`（`~/.agents/skills`）、`opencode`、`pi`；後兩個的 skills 關掉，只用來寫 MCP 和連全域規則。
+skillshare 把 skill 同步過去的 client 目錄。現在有四個：`claude`（`~/.claude/skills`）、`codex`（`~/.agents/skills`）、`opencode`、`pi`；後兩個的 skills 通常關掉（那台沒勾 claude、codex 時才開），只用來寫 MCP 和連全域規則。
 _Avoid_: client
 
 **Client**:

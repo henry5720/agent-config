@@ -26,7 +26,7 @@ flowchart LR
 ```
 
 OpenCode 自己會掃 `~/.claude/skills/`、`~/.agents/skills/`、`~/.config/opencode/skills/` 和
-專案裡對應的目錄，pi 會掃 `~/.agents/skills/`，所以 skillshare 的 opencode、pi target **skills 關掉**
+專案裡對應的目錄，pi 會掃 `~/.agents/skills/`，所以 skillshare 的 opencode、pi target **skills 關掉**（那台沒勾 claude、codex 時才照常同步，由 dotfiles 判斷）
 （只拿來寫 MCP、連全域規則），不然同一支出現好幾份。
 
 不歸 skillshare 管的例外：

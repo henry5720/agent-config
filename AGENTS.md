@@ -26,7 +26,7 @@
 - **skill 資料夾裡不放 README。** skill 資料夾會被 sync 到各 client；給人看的照上面那條放。
   第三方 skill 帶來的 README 不動。
 - **OpenCode、pi 的 target 不開 skills。** OpenCode 會讀 `~/.claude/skills` 和 `~/.agents/skills`，pi 會讀
-  `~/.agents/skills`，開了同一支會出現好幾次。這兩個 target 只為了 MCP 和全域規則（由 dotfiles 釘成 `enabled: false`）。
+  `~/.agents/skills`，開了同一支會出現好幾次。這兩個 target 只為了 MCP 和全域規則（由 dotfiles 釘成 `enabled: false`；那台沒勾讀得到的 claude、codex 時才照常同步）。
 
 ## 放哪
 
