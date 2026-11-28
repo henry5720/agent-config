@@ -6,7 +6,7 @@ skillshare 的通用用法看[官方文件](https://skillshare.runkids.cc)，這
 ## 目錄樹
 
 ```text
-extras/<名字>/         給模型讀的指令檔（全域規則、commit 指引），由 extras 連到各 client
+extras/<名字>/         給模型讀的文字檔（全域規則、commit 指引），由 extras 連到各 client
 mcp.yaml              三個 client 共用的 MCP server
 hooks/<名字>.yaml      自己寫的 hook（skillshare 的 hook entry），每台各自 add
 docs/                 給人看的文件
@@ -47,6 +47,9 @@ hook 和 plugin 也存在 `config.yaml`，所以每台要各自 add（hook 見 [
 
 全域規則每個 session 都會載入，只寫換到任何一個 repo 都還成立的事；只在特定任務用到的流程寫成 skill，
 全域留一行什麼時候載入。
+
+回覆的格式、語氣交給各 client 的 harness 決定。同一件事糾正過第二次才寫成規則：預先寫的限制會跟 skill
+（例如 `grilling` 成批提問、列選項）打架，而且三家 harness 的預設不同，在一家多餘、在另一家可能相反。
 
 `<!-- CODEGRAPH_START -->` 到 `<!-- CODEGRAPH_END -->` 之間是 `codegraph install` 自己寫進
 `~/.claude/CLAUDE.md` 的段落，`codegraph upgrade` 會重寫兩個標記之間的內容。所以：
