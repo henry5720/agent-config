@@ -1,13 +1,11 @@
 # HITL 操作走 herdr
 
-官方 `herdr` skill 寫的是 "Use only when the user explicitly mentions Herdr" 和
-"Do not create a workspace, tab, worktree, or different cwd unless the user explicitly requests that topology"。
-使用者已經明確要求：**HITL 操作**一律在已配置主機的 herdr、有標籤的 workspace 裡跑。這是那兩條本身允許的情況，不用每次再提。
+跟官方 `herdr` skill 的關係看 [SKILL.md](SKILL.md) 開頭。
 
 ## 判準
 
-- **HITL 操作**：改已配置主機狀態的（apply、安裝、重啟服務、git reset）、跑很久的、含**人工步驟**的。人可能會看、review、喊停或接手，所以要跑在 workspace 裡讓人看得到。
-- **AFK 操作**：唯讀的查詢與檢查。照常在自己的 shell 或 ssh 跑，不開 workspace。
+- **HITL 操作**：改到自己工作目錄以外的（別台機器、系統套件、apply、重啟服務、別人 checkout 的 git reset）、跑很久的、含**人工步驟**的。人可能會看、review、喊停或接手，所以要跑在 workspace 裡讓人看得到。
+- **AFK 操作**：唯讀的查詢與檢查，和自己工作目錄裡的開發指令（`pnpm install`、測試、commit）。照常在自己的 shell 或 ssh 跑，不開 workspace。
 
 拿不準就當 HITL。
 
