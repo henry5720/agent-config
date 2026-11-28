@@ -28,10 +28,10 @@ _Avoid_: local skill、personal skill
 
 **Extras**:
 給模型讀的文字檔，每台機器都一樣，例如 **全域規則**、commit 指引。內容在這個 repo 的 `extras/<名字>/`，由 skillshare 的 **Extras sync** 連到各 client 讀的位置；連到哪寫在 `config.yaml` 的 `extras` 段，由 dotfiles 的 chezmoi 釘（決策見 [ADR 0003](https://github.com/henry5720/dotfiles/blob/main/docs/adr/0003-agent-instructions-linked-by-skillshare-extras.md)）。
-_Avoid_: Instructions、指令檔、設定、rules（Claude Code 的 `.claude/rules/` 是另一套依路徑載入的機制）
+_Avoid_: Instructions、指令檔、設定、rules
 
 **全域規則**:
-**Extras** 裡的 `extras/agents-md/AGENTS.md`：每個 client 每個 session 都自動載入的那一份。commit 指引這類要經它指過去才讀的，不算全域規則。
+**Extras** 裡的 `extras/agents-md/AGENTS.md`：所有 client 每個 session 都載入的那一份。只有單一 client 載入的（`pstack-models`、`opencode-commit`），或要經它指過去才讀的（`agent-commit`），都不算全域規則。
 _Avoid_: 全域 AGENTS.md、全域 CLAUDE.md（檔名隨 client 變）、全域指令檔
 
 **Settings**:
@@ -40,7 +40,7 @@ _Avoid_: 指令、instructions
 
 **Agent**:
 skillshare 的 native agent，也就是一個 subagent 定義檔（`agents/<名字>.md`），由主 agent 派工時才載入。目前沒有使用；Claude target 的 `agents` 路徑已由 dotfiles 釘好，放進 `agents/` 再 `skillshare sync agents` 就生效。
-_Avoid_: 用來指 `AGENTS.md`（那是 **全域規則**）
+_Avoid_: 用來指 `AGENTS.md`（那是給模型讀的規則檔，全域那份叫 **全域規則**）
 
 **Sync**:
 把 source 的 skill 以 symlink 放進各 target（`skillshare sync`）。不處理 MCP 與 **Extras**；`skillshare sync --all` 會連 **MCP sync**、**Extras sync** 一起做。
@@ -70,7 +70,7 @@ _Avoid_: 交接（那是 issue 換手）
 
 - 一個 **Source** 會 **Sync** 到多個 **Target**
 - **Extras** 的內容在 **Source** 裡，由 **Extras sync** 連到各 client；連到哪由 chezmoi 釘在 `config.yaml`；**Settings** 在 chezmoi
-- **全域規則**是 **Extras** 的其中一份，commit 指引由它指過去
+- **全域規則**是 **Extras** 的其中一份，`agent-commit` 由它指過去
 - 一個 **Client** 可以讀多個 **Target**（OpenCode 同時讀兩個）
 - **Own skill** 和 **Third-party skill** 都在 **Source** 裡；**Local skill** 只在 **Target** 裡
 - 一個操作不是 **HITL 操作**就是 **AFK 操作**；**人工步驟**只出現在 **HITL 操作**裡
