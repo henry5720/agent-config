@@ -1,0 +1,4 @@
+# 工作目錄一律 LF：Windows 的 Git 預設 core.autocrlf=true，沒有這行會 checkout 成 CRLF，
+# skillshare 算的 file_hashes 對不上，check 把第三方 skill 全報成 modified、update 跳過。
+# 已經 clone 的機器要重新 checkout 一次（git rm --cached -r -q . ; git reset --hard）才生效。
+* text=auto eol=lf
