@@ -279,6 +279,8 @@ class FunnelTest(FakeBinTest):
         proc = self.start(self.open_args())
         out = self.read_until(proc, "公開網址")
         self.assertIn("不帶驗證=401（要 401）", out)
+        # 等 DNS 時先說一聲，不然看起來像卡住（#157）
+        self.assertIn(f"公開 DNS 還查不到 {HOST}", out)
         self.assertIn(f"--resolve {HOST}:8443:{PUBLIC_IP}", self.calls())
         proc.send_signal(signal.SIGTERM)
         proc.communicate(timeout=15)
@@ -1039,6 +1041,43 @@ class ServeTest(ServeFixture):
         self.assertEqual(rows, [])
         self.assertIn("沒有在跑的服務", out)
 
+    def test_ps_only_queries_hosts_that_were_up(self):
+        # #157：不逐台掃 ssh config（慢，也會到客戶機器跑 PowerShell）
+        rows, out = self.ps_rows()
+        self.assertEqual(rows, [])
+        self.assertIn("沒有 up 過", out)
+        self.run_cli([*UP, "windows-mcp", "box", "--create-task"])
+        rows, out = self.ps_rows()
+        self.assertEqual([r[1] for r in rows], ["box"], out)
+        for other in ("laptop", "other-box"):
+            calls = self.base / other / "calls"
+            self.assertNotIn("powershell", calls.read_text() if calls.exists() else "")
+
+    def test_ps_lists_recorded_host_that_is_unreachable_or_stopped(self):
+        self.run_cli([*UP, "windows-mcp", "box", "--create-task"])
+        self.env["FAKE_ONLY_HOST"] = "nobody"
+        rows, out = self.ps_rows()
+        self.assertEqual(rows[0][1:3] + [" ".join(rows[0][5:])], ["box", "serve", "ssh 連不上（重跑 up，不用了就 down）"], out)
+        self.env.pop("FAKE_ONLY_HOST")
+        # 那台重開機過：服務不在了，但記錄還在
+        for name in ("listen", "serve"):
+            (self.state / name).unlink()
+        rows, out = self.ps_rows()
+        self.assertEqual(" ".join(rows[0][5:]), "沒在跑（重跑 up，不用了就 down）", out)
+        self.run_cli([*DOWN, "windows-mcp", "box"])
+        rows, out = self.ps_rows()
+        self.assertEqual(rows, [], out)
+
+    def test_ps_counts_one_machine_up_under_two_host_names_once(self):
+        cfg = Path(self.env["HOME"]) / ".ssh" / "config"
+        cfg.write_text(cfg.read_text().replace("Host box\n", "Host box box-alias\n"))
+        self.env["FAKE_ALIASES"] = "box-alias=box"
+        for name in ("box", "box-alias"):
+            code, out = self.run_cli([*UP, "windows-mcp", name, "--create-task"])
+            self.assertEqual(code, 0, out)
+        rows, out = self.ps_rows()
+        self.assertEqual(len(rows), 1, out)
+
     def test_ps_without_key_still_lists_but_says_not_verified(self):
         self.run_cli([*UP, "windows-mcp", "box", "--create-task"])
         self.env.pop("WINDOWS_MCP_AUTH_KEY")
@@ -1156,7 +1195,7 @@ class ForwardTest(ServeFixture):
         # 那台還在跑、這台的轉發斷了：照樣列出來，說驗不了
         (self.state / "master").unlink()
         rows, out = self.ps_rows()
-        self.assertEqual(rows[0][2:5] + [" ".join(rows[0][5:])], ["forward", f"http://127.0.0.1:{self.local_port}/mcp", "-", "轉發沒開（重跑 up）"], out)
+        self.assertEqual(rows[0][2:5] + [" ".join(rows[0][5:])], ["forward", f"http://127.0.0.1:{self.local_port}/mcp", "-", "在跑但轉發沒開（重跑 up，不用了就 down）"], out)
         self.run_cli([*DOWN, "windows-mcp", "box"])
         rows, out = self.ps_rows()
         self.assertEqual(rows, [], out)

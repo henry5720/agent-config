@@ -16,7 +16,8 @@ import time
 from urllib.parse import urlsplit
 
 PROBE_TRIES = 10
-DNS_TRIES = 20
+# 3 秒一次約等 3 分鐘：company-ec2 第一次開 Funnel 時公開 DNS 超過 60 秒才有紀錄（#157）
+DNS_TRIES = 60
 # 從公網打收掉的網址會看到的碼：Funnel 連不上是 000，quick tunnel 是 Cloudflare 回 530（2026-11-05 henry-laptop 實測）
 CLOSED_CODES = ("000", "530")
 WINDOWS_SHELLS = ("powershell.exe", "pwsh.exe", "powershell", "pwsh")
@@ -73,6 +74,8 @@ def wait_public_ip(host):
         ip = public_ip(host)
         if ip:
             return ip
+        if i == 0:
+            say(f"公開 DNS 還查不到 {host}，最多等 {DNS_TRIES * interval:.0f} 秒…")
         if i < DNS_TRIES - 1:
             time.sleep(interval)
     return ""

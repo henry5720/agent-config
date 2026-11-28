@@ -47,10 +47,10 @@ description: 連線：agent 跟服務不在同一台時怎麼連過去。同一�
 
 1. **先問使用者**，說好才跑：
    - 那台第一次 `up` 要加 `--create-task`：常駐 task 會一直留在那台。
-   - 客戶的機器：`up`、`down` 都會在那台跑 PowerShell，每次都先問。客戶機器在 `services.yaml` 的 `hosts.<host>` 設 `keep: false`（範例在檔案註解），task 由 `up` 建、`down` 刪。
+   - 客戶的機器：`up`、`down`、`ps <服務> <host>` 都會在那台跑 PowerShell，每次都先問。客戶機器在 `services.yaml` 的 `hosts.<host>` 設 `keep: false`（範例在檔案註解），task 由 `up` 建、`down` 刪。
 2. **起**：`remote-access up <服務> <host>`。已經起好而且驗證過時只回報，重跑安全。
    完成條件：印出 `網址：…`（或 `已經起好：…`）和 `MCP：<名稱>`。
-3. **查**：`remote-access ps` 列出接著哪幾台、網址或本機 port、MCP 名稱、驗證過沒。
+3. **查**：`remote-access ps` 列出這台 `up` 過、還沒 `down` 的機器，各自的網址或本機 port、MCP 名稱、驗證過沒；連不上、沒在跑也列。別台 agent 機器 `up` 的不在裡面，要查就 `ps <服務> <host>`。
 4. **收**：`remote-access down <服務> <host>`。
    完成條件：印 `已收乾淨` 或 `本來就沒開`。
 5. **換 key**：`remote-access key init` 第一次產生，`remote-access key rotate` 換新並重起已接上的機器；兩個都要重開 session 才讀得到。
