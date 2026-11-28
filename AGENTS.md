@@ -35,7 +35,7 @@
 | 機制 | 放哪 |
 |---|---|
 | 全域規則 | `instructions/agents-md/AGENTS.md`；skillshare extras 連到 `~/.claude/CLAUDE.md`、`~/.codex/AGENTS.md`、`~/.config/opencode/AGENTS.md`。要加連結改 dotfiles 的 `modify_config.yaml.tmpl`，不要用 `skillshare extras` 指令（下次 `chezmoi apply` 會蓋回去） |
-| skill | `skills/<名字>/`；補第三方 skill 沒寫的步驟也是另寫一支 |
+| skill | `skills/<名字>/`；補第三方 skill 沒寫的步驟也是另寫一支。疊在第三方 skill、MCP、工具上的個人偏好命名 `<工具>-workflow`（`herdr-workflow`、`pms-workflow`），開頭寫明官方管什麼、這份只寫偏好；自己的工具用它本身的名字（`remote-access`） |
 | MCP | `skillshare mcp add`，寫進 `mcp.yaml` |
 | hook | 自己寫的定義放 `hooks/<名字>.yaml`，用 `skillshare hooks add <名字> --file` 存進 `config.yaml` 再 sync（每台都要 add，步驟在 [docs/hooks/](docs/hooks/README.md)）；工具自己裝的（herdr、codegraph、wakatime）不收，重裝時它們會再寫一次 |
 | plugin | `skillshare plugin add`，記在 `config.yaml` 的 `plugins:`（不進 repo，每台各自 add）。wakatime 的由 dotfiles apply 裝，不收 |
