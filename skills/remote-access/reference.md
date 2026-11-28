@@ -17,7 +17,9 @@
 | `沒有人登入桌面` | 服務要桌面 session。請使用者登入那台桌面（ssh 的那個帳號）再跑 |
 | `HostName 要是 ts.net 名稱` | serve 網址從 ssh config 的 HostName 來。ssh config 由 dotfiles 管，回報使用者改；serve 真的連不到才在 `hosts.<host>` 改 `mode: forward` |
 | `還沒有常駐 task` | 照 SKILL.md〈服務定義〉第 1 步問，說好再加 `--create-task` |
-| `被別的程式佔著` | 照[本機 port 總表](SKILL.md#本機-port-總表)回報，不換 port、不停別人的程式 |
+| `task 由服務的 skill 建` | 沒有 key 的服務（browser）不建 task。照服務的 skill 問使用者、建好再跑 `up` |
+| `被別的程式佔著` | 照[本機 port 總表](SKILL.md#本機-port-總表)回報，不換 port、不停別人的程式。browser 會附上佔著的那支 Chrome 回的 User-Agent（常是別台的 `ssh -R`），一起回報 |
+| `接到的不是 <host> 那支` | 轉發開了，但這台 `local_port` 接到的跟那台自己的 `same_as_host` 欄位不一樣，也就是接到別支 Chrome。轉發已收掉；把印出的 User-Agent 回報使用者，不換 port |
 | `已經有別的 tailscale serve 設定` | 那台的 serve 有別人的設定，回報使用者，不要蓋掉 |
 | `ssh … 跑 PowerShell 沒有回應` | 先確認 `ssh <host>` 連得上、那台是 Windows |
 | `驗證沒過`、`起不來` | 看下面〈serve 模式〉和服務 skill 的 reference.md |

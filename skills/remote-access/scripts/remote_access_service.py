@@ -21,6 +21,12 @@ up（forward 模式，services.yaml 的 hosts.<host> 設 mode: forward）：serv
 local_port 被別的程式佔著就報錯、說出是誰，不換 port。down 多做 ssh -O exit；轉發開著沒看 ssh -O check。
 ControlMaster 的 socket 在 ~/.local/state/remote-access/。
 
+沒有 key 的服務（browser）：不送 key、不寫設定檔，只 `schtasks /run` 叫起服務的 skill 建好的 task，
+task 不在就報錯（remote-access 不建）。驗證打 verify.path 要回 expect_without。
+verify.same_as_host 是 JSON 欄位名稱：這台經轉發打到的那個欄位，要跟那台自己打 127.0.0.1:<port> 的一樣，
+不一樣就是接到別支（例如 browser 的 webSocketDebuggerUrl 每支 Chrome 不同）。
+stop.keep_running 的服務 down 只關轉發，服務留在那台（browser 的 Chrome 和分頁留給使用者）。
+
 ps：查這台 up 過的（服務、host）：up 成功時記到 ~/.local/state/remote-access/connected，down 收乾淨時刪掉。
 記錄只決定查哪幾台，在不在跑照樣即時查（serve 模式查那台的 serve 狀態、port 有沒有在聽；forward 模式查 ssh -O check），
 列出服務、host、mode、網址或本機 port、MCP 名稱、驗證結果；ssh 連不上、逾時、沒在跑也列出來。多台同時查，每台最多等 REMOTE_ACCESS_PROBE_TIMEOUT 秒
@@ -44,6 +50,7 @@ import concurrent.futures
 import contextlib
 import io
 import ipaddress
+import json
 import os
 import re
 import socket
@@ -54,7 +61,7 @@ import unicodedata
 from pathlib import Path
 from types import SimpleNamespace
 
-from remote_access_common import run, say, verify
+from remote_access_common import probe as probe_url, run, say, verify
 
 # 測試用 REMOTE_ACCESS_SERVICES 指到別的服務定義
 SERVICES_FILE = Path(os.environ.get("REMOTE_ACCESS_SERVICES") or Path(__file__).resolve().parent.parent / "services.yaml")
@@ -62,6 +69,9 @@ ENV_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 # key 會寫進 TOML 字串，只收不用跳脫的字元
 KEY_RE = re.compile(r"[A-Za-z0-9._~+/=-]{16,}")
 TASK_NAME_RE = re.compile(r"[A-Za-z0-9._-]+")
+# verify.same_as_host、verify.path 會拼進 PowerShell
+FIELD_RE = re.compile(r"[A-Za-z0-9_-]+")
+PATH_RE = re.compile(r"/[A-Za-z0-9/._-]*")
 
 
 def die(msg):
@@ -88,10 +98,11 @@ def mcp_name(url):
     return next((name for name, s in servers.items() if (s or {}).get("url") == url), "")
 
 
-def say_mcp(url, key_env):
-    name = mcp_name(url)
+def say_mcp(svc, url, key_env):
+    # services.yaml 的 mcp 寫死名稱：stdio 的 MCP（chrome-devtools）在 mcp.yaml 沒有 url 可以對
+    name = svc.get("mcp") or mcp_name(url)
     if name:
-        say(f"MCP：{name}（key 用 {key_env}），在 session 裡打 /mcp 重連")
+        say(f"MCP：{name}" + (f"（key 用 {key_env}）" if key_env else "") + "，在 session 裡打 /mcp 重連")
     else:
         say(f"mcp.yaml 沒有網址是 {url} 的條目：用 skillshare mcp add 加一筆（bearerToken fromEnv {key_env}），"
             "sync 後在 session 裡打 /mcp 重連")
@@ -162,6 +173,21 @@ if (-not $l.Count) { 'listen=none' }
 elseif ($l | Where-Object { $_.CommandLine -notmatch $Match }) { 'listen=other:' + ((($l | ForEach-Object { "$($_.ProcessId)/$($_.Name)" }) -join ',') -replace '[^\x20-\x7e]', '?') }
 else { 'listen=ours' }
 "serve=$(ServeState)"
+"""
+
+# 沒有 key 的服務：task 由服務的 skill 建好，這裡只叫起、等它聽 port
+PS_RUN = r"""
+if (-not (Get-ScheduledTask -TaskName $Task -ErrorAction SilentlyContinue)) { 'error=notask'; exit 1 }
+schtasks /run /tn $Task *> $null
+for ($i = 0; $i -lt 30 -and -not @(Ours).Count; $i++) { Start-Sleep -Seconds 1 }
+if (-not @(Ours).Count) { 'error=nolisten'; exit 1 }
+'started=1'
+"""
+
+# 那台自己打 127.0.0.1:<port><path>，回 JSON 的 @FIELD@ 欄位
+PS_IDENTITY = r"""
+$v = try { [string](Invoke-RestMethod "http://127.0.0.1:$Port@PATH@" -TimeoutSec 5).'@FIELD@' } catch { '' }
+'id=' + ($v -replace '[^\x20-\x7e]', '?')
 """
 
 # key 從 sftp 放上來的暫存檔讀、讀完就刪，寫進只有 server 讀的設定檔；task 的參數只有設定檔路徑
@@ -330,6 +356,8 @@ def stop(host, svc):
     forwarded = svc["mode"] == "forward" and forward_alive(host, svc)
     if forwarded:
         forward_close(host, svc)
+    if svc["keep_running"]:
+        return forwarded, not forward_alive(host, svc)
     _, out = win(host, ps_script("stop", PS_STOP, svc, KEEP="$true" if svc["task"]["keep"] else "$false"))
     after = probe(host, svc)
     # 查不到（ssh 連不上、逾時）不算收乾淨，不然 down 會刪掉記錄、把還在跑的藏起來
@@ -368,7 +396,45 @@ def resolve(args):
     svc["task"] = {"name": task["name"], "keep": bool(task.get("keep", True))}
     svc["port"] = int(svc["port"])
     svc["match"] = re.sub(r"[^A-Za-z0-9._-]", "", svc.get("stop", {}).get("match", args.service))
+    svc["keep_running"] = bool(svc.get("stop", {}).get("keep_running"))
+    same = svc["verify"].get("same_as_host")
+    if same and not (FIELD_RE.fullmatch(same) and PATH_RE.fullmatch(svc["verify"].get("path", "/"))):
+        die(f"{args.service} 的 verify.same_as_host 只能英數和 _-，path 只能英數和 /._-")
     return svc
+
+
+def local_json(url):
+    """這台打 url 回的 JSON（dict）；連不上或不是 JSON 回 {}。"""
+    try:
+        data = json.loads(run(["curl", "-s", "-m", "5", url]).stdout)
+    except ValueError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def verify_service(host, svc, base, key_env):
+    """有 key 照 verify（不帶、帶 key 各回 verify 寫的碼）；沒 key 只打不帶的。再照 same_as_host 比對是不是那台的。"""
+    v = svc["verify"]
+    url = base + v.get("path", "/")
+    if "key" in svc:
+        if not verify(verify_check(svc, key_env), base, public_dns=False):
+            return False
+    else:
+        code = probe_url(url, "", [])
+        say(f"驗證：{url} 回 {code}（要 {v['expect_without']}）")
+        if code != str(v["expect_without"]):
+            return False
+    field = v.get("same_as_host")
+    if not field:
+        return True
+    seen = local_json(url)
+    theirs = win(host, ps_script("identity", PS_IDENTITY, svc, PATH=v.get("path", "/"), FIELD=field))[1].get("id", "")
+    if theirs and seen.get(field) == theirs:
+        say(f"比對：{url} 的 {field} 跟 {host} 自己的一樣，接到的是 {host} 那支")
+        return True
+    say(f"比對：{url} 接到的不是 {host} 那支（{field}：這台看到 {seen.get(field) or '空的'}，"
+        f"{host} 自己的是 {theirs or '空的'}；這台看到的 User-Agent：{seen.get('User-Agent') or '空的'}）")
+    return False
 
 
 def verify_check(svc, key_env):
@@ -386,13 +452,14 @@ def verify_check(svc, key_env):
 
 def cmd_up(args):
     svc = resolve(args)
-    key_env = args.key_env or svc["key"]["env"]
-    if not ENV_NAME_RE.fullmatch(key_env):
+    keyed = "key" in svc
+    key_env = (args.key_env or svc["key"]["env"]) if keyed else None
+    if keyed and not ENV_NAME_RE.fullmatch(key_env):
         die(f"--key-env 要是環境變數名稱：{key_env}")
-    key = os.environ.get(key_env, "")
-    if not key:
+    key = os.environ.get(key_env, "") if keyed else ""
+    if keyed and not key:
         die(f"環境變數 {key_env} 沒有 key：先讓 shell 讀進 key（agent 那台的 ~/.config/windows-mcp/auth.env）")
-    if not KEY_RE.fullmatch(key):
+    if keyed and not KEY_RE.fullmatch(key):
         die(f"{key_env} 的 key 格式不對：至少 16 字元，只能英數和 ._~+/=-")
     forward = svc["mode"] == "forward"
     allow = []
@@ -410,14 +477,15 @@ def cmd_up(args):
         if not allow:
             die(f"{args.service} 的 allow 是空的：serve 模式要列允許連進來的 agent 機器")
         url = f"https://{hostname}"
-    check = verify_check(svc, key_env)
+    path = svc["verify"].get("path", "/")
+    key_from = f"，key 從 {key_env}" if keyed else "，沒有 key"
     if args.dry_run and forward:
         say(f"[dry-run] {args.host}：{svc['task']['name']} task 起 {args.service}（127.0.0.1:{svc['port']}），"
-            f"ssh ControlMaster 轉發 → {url}{check.path}，key 從 {key_env}")
+            f"ssh ControlMaster 轉發 → {url}{path}{key_from}")
         return
     if args.dry_run:
         say(f"[dry-run] {args.host}：{svc['task']['name']} task 起 {args.service}（0.0.0.0:{svc['port']}，"
-            f"allowlist {','.join(allow)}），tailscale serve → {url}{check.path}，key 從 {key_env}")
+            f"allowlist {','.join(allow)}），tailscale serve → {url}{path}{key_from}")
         return
 
     state = probe(args.host, svc)
@@ -433,15 +501,23 @@ def cmd_up(args):
     if forward and not forwarded:
         owner = port_owner(svc["local_port"])
         if owner:
-            die(f"這台的 {svc['local_port']} 被別的程式佔著（{owner}）：請使用者處理，不自動換 port")
-    if state.get("listen") == "ours" or state.get("serve") == "ours" or forwarded:
-        if verify(check, url, public_dns=False):
-            say(f"{args.service} 在 {args.host} 已經起好：{url}{check.path}")
-            say_mcp(url + check.path, key_env)
+            # 佔著的常是別台的 ssh -R：看不出是哪台，附上它回的 User-Agent（Windows／Linux、HeadlessChrome）
+            ua = svc["verify"].get("same_as_host") and local_json(f"http://127.0.0.1:{svc['local_port']}{path}").get("User-Agent")
+            die(f"這台的 {svc['local_port']} 被別的程式佔著（{owner}" + (f"；它回的 User-Agent：{ua}" if ua else "")
+                + "）：請使用者處理，不自動換 port")
+    running_there = state.get("listen") == "ours" or state.get("serve") == "ours"
+    # keep_running 的服務（browser）在那台開著、這台還沒轉發是常態（使用者自己開的 Chrome），不用收掉重起
+    if forwarded or (running_there and not (forward and svc["keep_running"])):
+        if verify_service(args.host, svc, url, key_env):
+            say(f"{args.service} 在 {args.host} 已經起好：{url}{path}")
+            say_mcp(svc, url + path, key_env)
             set_recorded(args.service, args.host, True)
             return
         say("上一輪起的沒通過驗證，收掉重起")
         stop(args.host, svc)
+    if state.get("task") != "1" and not keyed:
+        die(f"{args.host} 還沒有 task {svc['task']['name']}：{args.service} 的 task 由服務的 skill 建（問過使用者），"
+            "remote-access 不建")
     if state.get("task") != "1" and svc["task"]["keep"] and not args.create_task:
         die(f"{args.host} 還沒有常駐 task {svc['task']['name']}：它會一直留在那台，問過使用者後加 --create-task 再跑")
 
@@ -450,18 +526,21 @@ def cmd_up(args):
     # forward 只有 ssh 轉進來的 127.0.0.1 連得到，不用 allowlist
     security = "''" if forward else (
         '"`n[security]`nip_allowlist = [' + ", ".join(f"'{ip}'" for ip in allow) + ']`n"')
-    if not put_key(args.host, key):
+    if keyed and not put_key(args.host, key):
         die(f"經 sftp 把 key 放到 {args.host} 失敗：確認 sftp {args.host} 連得上（那台 sshd 要開 sftp subsystem）")
-    code, out = win(args.host, ps_script("start", PS_START, svc, BIND="127.0.0.1" if forward else "0.0.0.0",
-                                         SECURITY=security, SERVE="$false" if forward else "$true",
-                                         # keep: false 的 task 每次 up 建、down 刪，不用問
-                                         CREATE="$true" if args.create_task or not svc["task"]["keep"] else "$false"))
+    if keyed:
+        code, out = win(args.host, ps_script("start", PS_START, svc, BIND="127.0.0.1" if forward else "0.0.0.0",
+                                             SECURITY=security, SERVE="$false" if forward else "$true",
+                                             # keep: false 的 task 每次 up 建、down 刪，不用問
+                                             CREATE="$true" if args.create_task or not svc["task"]["keep"] else "$false"))
+    else:
+        code, out = win(args.host, ps_script("start", PS_RUN, svc))
     if code != 0 or out.get("started") != "1":
         reason = {
             "notask": "task 不在（加 --create-task 建）",
             "noexe": "那台找不到 windows-mcp（照 windows-access 裝）",
             "taskcreate": "建 task 失敗",
-            "nolisten": f"server 30 秒內沒在 {svc['port']} 起來（桌面 session 有沒有登入著）",
+            "nolisten": f"server 30 秒內沒在 {svc['port']} 起來（桌面 session 有沒有登入著；其他原因看服務的 skill）",
             "serve": "tailscale serve 沒開起來",
         }.get(out.get("error"), f"exit {code}")
         stop(args.host, svc)
@@ -471,12 +550,12 @@ def cmd_up(args):
         if not ok:
             stop(args.host, svc)
             die(f"ssh 轉發開不起來（{err or '沒有錯誤訊息'}）。起了一半的已收掉")
-    if not verify(check, url, public_dns=False):
+    if not verify_service(args.host, svc, url, key_env):
         stop(args.host, svc)
         die("驗證沒過，起了一半的已收掉。看 remote-access 的 reference.md")
     via = f"（ssh 轉到 {args.host} 的 {svc['port']}）" if forward else ""
-    say(f"網址：{url}{check.path}{via}")
-    say_mcp(url + check.path, key_env)
+    say(f"網址：{url}{path}{via}")
+    say_mcp(svc, url + path, key_env)
     set_recorded(args.service, args.host, True)
 
 
@@ -494,12 +573,13 @@ def cmd_down(args):
     say(f"{args.service} 在 {args.host} 已收乾淨" if was else f"{args.service} 在 {args.host} 本來就沒開")
 
 
-def ps_verify(svc, base, key_env=None):
-    key_env = key_env or svc["key"]["env"]
-    if not os.environ.get(key_env):
-        return f"沒驗證（{key_env} 沒設）"
+def ps_verify(host, svc, base, key_env=None):
+    if "key" in svc:
+        key_env = key_env or svc["key"]["env"]
+        if not os.environ.get(key_env):
+            return f"沒驗證（{key_env} 沒設）"
     with contextlib.redirect_stdout(io.StringIO()):  # verify 的過程訊息不混進表格
-        return "通過" if verify(verify_check(svc, key_env), base, public_dns=False) else "沒通過"
+        return "通過" if verify_service(host, svc, base, key_env) else "沒通過"
 
 
 def ps_serve(svc, host):
@@ -565,8 +645,8 @@ def cmd_ps(args):
     rows = []
     for name, host, svc, base, note in running(args.service, args.host):
         url = base + svc["verify"].get("path", "/")
-        rows.append((name, host, svc["mode"], url, mcp_name(url) or "-",
-                     f"{note}（重跑 up，不用了就 down）" if note else ps_verify(svc, base, args.key_env)))
+        rows.append((name, host, svc["mode"], url, svc.get("mcp") or mcp_name(url) or "-",
+                     f"{note}（重跑 up，不用了就 down）" if note else ps_verify(host, svc, base, args.key_env)))
     if not rows:
         say("沒有在跑的服務" if args.host else "這台沒有 up 過的機器（只列 up 過的；查別台用 ps <服務> <host>）")
         return
