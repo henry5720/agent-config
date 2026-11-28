@@ -1,6 +1,6 @@
 ---
 name: windows-access
-description: 讓 agent 操作一台 Windows 桌面（截圖、點擊、打字）：同一台用 stdio 的 windows-mcp；別台用 `remote-access up windows-mcp <host>` 起 server、接 MCP，用完 `down`，key 要作廢時 `remote-access key rotate`。要操作某台 Windows 的 GUI app、在那台起或收 windows-mcp server、設定接別台 Windows 的 MCP 時使用。
+description: 讓 agent 操作一台 Windows 桌面（截圖、點擊、打字）。要操作某台 Windows 的 GUI app、在那台起或收 windows-mcp server、設定接別台 Windows 的 MCP 時使用。
 ---
 
 # windows-access

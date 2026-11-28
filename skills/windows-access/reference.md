@@ -40,7 +40,7 @@ Invoke-WebRequest -UseBasicParsing https://raw.githubusercontent.com/henry5720/a
 
    `<綁的位址>`：quick tunnel 用 `127.0.0.1`；Funnel 不改寫 `Host`，用 `0.0.0.0`（預設）。綁 `0.0.0.0` 時它先確認防火牆沒有讓區網連到 8000 的 inbound 規則，有就拒絕。
    完成條件：印出 `server 在 <綁的位址>:8000，key 已複製到剪貼簿（沒有印出來）`。印 `8000 已經有程式在聽` 時看它列的程式：是 windows-mcp 就先跑 `stop` 再起；不是就停下來回報使用者，不要自己停它。
-2. **連線**：照 `remote-access`〈tailnet 外〉，輸入照下面的表。
+2. **連線**：照 `remote-access` 的 [tailnet-outside.md](../remote-access/tailnet-outside.md)，輸入照下面的表。
 3. **交 key**：key 在那台的剪貼簿。請使用者交給對方 agent 的使用者，設成啟動 agent 的 shell 的環境變數 `WINDOWS_MCP_AUTH_KEY`，再開 session。agent 自己讀 key、或把 key 傳到別的服務，都要先取得使用者明說同意。用聊天訊息交的話，用完一定要 `rotate`。`config.toml` 開在畫面上時 key 會被 `Screenshot` 拍進去，真的用記事本開過就立刻關掉。
 4. **收**：先照 `remote-access` 收掉公開網址，再跑 `powershell -NoProfile -ExecutionPolicy Bypass -File <script> stop`（key 不換）；key 要作廢時改跑 `rotate`（先停，再換 key、設定改回 `127.0.0.1`）。聽 8000 的不是 windows-mcp 時它不停那支，列出 PID 和程式名後 exit 1：照轉達給使用者。
    完成條件：印出 `還在聽 8000 的程式：0（要 0）` 和 `已收掉（key 沒換）`；`rotate` 是 `已收掉，key 已換新`。
@@ -56,4 +56,4 @@ Invoke-WebRequest -UseBasicParsing https://raw.githubusercontent.com/henry5720/a
 | 不帶／帶驗證 | `401`／`200` |
 | auth header | 從 agent 這台驗：`--auth-header-cmd 'printf "Authorization: Bearer %s\n" "$WINDOWS_MCP_AUTH_KEY"'`（key 在環境變數，不印出來）。你就在那台 Windows：`<印出 header 的 PowerShell>` 填 `powershell -NoProfile -ExecutionPolicy Bypass -File <script> auth-header` |
 
-你就在那台 Windows 時，`remote-access`〈agent 就在那台 Windows〉第 3 步那段的輸入：`<curl 參數>` 填 `'-X', 'POST', '-H', 'Accept: application/json, text/event-stream', '-H', 'Content-Type: application/json'`，`$json` 填上面 `-d` 後面那串 JSON。
+你就在那台 Windows 時，`remote-access` 的 [tailnet-outside.md〈agent 在原生 Windows〉](../remote-access/tailnet-outside.md#agent-在原生-windows)第 3 步那段的輸入：`<curl 參數>` 填 `'-X', 'POST', '-H', 'Accept: application/json, text/event-stream', '-H', 'Content-Type: application/json'`，`$json` 填上面 `-d` 後面那串 JSON。
