@@ -5,7 +5,7 @@
 ## Language
 
 **Source**:
-這個 repo 裡的 `skills/`、`mcp.yaml` 與 `instructions/`，所有機器上 skill、MCP 和 **Instructions** 的唯一來源。
+這個 repo 裡的 `skills/`、`mcp.yaml` 與 `extras/`，所有機器上 skill、MCP 和 **Instructions** 的唯一來源。
 _Avoid_: 本機 skill
 
 **Target**:
@@ -27,7 +27,7 @@ _Avoid_: local skill、personal skill
 用 `skillshare install` 從別人的 repo 裝進來的 skill，來源記在 `skills/.metadata.json`。`update --all` 會覆蓋它。
 
 **Instructions**:
-給模型讀的指令文字，每台機器都一樣，例如全域 `AGENTS.md`（Claude 那邊叫 `CLAUDE.md`）與 commit 指引。內容在這個 repo 的 `instructions/<名字>/`，由 skillshare 的 **Extras sync** 連到各 client 讀的位置；連到哪寫在 `config.yaml` 的 `extras` 段，由 dotfiles 的 chezmoi 釘（決策見 [ADR 0003](https://github.com/henry5720/dotfiles/blob/main/docs/adr/0003-agent-instructions-linked-by-skillshare-extras.md)）。
+給模型讀的指令文字，每台機器都一樣，例如全域 `AGENTS.md`（Claude 那邊叫 `CLAUDE.md`）與 commit 指引。內容在這個 repo 的 `extras/<名字>/`，由 skillshare 的 **Extras sync** 連到各 client 讀的位置；連到哪寫在 `config.yaml` 的 `extras` 段，由 dotfiles 的 chezmoi 釘（決策見 [ADR 0003](https://github.com/henry5720/dotfiles/blob/main/docs/adr/0003-agent-instructions-linked-by-skillshare-extras.md)）。
 _Avoid_: 設定、rules
 
 **Settings**:

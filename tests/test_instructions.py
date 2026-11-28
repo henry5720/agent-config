@@ -1,4 +1,4 @@
-"""instructions/ 裡的 Instructions：source 檔在不在、彼此引用的路徑對不對。
+"""extras/ 裡的 Instructions：source 檔在不在、彼此引用的路徑對不對。
 
 要連到哪些路徑由 dotfiles 的 chezmoi symlink 模板決定，那邊的 tests 驗；這裡只驗 source 內容。
 """
@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 
-INSTRUCTIONS = Path(__file__).resolve().parents[1] / "instructions"
+INSTRUCTIONS = Path(__file__).resolve().parents[1] / "extras"
 AGENTS = INSTRUCTIONS / "agents-md" / "AGENTS.md"
 AGENT_COMMIT = INSTRUCTIONS / "agent-commit" / "instructions.md"
 OPENCODE_COMMIT = INSTRUCTIONS / "opencode-commit" / "commit-instructions.md"
